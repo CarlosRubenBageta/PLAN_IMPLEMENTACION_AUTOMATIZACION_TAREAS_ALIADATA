@@ -241,6 +241,66 @@ var FIXTURES_INTEGRACION_FASE8 = [
       noArchivar: true,
       clavesEtiquetaProhibidas: ['RevisionSinTareas', 'RevisionErrorProcesamiento', 'RevisionErrorAutomatizacion']
     }
+  },
+  {
+    id: 'INT-FASE8-06-FIRMA-EXTENSA',
+    descripcion: 'Equivalente a CP-14: una consulta real breve seguida de una firma de correo y un aviso legal extenso, debe generar una única tarea a partir de la consulta, sin fabricar ninguna tarea desde el texto de la firma/aviso legal.',
+    remitentePermitido: 'sichar@gmail.com',
+    asuntoBase: '[PRUEBA-AUTOMATIZACION][INTEGRACION] Consulta rápida',
+    // A diferencia de los fixtures anteriores (un único párrafo continuo), este
+    // cuerpo usa múltiples párrafos con saltos de línea reales: la consulta,
+    // una línea en blanco, y la firma/aviso legal. El prompt real (codigo/
+    // prompts_ia.gs) ya instruye explícitamente: "Identificá TODAS las
+    // observaciones del correo... excluyendo firmas, avisos legales y
+    // publicidad" — este fixture es la primera prueba real de esa regla en
+    // este automatizador. Las líneas de la firma se mantienen cortas para
+    // minimizar el riesgo de que Gmail las re-envuelva de forma impredecible
+    // al enviarlas (mismo mecanismo de canonicalización de transporte ya
+    // probado con el piloto CP-05, pero nunca sobre un bloque tan largo).
+    // La consulta se ancla explícitamente como reunión INTERNA para que el
+    // tablero esperado (Gestión General) no sea ambiguo con Comercial.
+    cuerpo: [
+      '¿Podemos confirmar la reunión interna de mañana a las 15hs para revisar el estado general del equipo?',
+      '',
+      '--',
+      'Juan Pérez',
+      'Gerente de Cuentas | Aliadata',
+      'Tel: +54 9 261 555-5555',
+      'Este mensaje es confidencial y está dirigido a su destinatario.',
+      'Si no es el destinatario, notifique al remitente y elimínelo.',
+      'Las opiniones expresadas son del autor, no de Aliadata.',
+      'Por favor considere el impacto ambiental antes de imprimir.',
+      'Aliadata no garantiza que este mensaje esté libre de virus.',
+      'El uso indebido de esta comunicación puede ser ilegal.',
+      'Este correo puede ser monitoreado con fines de calidad.',
+      'Aliadata S.A. — Mendoza, Argentina.',
+      'CUIT 30-12345678-9.',
+      'www.alia-data.com',
+      'No responda si el mensaje llegó por error.'
+    ].join('\n'),
+    versionPromptMinima: 'v4-INC-FASE8-011-informativo-sin-tareas',
+    esperado: {
+      // Log Mensajes (por nombre de encabezado).
+      estado: 'PROCESADO',
+      etapa: 'FINALIZADO',
+      cantidad_observaciones: 1,
+      cantidad_tareas: 1,
+      resultado_gmail: 'SOLO_ETIQUETADO',
+      // Registro Tareas: exactamente 1 fila (misma generalización N=1 de CP-15).
+      filasRegistroTareas: 1,
+      tareasEsperadas: [
+        { tablero: 'Gestión General' }
+      ],
+      // Indice Idempotencia: una entrada por task_id del manifiesto, todas PROCESADO.
+      entradasIndiceIdempotencia: 1,
+      estadoFinalIndice: 'PROCESADO',
+      // Gmail: recibe Procesado; ninguna etiqueta de revisión/error.
+      claveEtiquetaEsperada: 'Procesado',
+      conservaEtiquetaPrueba: true,
+      conservaInbox: true,
+      noArchivar: true,
+      clavesEtiquetaProhibidas: ['RevisionSinTareas', 'RevisionErrorProcesamiento', 'RevisionErrorAutomatizacion']
+    }
   }
 ];
 

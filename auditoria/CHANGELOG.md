@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-07-24] — Ampliación incremental del automatizador de integración: fixture INT-FASE8-06-FIRMA-EXTENSA (CP-14)
+
+### Contexto
+Se agrega un cuarto fixture con tareas, equivalente a CP-14 (`pruebas/CASOS_DE_PRUEBA.md`): "la IA no genera una tarea falsa a partir del texto de la firma/aviso legal; la observación real (confirmar la reunión) sí se detecta". Al igual que CP-15, ejercita la generalización N=1 (ya probada por CP-15), y además cubre una regla del prompt hasta ahora no probada en ningún fixture real de este automatizador: "Identificá TODAS las observaciones del correo... excluyendo firmas, avisos legales y publicidad" (`codigo/prompts_ia.gs`).
+
+### Diseño del fixture
+El cuerpo repite fielmente la estructura del enunciado original de CP-14: una consulta breve y real ("¿Podemos confirmar la reunión...?"), seguida de una firma de correo realista (nombre, cargo, teléfono) y un aviso legal extenso (~15 líneas: confidencialidad, impacto ambiental, exención de responsabilidad, datos de la empresa). A diferencia de los fixtures anteriores (CP-03/CP-04/CP-15, un único párrafo continuo), este cuerpo usa múltiples párrafos con saltos de línea reales — es la primera vez que se ejercita la comparación de cuerpo (`CUERPO_NO_COINCIDE`) sobre un texto con esta estructura. Se mantuvieron las líneas de la firma/aviso legal razonablemente cortas para minimizar el riesgo de que Gmail las re-envuelva de forma impredecible al enviarlas (mismo mecanismo de canonicalización ya probado con el piloto CP-05, pero nunca sobre un bloque de firma tan largo).
+
+La consulta se redactó como una reunión **interna** ("revisar el estado general del equipo"), para anclar sin ambigüedad el tablero esperado en `Gestión General` — el único tablero de `TABLEROS_VALIDOS` que no tiene una regla de clasificación técnica/financiera/comercial específica, y el más consistente con una reunión administrativa genérica sin más contexto.
+
+### Cambios
+- `pruebas/fixtures_integracion_fase8.gs`: nuevo fixture `INT-FASE8-06-FIRMA-EXTENSA`, con `esperado.tareasEsperadas` de 1 elemento (`Gestión General`).
+- `pruebas/pruebas_automatizador_integracion_fase8.gs`: nuevo `crearEstadoFirmaExtensa_`/`prepararSimuladoFirmaExtensa_`, reutilizando **sin cambios** el doble `efectoFormalUnaTareaFabrica_` ya creado para CP-15 (con `tablero1: 'Gestión General'`) — no hizo falta una fábrica nueva, dado que la forma (1 observación, 1 tarea) es idéntica a CP-15. Una prueba de camino correcto confirma que la generalización N=1 también aprueba con este fixture.
+- `codigo/*.gs`: **sin cambios.**
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta ampliación. No se modificó `codigo/prompts_ia.gs`, `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-14 en esta entrada — requiere una corrida real (`SIMULACION_OK` + `FORMAL_OK`).
+
+---
+
 ## [2026-07-24] — CP-15 Aprobado: corrida real completa de INT-FASE8-05-OBSERVACIONES-DUPLICADAS (SIMULACION_OK + FORMAL_OK)
 
 ### Contexto

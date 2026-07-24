@@ -91,6 +91,7 @@ Nunca se escriben estos valores en `PropertiesService` (verificado por la prueba
 | `INT-FASE8-02-DOS-TAREAS` | CP-03 | Una única observación con dos acciones concretas: `PROCESADO`, 1 observación, 2 tareas (`Desarrollo IT` + `Comercial`) que comparten el mismo `observacion_texto_original`; Gmail recibe `Procesado`. **CP-03 Aprobado (24/07/2026)**, tras tres corridas reales previas que expusieron y permitieron corregir dos falsos negativos del verificador y una ambigüedad del fixture (secciones 9.1.1 a 9.1.3). |
 | `INT-FASE8-04-TRES-TAREAS` | CP-04 | Una única observación con tres acciones concretas: `PROCESADO`, 1 observación, 3 tareas (`Desarrollo IT` + `Finanzas` + `Comercial`) que comparten el mismo `observacion_texto_original`; Gmail recibe `Procesado`. Reutiliza `verificarResultadoFormal_()`/`verificarClasificacionSimulada_()` sin ningún cambio de código (ya generalizados a N tareas por CP-03). **CP-04 Aprobado (24/07/2026)**, tras una corrida real previa que expuso y permitió corregir una ambigüedad del fixture (sección 9.2.1). |
 | `INT-FASE8-05-OBSERVACIONES-DUPLICADAS` | CP-15 | El mismo pedido repetido dos veces sin marcador de cita: `PROCESADO`, 1 observación, 1 tarea (`Finanzas`) consolidada por RF-04 (`documentacion/REGLAS_FUNCIONALES.md`). Primera prueba real de la generalización N-tareas en N=1, y primera prueba de RF-04 en un fixture real de este automatizador. **CP-15 Aprobado (24/07/2026)**, al primer intento, sin necesitar ajuste de redacción (sección 9.3.1). |
+| `INT-FASE8-06-FIRMA-EXTENSA` | CP-14 | Una consulta real breve seguida de una firma de correo y un aviso legal extenso (~15 líneas): `PROCESADO`, 1 observación, 1 tarea (`Gestión General`), sin ninguna tarea fabricada desde la firma/aviso legal (regla explícita del prompt, `codigo/prompts_ia.gs`). Primer fixture con cuerpo multi-párrafo (consulta + firma). Pendiente de corrida real (ver sección 9.4). |
 
 La propiedad `AUTO_FASE8_CASO` (`ScriptProperties` del proyecto de prueba) selecciona el fixture activo por `id`; si está ausente, se usa `FIXTURE_INTEGRACION_POR_DEFECTO` (`INT-FASE8-01-INFORMATIVO`). El automatizador **solo lee** esta propiedad — nunca la escribe ni modifica ninguna otra propiedad de configuración productiva. Para ejecutar el caso de CP-03, configurar `AUTO_FASE8_CASO=INT-FASE8-02-DOS-TAREAS`; para CP-04, `AUTO_FASE8_CASO=INT-FASE8-04-TRES-TAREAS`; en ambos casos, antes de llamar a `prepararCasoIntegracionFase8Visible()` (ver procedimiento, sección 9).
 
@@ -275,6 +276,39 @@ Esta corrida clasificó exactamente 1 observación / 1 tarea en `Finanzas` — c
 
 **CP-15 pasa de Pendiente a Aprobado — 24/07/2026.** Además de aprobar el caso, esta corrida confirma en producción real que RF-04 (consolidación de observaciones duplicadas) está correctamente codificada en el prompt y que el modelo la sigue. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
+### 9.4. Procedimiento para CP-14 (`INT-FASE8-06-FIRMA-EXTENSA`)
+
+**CP-14 Pendiente** — todavía no tiene ninguna corrida real. El procedimiento es el mismo (pasos 0-6 de la sección 9), con dos diferencias:
+
+- Antes del paso 3 (`prepararCasoIntegracionFase8Visible()`), configurar en el proyecto de prueba la propiedad `AUTO_FASE8_CASO=INT-FASE8-06-FIRMA-EXTENSA` (sección 6).
+- El asunto/cuerpo a enviar (paso 4) serán los de este fixture: `[PRUEBA-AUTOMATIZACION][INTEGRACION] Consulta rápida [<marcador>]`, con el cuerpo (varios párrafos, a diferencia de los fixtures anteriores):
+
+```text
+¿Podemos confirmar la reunión interna de mañana a las 15hs para revisar el estado general del equipo?
+
+--
+Juan Pérez
+Gerente de Cuentas | Aliadata
+Tel: +54 9 261 555-5555
+Este mensaje es confidencial y está dirigido a su destinatario.
+Si no es el destinatario, notifique al remitente y elimínelo.
+Las opiniones expresadas son del autor, no de Aliadata.
+Por favor considere el impacto ambiental antes de imprimir.
+Aliadata no garantiza que este mensaje esté libre de virus.
+El uso indebido de esta comunicación puede ser ilegal.
+Este correo puede ser monitoreado con fines de calidad.
+Aliadata S.A. — Mendoza, Argentina.
+CUIT 30-12345678-9.
+www.alia-data.com
+No responda si el mensaje llegó por error.
+```
+
+**Riesgo reconocido de antemano:** es el primer fixture con cuerpo multi-párrafo (los anteriores eran un único párrafo continuo). Si Gmail re-envuelve alguna línea larga de forma distinta a lo esperado, la barrera `CUERPO_NO_COINCIDE` podría bloquear la simulación aunque la canonicalización de transporte (probada con el piloto CP-05) esté funcionando correctamente — en ese caso, el ajuste sería de formato/línea, no de lógica.
+
+**Aserciones del piloto (INT-FASE8-06, equivalente a CP-14).** Dry-run: exactamente un mensaje elegible; cero cambios en Gmail y en las ocho hojas (técnicas y de negocio); clasificación esperada 1 observación / 1 tarea en `Gestión General`. Formal: `Log Mensajes` con una fila, `estado=PROCESADO`, `etapa=FINALIZADO`, `cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`; `Registro Tareas` con exactamente 1 fila para el `message_id`; `Indice Idempotencia` con 1 entrada (`estado_final=PROCESADO`); una fila nueva en `Gestión General` (vinculada por `ID`); Gmail conserva `Pruebas-Automatizacion` e `INBOX`, recibe `Procesado`, no recibe etiquetas de revisión/error, no se archiva.
+
+Tras una corrida real satisfactoria, la aprobación de CP-14 (si corresponde) se registra por separado en `pruebas/CASOS_DE_PRUEBA.md`/`pruebas/resultados/RESULTADOS_FASE_8.md`, con el mismo criterio humano de revisión que el resto de los casos de prueba.
+
 ## 10. Sanitización de logs y estado de sesión
 
 Los logs del automatizador contienen únicamente categorías, IDs, estados, conteos y valores de catálogo (prefijo `[AUTO-FASE8]`). **Nunca** cuerpos de correo, prompts, `motivo_sin_tareas`, `motivo_revision`, API keys ni `cfg` completo. El estado de sesión en `UserProperties` guarda solo datos no sensibles (`run_id`, `fixtureId`, marcador, asunto sintético, `message_id`, fingerprint, hash de baseline, nonce, estado). Las pruebas I1–I5 verifican que ni la API key, ni el cuerpo del fixture, ni el texto libre de la columna `error` aparecen en logs o en el estado guardado, y que nunca se escribe una propiedad de configuración.
@@ -295,7 +329,9 @@ La corrección del 24/07/2026 (falso negativo de clasificación, `messageId 19f9
 
 La ampliación del 24/07/2026 (CP-04/`INT-FASE8-04-TRES-TAREAS`) agregó el fixture y dobles de prueba **separados** de los de CP-03 (`crearEstadoTresTareas_`, `efectoFormalTresTareasFabrica_`, `prepararSimuladoTresTareas_`) — deliberadamente no se generalizaron los dobles existentes de 2 tareas a N, para no arriesgar la cobertura ya aprobada de CP-03. Nuevas pruebas (sección P): camino correcto (1 observación, 3 tareas en `Desarrollo IT`/`Finanzas`/`Comercial`); la simulación aprueba sin tocar Registro Tareas/Indice/hojas de negocio; tablero equivocado (`Soporte` en lugar de `Finanzas`) entre los tres; y tablero duplicado (`Desarrollo IT` dos veces, falta `Comercial`) — no se repite exhaustivamente cada escenario ya cubierto por las pruebas M2-M18 de CP-03, dado que esa cobertura ya valida de forma genérica la lógica de comparación de multiset; lo nuevo que hacía falta confirmar era específicamente que la generalización también funciona a N=3. Resultado de esa ejecución local: 151/151 verificaciones OK (las 147 anteriores sin cambios + 4 nuevas).
 
-La ampliación del 24/07/2026 (CP-15/`INT-FASE8-05-OBSERVACIONES-DUPLICADAS`) agregó el fixture y un doble de prueba dedicado para 1 tarea (`crearEstadoUnaTarea_`, `efectoFormalUnaTareaFabrica_`, `prepararSimuladoUnaTarea_`), separado de los de 2 y 3 tareas por el mismo criterio que CP-04. Nuevas pruebas (sección Q): camino correcto (1 observación, 1 tarea en `Finanzas`) y la simulación aprueba sin tocar Registro Tareas/Indice/hojas de negocio — confirman que la generalización N-tareas también funciona en N=1 (ya probada en N=2 y N=3). La consolidación de RF-04 en sí (si la IA real reporta 1 o 2 observaciones para el pedido repetido) solo puede confirmarse con una corrida real, no con estas pruebas locales. Resultado de la última ejecución local: **153/153 verificaciones OK** (las 151 anteriores sin cambios + 2 nuevas). Las otras cuatro suites locales del proyecto (`ejecutarPruebasEvaluadorIAFase8()`: 60/60; `ejecutarPruebasExtraerContenidoNuevo()`: 19/19; `ejecutarPruebasPromptObservacionesMixtas()`: 46/46; `ejecutarPruebasSanitizacionHojasTecnicas()`: 17/17) se re-ejecutaron sin cambios de código y no muestran regresiones.
+La ampliación del 24/07/2026 (CP-15/`INT-FASE8-05-OBSERVACIONES-DUPLICADAS`) agregó el fixture y un doble de prueba dedicado para 1 tarea (`crearEstadoUnaTarea_`, `efectoFormalUnaTareaFabrica_`, `prepararSimuladoUnaTarea_`), separado de los de 2 y 3 tareas por el mismo criterio que CP-04. Nuevas pruebas (sección Q): camino correcto (1 observación, 1 tarea en `Finanzas`) y la simulación aprueba sin tocar Registro Tareas/Indice/hojas de negocio — confirman que la generalización N-tareas también funciona en N=1 (ya probada en N=2 y N=3). La consolidación de RF-04 en sí (si la IA real reporta 1 o 2 observaciones para el pedido repetido) solo puede confirmarse con una corrida real, no con estas pruebas locales. Resultado de esa ejecución local: 153/153 verificaciones OK (las 151 anteriores sin cambios + 2 nuevas).
+
+La ampliación del 24/07/2026 (CP-14/`INT-FASE8-06-FIRMA-EXTENSA`) agregó el fixture (primer cuerpo multi-párrafo: consulta + firma/aviso legal) y `crearEstadoFirmaExtensa_`/`prepararSimuladoFirmaExtensa_`, reutilizando **sin cambios** `efectoFormalUnaTareaFabrica_` (creada para CP-15) con un tablero distinto (`Gestión General`). Una prueba de camino correcto (sección R) confirma que la generalización N=1 también aprueba con este fixture. La exclusión de firmas/avisos legales por parte de la IA real (regla ya codificada en el prompt) solo puede confirmarse con una corrida real. Resultado de la última ejecución local: **154/154 verificaciones OK** (las 153 anteriores sin cambios + 1 nueva). Las otras cuatro suites locales del proyecto (`ejecutarPruebasEvaluadorIAFase8()`: 60/60; `ejecutarPruebasExtraerContenidoNuevo()`: 19/19; `ejecutarPruebasPromptObservacionesMixtas()`: 46/46; `ejecutarPruebasSanitizacionHojasTecnicas()`: 17/17) se re-ejecutaron sin cambios de código y no muestran regresiones.
 
 ## 12. Resultado real del primer piloto (24/07/2026)
 

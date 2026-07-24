@@ -734,6 +734,31 @@ function efectoFormalUnaTareaFabrica_(opciones) {
 }
 
 // ============================================================================
+// DOBLES ESPECÍFICOS DE INT-FASE8-06-FIRMA-EXTENSA (CP-14)
+// ============================================================================
+//
+// Reutiliza SIN CAMBIOS efectoFormalUnaTareaFabrica_ (creada para CP-15): la
+// forma del resultado (1 observación, 1 tarea) es idéntica; solo cambia el
+// fixture activo y el tablero esperado (Gestión General en vez de Finanzas).
+
+/** Crea el estado base seleccionando el fixture de firma extensa vía AUTO_FASE8_CASO. */
+function crearEstadoFirmaExtensa_(overrides) {
+  var estado = crearEstadoIntegracion_(overrides || {});
+  estado.props.AUTO_FASE8_CASO = 'INT-FASE8-06-FIRMA-EXTENSA';
+  return estado;
+}
+
+/** prepararCaso_() + simularEnvioMensaje_() + simularYVerificar_() para el fixture de firma extensa. */
+function prepararSimuladoFirmaExtensa_(overridesEstado) {
+  var estado = crearEstadoFirmaExtensa_(overridesEstado);
+  var amb = crearAmbFalsoIntegracion_(estado);
+  prepararCaso_(amb);
+  simularEnvioMensaje_(estado);
+  simularYVerificar_(amb);
+  return { estado: estado, amb: amb };
+}
+
+// ============================================================================
 // SUITE
 // ============================================================================
 
@@ -1776,6 +1801,28 @@ function ejecutarPruebasAutomatizadorIntegracionFase8() {
       estado.sheets['Indice Idempotencia']._datos().length === 1 &&
       estado.sheets['Finanzas']._datos().length === 5,
       JSON.stringify(sim.errores));
+  })();
+
+  // ==========================================================================
+  // R: INT-FASE8-06-FIRMA-EXTENSA (CP-14) — confirma que la generalización N=1
+  //    (ya probada por CP-15) también aprueba con este fixture, reutilizando
+  //    sin cambios efectoFormalUnaTareaFabrica_ con un tablero distinto
+  //    (Gestión General). La exclusión de firmas/avisos legales del prompt
+  //    real solo puede confirmarse con una corrida real — ver auditoria/CHANGELOG.md.
+  // ==========================================================================
+
+  function ejecutarFormalFirmaExtensa_(opciones) {
+    opciones = opciones || {};
+    opciones.tablero1 = opciones.tablero1 || 'Gestión General';
+    var ctx = prepararSimuladoFirmaExtensa_({ efectoFormal: efectoFormalUnaTareaFabrica_(opciones) });
+    return { resultado: ejecutarFormalYVerificar_(ctx.amb), estado: ctx.estado };
+  }
+
+  // R1: camino correcto — 1 observación, 1 tarea (Gestión General).
+  (function () {
+    var r = ejecutarFormalFirmaExtensa_({});
+    assert('R1 — INT-FASE8-06: camino correcto (1 observación, 1 tarea en Gestión General) aprueba',
+      r.resultado.ok === true, JSON.stringify(r.resultado.errores));
   })();
 
   Logger.log('--- Resumen ---');
