@@ -184,7 +184,7 @@ El mar, 21 jul 2026, Juan escribió:
 > Necesitamos el informe de gastos de julio antes del viernes.
 ```
 **Resultado esperado:** una sola tarea (RF-04, consolidación), no dos filas idénticas.
-**Estado:** Pendiente.
+**Estado:** Aprobado — 24/07/2026. Ejecutado mediante el automatizador de integración de Fase 2A (`runId 01fbd80c-a874-4eed-82a6-c21a14b8070f`, `message_id 19f9621b19597350`, fixture `INT-FASE8-05-OBSERVACIONES-DUPLICADAS`): `SIMULACION_OK` confirmó 1 observación/1 tarea simulada (`Finanzas/Alto`), sin escrituras; `FORMAL_OK` confirmó automáticamente `Log Mensajes` (`cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`), 1 fila en `Registro Tareas`, 1 entrada en `Indice Idempotencia`, una fila nueva en la hoja `Finanzas`, y la etiqueta `Procesado` aplicada en Gmail. **Nota sobre la redacción:** el cuerpo enviado no repitió el pedido dentro de un bloque de cita tipo respuesta como en el enunciado original de arriba — ese patrón lo recorta `extraerContenidoNuevo()` antes de llegar a la IA, probando el recorte de citas (ya cubierto localmente) en vez de la consolidación de RF-04 que este caso busca validar. El cuerpo real usado repite el pedido sin marcador de cita (ver `auditoria/CHANGELOG.md` y `documentacion/AUTOMATIZACION_INTEGRACION_FASE8.md`, sección 9.3), preservando el mismo objetivo funcional (una sola tarea a partir de un pedido duplicado). Aprobó al primer intento, sin necesitar ajuste de redacción. Ver detalle completo en `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
 ## CP-16 — Cuerpo vacío
 

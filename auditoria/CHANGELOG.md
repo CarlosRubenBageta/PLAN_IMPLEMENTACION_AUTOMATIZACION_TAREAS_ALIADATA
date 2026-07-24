@@ -1,5 +1,37 @@
 # Changelog
 
+## [2026-07-24] — CP-15 Aprobado: corrida real completa de INT-FASE8-05-OBSERVACIONES-DUPLICADAS (SIMULACION_OK + FORMAL_OK)
+
+### Contexto
+Con el fixture recién agregado (ver entrada inmediatamente anterior), la primera corrida real completó el flujo de dos invocaciones sin ninguna discrepancia, al primer intento:
+
+```text
+runId: 01fbd80c-a874-4eed-82a6-c21a14b8070f
+messageId: 19f9621b19597350 (nuevo, nunca antes usado)
+simulación: SIMULACION_OK
+formal: FORMAL_OK
+```
+
+`simularYVerificarCasoIntegracionFase8Visible()` reportó `[DRY_RUN] 19f9621b19597350: 1 observación(es), 1 tarea(s) simulada(s) [Finanzas/Alto]` y `[AUTO-FASE8] SIMULACION_OK`. `ejecutarFormalYVerificarCasoIntegracionFase8Visible()` reportó `[AUTO-FASE8] FORMAL_OK` para el mismo `runId`/`messageId`, sin re-preparar la sesión.
+
+### Ambigüedad resuelta
+Esta corrida resuelve la ambigüedad señalada en la entrada anterior: la IA real consolidó (RF-04) el pedido repetido **también a nivel de observación** (`cantidad_observaciones=1`), no la lectura alternativa (2 observaciones con 1 tarea combinada entre ambas). El fixture no necesitó ningún ajuste de redacción — la decisión de diseño de evitar el marcador de cita de Gmail (para que el texto duplicado llegara íntegro a la IA) fue suficiente al primer intento.
+
+### Qué certifica `FORMAL_OK` (por construcción de `verificarResultadoFormal_()`, sección 7)
+- **`Log Mensajes`:** una fila para este `message_id`, `estado=PROCESADO`, `etapa=FINALIZADO`, `cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`.
+- **`Registro Tareas`:** exactamente 1 fila; `task_id` no vacío; `estado_escritura=ESCRITA`; `tablero=Finanzas`; `observacion_texto_original` no vacío.
+- **`Indice Idempotencia`:** exactamente 1 entrada, `estado_final=PROCESADO`.
+- **Hojas de negocio:** una fila nueva en `Finanzas`, vinculada por la columna `ID` a ese `task_id`, con todas las filas previas al baseline exactamente intactas.
+- **Gmail:** conserva `Pruebas-Automatizacion` e `INBOX`, recibe `Procesado`, no recibe ninguna etiqueta de revisión/error, no se archiva.
+
+### Aprobación
+**CP-15 pasa de Pendiente a Aprobado — 24/07/2026**, primera corrida real sin necesitar ninguna iteración de ajuste. Además de aprobar el caso, esta corrida confirma en producción real: (a) que la generalización a N tareas de `verificarResultadoFormal_()`/`verificarClasificacionSimulada_()` también funciona en N=1 (ya confirmada en N=2 y N=3 por CP-03/CP-04); y (b) que RF-04 (consolidación de observaciones duplicadas) está correctamente codificada en el prompt real y el modelo la sigue. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### No accedido
+No se modificó ningún archivo de código (`codigo/*.gs` ni `pruebas/*.gs`) en esta entrada — es exclusivamente el registro de una corrida real exitosa y la actualización de los documentos de seguimiento.
+
+---
+
 ## [2026-07-24] — Ampliación incremental del automatizador de integración: fixture INT-FASE8-05-OBSERVACIONES-DUPLICADAS (CP-15)
 
 ### Contexto

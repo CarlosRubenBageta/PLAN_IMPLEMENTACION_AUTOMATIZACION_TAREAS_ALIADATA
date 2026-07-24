@@ -90,7 +90,7 @@ Nunca se escriben estos valores en `PropertiesService` (verificado por la prueba
 | `INT-FASE8-01-INFORMATIVO` | CP-05 | Correo completamente informativo: `SIN_TAREAS`, 0 observaciones, 0 tareas, `observaciones: []`; Gmail recibe `Revisión manual/Sin tareas detectadas`. **Piloto real aprobado (24/07/2026).** |
 | `INT-FASE8-02-DOS-TAREAS` | CP-03 | Una única observación con dos acciones concretas: `PROCESADO`, 1 observación, 2 tareas (`Desarrollo IT` + `Comercial`) que comparten el mismo `observacion_texto_original`; Gmail recibe `Procesado`. **CP-03 Aprobado (24/07/2026)**, tras tres corridas reales previas que expusieron y permitieron corregir dos falsos negativos del verificador y una ambigüedad del fixture (secciones 9.1.1 a 9.1.3). |
 | `INT-FASE8-04-TRES-TAREAS` | CP-04 | Una única observación con tres acciones concretas: `PROCESADO`, 1 observación, 3 tareas (`Desarrollo IT` + `Finanzas` + `Comercial`) que comparten el mismo `observacion_texto_original`; Gmail recibe `Procesado`. Reutiliza `verificarResultadoFormal_()`/`verificarClasificacionSimulada_()` sin ningún cambio de código (ya generalizados a N tareas por CP-03). **CP-04 Aprobado (24/07/2026)**, tras una corrida real previa que expuso y permitió corregir una ambigüedad del fixture (sección 9.2.1). |
-| `INT-FASE8-05-OBSERVACIONES-DUPLICADAS` | CP-15 | El mismo pedido repetido dos veces sin marcador de cita: `PROCESADO`, 1 observación, 1 tarea (`Finanzas`) consolidada por RF-04 (`documentacion/REGLAS_FUNCIONALES.md`). Primera prueba real de la generalización N-tareas en N=1, y primera prueba de RF-04 en un fixture real de este automatizador. Pendiente de corrida real (ver sección 9.3). |
+| `INT-FASE8-05-OBSERVACIONES-DUPLICADAS` | CP-15 | El mismo pedido repetido dos veces sin marcador de cita: `PROCESADO`, 1 observación, 1 tarea (`Finanzas`) consolidada por RF-04 (`documentacion/REGLAS_FUNCIONALES.md`). Primera prueba real de la generalización N-tareas en N=1, y primera prueba de RF-04 en un fixture real de este automatizador. **CP-15 Aprobado (24/07/2026)**, al primer intento, sin necesitar ajuste de redacción (sección 9.3.1). |
 
 La propiedad `AUTO_FASE8_CASO` (`ScriptProperties` del proyecto de prueba) selecciona el fixture activo por `id`; si está ausente, se usa `FIXTURE_INTEGRACION_POR_DEFECTO` (`INT-FASE8-01-INFORMATIVO`). El automatizador **solo lee** esta propiedad — nunca la escribe ni modifica ninguna otra propiedad de configuración productiva. Para ejecutar el caso de CP-03, configurar `AUTO_FASE8_CASO=INT-FASE8-02-DOS-TAREAS`; para CP-04, `AUTO_FASE8_CASO=INT-FASE8-04-TRES-TAREAS`; en ambos casos, antes de llamar a `prepararCasoIntegracionFase8Visible()` (ver procedimiento, sección 9).
 
@@ -251,16 +251,29 @@ Con la redacción final del cuerpo (sección 9.2) ya aplicada, esta corrida clas
 
 ### 9.3. Procedimiento para CP-15 (`INT-FASE8-05-OBSERVACIONES-DUPLICADAS`)
 
-**CP-15 Pendiente** — todavía no tiene ninguna corrida real. El procedimiento es el mismo (pasos 0-6 de la sección 9), con dos diferencias:
+**CP-15 Aprobado — 24/07/2026** (ver sección 9.3.1). El procedimiento que llevó a esa corrida (pasos 0-6 de la sección 9), con dos diferencias:
 
 - Antes del paso 3 (`prepararCasoIntegracionFase8Visible()`), configurar en el proyecto de prueba la propiedad `AUTO_FASE8_CASO=INT-FASE8-05-OBSERVACIONES-DUPLICADAS` (sección 6).
 - El asunto/cuerpo a enviar (paso 4) serán los de este fixture: `[PRUEBA-AUTOMATIZACION][INTEGRACION] Pedido repetido [<marcador>]` con el cuerpo "Necesitamos el informe de gastos de julio antes del viernes. Como te comentaba antes: necesitamos el informe de gastos de julio antes del viernes." — un único párrafo, sin línea en blanco. A diferencia del enunciado original de CP-15 (`pruebas/CASOS_DE_PRUEBA.md`), este cuerpo **no** usa un bloque de cita tipo respuesta ("El [fecha] escribió:\n> ..."), porque ese patrón coincide con un marcador de corte de `extraerContenidoNuevo()` y se recortaría antes de llegar a la IA — probando el recorte de citas (ya cubierto localmente) en vez de la consolidación de RF-04, que es lo que este fixture busca ejercitar.
 
-**Ambigüedad a confirmar con esta corrida:** el fixture espera `cantidad_observaciones=1` (consolidación también a nivel de observación), pero el prompt no trae un ejemplo few-shot de esta regla y admite una lectura alternativa (`cantidad_observaciones=2`, `cantidad_tareas=1`). Si la corrida real muestra la lectura alternativa, se documentará como hallazgo (no un defecto del automatizador) y se ajustará `esperado.cantidad_observaciones`.
+**Ambigüedad reconocida antes de la corrida (ya resuelta, ver sección 9.3.1):** el fixture esperaba `cantidad_observaciones=1` (consolidación también a nivel de observación), pero el prompt no trae un ejemplo few-shot de esta regla y admitía una lectura alternativa (`cantidad_observaciones=2`, `cantidad_tareas=1`). La corrida real confirmó la primera lectura.
 
 **Aserciones del piloto (INT-FASE8-05, equivalente a CP-15).** Dry-run: exactamente un mensaje elegible; cero cambios en Gmail y en las ocho hojas (técnicas y de negocio); clasificación esperada 1 observación / 1 tarea en `Finanzas`. Formal: `Log Mensajes` con una fila, `estado=PROCESADO`, `etapa=FINALIZADO`, `cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`; `Registro Tareas` con exactamente 1 fila para el `message_id`; `Indice Idempotencia` con 1 entrada (`estado_final=PROCESADO`); una fila nueva en `Finanzas` (vinculada por `ID`); Gmail conserva `Pruebas-Automatizacion` e `INBOX`, recibe `Procesado`, no recibe etiquetas de revisión/error, no se archiva.
 
 Tras una corrida real satisfactoria, la aprobación de CP-15 (si corresponde) se registra por separado en `pruebas/CASOS_DE_PRUEBA.md`/`pruebas/resultados/RESULTADOS_FASE_8.md`, con el mismo criterio humano de revisión que el resto de los casos de prueba.
+
+#### 9.3.1. Primer intento real (24/07/2026) — corrida completa exitosa, CP-15 Aprobado
+
+```text
+runId: 01fbd80c-a874-4eed-82a6-c21a14b8070f
+messageId: 19f9621b19597350 (nuevo)
+simulación: SIMULACION_OK
+formal: FORMAL_OK
+```
+
+Esta corrida clasificó exactamente 1 observación / 1 tarea en `Finanzas` — coincide en su totalidad con lo que exige CP-15, al primer intento, sin necesitar ningún ajuste de redacción del fixture. Resuelve la ambigüedad reconocida de antemano: la IA real consolidó (RF-04) el pedido repetido también a nivel de observación, no la lectura alternativa. `simularYVerificarCasoIntegracionFase8Visible()` informó `SIMULACION_OK`; `ejecutarFormalYVerificarCasoIntegracionFase8Visible()` informó `FORMAL_OK` sobre el mismo `runId`/`messageId`, sin re-preparar la sesión. `verificarResultadoFormal_()` confirmó automáticamente: `Log Mensajes` (`estado=PROCESADO`, `cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`); `Registro Tareas` con exactamente 1 fila (`task_id` no vacío, `estado_escritura=ESCRITA`, tablero `Finanzas`); `Indice Idempotencia` con 1 entrada (`estado_final=PROCESADO`); una fila nueva en `Finanzas` vinculada por `ID`; Gmail con `Procesado` aplicado, sin etiquetas de error/revisión, sin archivar.
+
+**CP-15 pasa de Pendiente a Aprobado — 24/07/2026.** Además de aprobar el caso, esta corrida confirma en producción real que RF-04 (consolidación de observaciones duplicadas) está correctamente codificada en el prompt y que el modelo la sigue. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
 ## 10. Sanitización de logs y estado de sesión
 
