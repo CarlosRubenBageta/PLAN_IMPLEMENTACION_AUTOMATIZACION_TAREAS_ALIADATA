@@ -289,6 +289,14 @@ function clasificacionSimuladaPorDefecto_(estado) {
   var sesion = crudo ? JSON.parse(crudo) : null;
   var fixture = sesion ? obtenerFixtureIntegracion_(sesion.fixtureId) : null;
   var esperado = fixture ? fixture.esperado : { cantidad_observaciones: 0, cantidad_tareas: 0, tareasEsperadas: [] };
+  // Fixtures cuyo resultado real es NO_ELEGIBLE/RESPUESTA_IA_INVALIDA/REQUIERE_REVISION
+  // (rechazo antes de una clasificación real de la IA, ver verificarClasificacionSimulada_())
+  // reproducen fielmente la forma exacta que devuelve procesarUnMensajeSimulado() para esas
+  // categorías: cantidades null y tableros vacío — nunca la derivación genérica de abajo,
+  // que asume que la IA sí clasificó (24/07/2026, hallazgo real INT-FASE8-07-CUERPO-VACIO).
+  if (esperado.resultadoSimulado && esperado.resultadoSimulado !== 'SIN_TAREAS' && esperado.resultadoSimulado !== 'TAREAS_SIMULADAS') {
+    return { resultado: esperado.resultadoSimulado, cantidadObservaciones: null, cantidadTareas: null, tableros: [] };
+  }
   var tableros = (esperado.tareasEsperadas || []).map(function (t) { return t.tablero; });
   return {
     resultado: esperado.cantidad_tareas > 0 ? 'TAREAS_SIMULADAS' : 'SIN_TAREAS',
@@ -1873,14 +1881,46 @@ function ejecutarPruebasAutomatizadorIntegracionFase8() {
   //    confirmación de que el filtro determinístico realmente dispara con este
   //    cuerpo (en vez de llegar a la IA) solo puede hacerse con una corrida
   //    real — ver auditoria/CHANGELOG.md.
+  //
+  //    S2-S4 (24/07/2026, corrección tras el primer hallazgo real,
+  //    messageId=19f9661d038ea8de): verificarClasificacionSimulada_() en sí
+  //    misma, para la categoría NO_ELEGIBLE (fixture.esperado.resultadoSimulado)
+  //    — la simulación DRY_RUN real nunca clasifica con la IA, así que
+  //    cantidadObservaciones/cantidadTareas son `null`, nunca 0.
   // ==========================================================================
 
   // S1: camino correcto — 0 observaciones, 0 tareas, SIN_TAREAS/RevisionSinTareas.
+  // Tras la corrección de clasificacionSimuladaPorDefecto_(), esta prueba ahora
+  // simula fielmente NO_ELEGIBLE/null/null/[] (antes derivaba, por error, un
+  // SIN_TAREAS/0/0 genérico que nunca habría detectado el hallazgo real).
   (function () {
     var ctx = prepararSimuladoCuerpoVacio_({});
     var r = ejecutarFormalYVerificar_(ctx.amb);
     assert('S1 — INT-FASE8-07: camino correcto (cuerpo vacío tras la cita, 0 observaciones/0 tareas) aprueba (SIMULACION_OK + FORMAL_OK)',
       r.ok === true, JSON.stringify(r.errores));
+  })();
+
+  // S2: NO_ELEGIBLE con cantidades null (la forma real que devuelve procesarUnMensajeSimulado()) aprueba.
+  (function () {
+    var fixture = obtenerFixtureIntegracion_('INT-FASE8-07-CUERPO-VACIO');
+    var r = verificarClasificacionSimulada_({ resultadosSimulados: [{ resultado: { resultado: 'NO_ELEGIBLE', cantidadObservaciones: null, cantidadTareas: null, tableros: [] } }] }, fixture);
+    assert('S2 — verificarClasificacionSimulada_(): NO_ELEGIBLE con cantidades null aprueba', r.ok === true, JSON.stringify(r.errores));
+  })();
+
+  // S3: el mensaje llega a una clasificación de la IA (SIN_TAREAS) en vez de ser filtrado — rechaza.
+  (function () {
+    var fixture = obtenerFixtureIntegracion_('INT-FASE8-07-CUERPO-VACIO');
+    var r = verificarClasificacionSimulada_({ resultadosSimulados: [{ resultado: { resultado: 'SIN_TAREAS', cantidadObservaciones: 0, cantidadTareas: 0, tableros: [] } }] }, fixture);
+    assert('S3 — verificarClasificacionSimulada_(): SIN_TAREAS en vez de NO_ELEGIBLE rechaza con SIMULACION_RESULTADO_NO_COINCIDE',
+      r.ok === false && tieneError(r, 'SIMULACION_RESULTADO_NO_COINCIDE:SIN_TAREAS'), JSON.stringify(r.errores));
+  })();
+
+  // S4: NO_ELEGIBLE pero con cantidades numéricas (0) en vez de null — rechaza (regresión hipotética del núcleo).
+  (function () {
+    var fixture = obtenerFixtureIntegracion_('INT-FASE8-07-CUERPO-VACIO');
+    var r = verificarClasificacionSimulada_({ resultadosSimulados: [{ resultado: { resultado: 'NO_ELEGIBLE', cantidadObservaciones: 0, cantidadTareas: 0, tableros: [] } }] }, fixture);
+    assert('S4 — verificarClasificacionSimulada_(): NO_ELEGIBLE con cantidades 0 en vez de null rechaza',
+      r.ok === false && tieneError(r, 'SIMULACION_CANTIDAD_OBSERVACIONES:0') && tieneError(r, 'SIMULACION_CANTIDAD_TAREAS:0'), JSON.stringify(r.errores));
   })();
 
   Logger.log('--- Resumen ---');

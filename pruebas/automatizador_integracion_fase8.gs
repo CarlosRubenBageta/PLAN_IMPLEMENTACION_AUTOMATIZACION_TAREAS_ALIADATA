@@ -511,6 +511,19 @@ function verificarResumenNucleo_(resumen, messageId) {
  * comparar nunca la clasificación obtenida contra la exigida por el fixture.
  * Nunca extrae nada de texto de Logger — solo lee el resultado estructurado
  * ya devuelto por el núcleo. Categorías cerradas; nunca texto libre.
+ *
+ * Corrección (24/07/2026, INT-FASE8-07-CUERPO-VACIO/CP-16,
+ * messageId=19f9661d038ea8de): procesarUnMensajeSimulado() devuelve
+ * cantidadObservaciones/cantidadTareas en `null` (nunca 0) para las
+ * categorías en las que el mensaje NUNCA llega a una clasificación real de
+ * la IA (NO_ELEGIBLE: filtro determinístico; RESPUESTA_IA_INVALIDA;
+ * REQUIERE_REVISION) — distinto de SIN_TAREAS/TAREAS_SIMULADAS, que sí
+ * clasifican. Un fixture cuyo resultado real es una de esas tres categorías
+ * declara fixture.esperado.resultadoSimulado con ese valor exacto; en ese
+ * caso se verifica la forma exacta de esas categorías (resultado, null, null,
+ * []) en vez de la comparación numérica genérica de abajo (pensada para
+ * SIN_TAREAS/TAREAS_SIMULADAS). Ausente ese campo, comportamiento idéntico al
+ * previo a esta corrección.
  */
 function verificarClasificacionSimulada_(resumen, fixture) {
   var datos = resumen && resumen.resultadosSimulados && resumen.resultadosSimulados[0] && resumen.resultadosSimulados[0].resultado;
@@ -518,6 +531,18 @@ function verificarClasificacionSimulada_(resumen, fixture) {
 
   var esperado = fixture.esperado;
   var errores = [];
+
+  var resultadoSimuladoEsperado = esperado.resultadoSimulado;
+  var esCategoriaSinClasificacion = resultadoSimuladoEsperado &&
+    resultadoSimuladoEsperado !== 'SIN_TAREAS' && resultadoSimuladoEsperado !== 'TAREAS_SIMULADAS';
+
+  if (esCategoriaSinClasificacion) {
+    if (datos.resultado !== resultadoSimuladoEsperado) errores.push('SIMULACION_RESULTADO_NO_COINCIDE:' + datos.resultado);
+    if (datos.cantidadObservaciones !== null) errores.push('SIMULACION_CANTIDAD_OBSERVACIONES:' + datos.cantidadObservaciones);
+    if (datos.cantidadTareas !== null) errores.push('SIMULACION_CANTIDAD_TAREAS:' + datos.cantidadTareas);
+    if ((datos.tableros || []).length !== 0) errores.push('SIMULACION_TABLEROS_NO_COINCIDEN');
+    return { ok: errores.length === 0, errores: errores };
+  }
 
   if (datos.cantidadObservaciones !== esperado.cantidad_observaciones) errores.push('SIMULACION_CANTIDAD_OBSERVACIONES:' + datos.cantidadObservaciones);
   if (datos.cantidadTareas !== esperado.cantidad_tareas) errores.push('SIMULACION_CANTIDAD_TAREAS:' + datos.cantidadTareas);

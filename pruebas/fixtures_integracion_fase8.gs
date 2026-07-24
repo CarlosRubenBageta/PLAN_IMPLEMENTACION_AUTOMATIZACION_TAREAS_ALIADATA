@@ -328,6 +328,15 @@ var FIXTURES_INTEGRACION_FASE8 = [
       etapa: 'FINALIZADO',
       cantidad_observaciones: 0,
       cantidad_tareas: 0,
+      // Clasificación simulada (DRY_RUN) real: procesarUnMensajeSimulado()
+      // devuelve resultado='NO_ELEGIBLE' con cantidadObservaciones/cantidadTareas
+      // en null (nunca 0) cuando el filtro determinístico rechaza el mensaje
+      // ANTES de la IA — distinto de un SIN_TAREAS clasificado por la IA.
+      // verificarClasificacionSimulada_() usa este campo para verificar esa
+      // forma exacta en vez de comparar cantidad_observaciones/cantidad_tareas
+      // (que arriba siguen en 0 porque esos SÍ son los valores correctos para
+      // la fila real de Log Mensajes, comparada por verificarResultadoFormal_()).
+      resultadoSimulado: 'NO_ELEGIBLE',
       resultado_gmail: 'SOLO_ETIQUETADO',
       // La columna "error" contiene el motivo del filtro determinístico
       // ("Cuerpo vacío tras extraer contenido nuevo..."); el automatizador

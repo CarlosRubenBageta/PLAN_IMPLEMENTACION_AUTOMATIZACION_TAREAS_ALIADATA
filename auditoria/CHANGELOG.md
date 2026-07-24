@@ -1,5 +1,37 @@
 # Changelog
 
+## [2026-07-24] — Primer hallazgo real en INT-FASE8-07-CUERPO-VACIO: verificarClasificacionSimulada_() no contempla NO_ELEGIBLE
+
+### Contexto
+La primera corrida real (`messageId=19f9661d038ea8de`) de `simularYVerificarCasoIntegracionFase8Visible()` sobre el fixture recién agregado (ver entrada inmediatamente anterior) mostró que el pipeline funcionó **exactamente como se buscaba**: `[DRY_RUN] 19f9661d038ea8de: descartado por filtro determinístico (Cuerpo vacío tras extraer contenido nuevo...). Sin escrituras.` — confirma que `evaluarFiltroDeterministico()` rechazó el mensaje antes de llegar a la IA, sin ninguna llamada real a OpenAI. Sin embargo, la verificación de la simulación falló: `[AUTO-FASE8] SIMULAR_FALLIDO messageId=19f9661d038ea8de errores=SIMULACION_CANTIDAD_OBSERVACIONES:null,SIMULACION_CANTIDAD_TAREAS:null`. La fase formal nunca se ejecutó (bloqueada correctamente por la falta de `SIMULACION_OK`).
+
+### Causa (confirmada por lectura de código, no una hipótesis)
+`procesarUnMensajeSimulado()` (`codigo/script_refactorizado.gs`) devuelve, **por diseño**, `cantidadObservaciones: null, cantidadTareas: null` para las tres categorías en las que el mensaje nunca llega a una clasificación real de la IA: `NO_ELEGIBLE` (filtro determinístico — el caso de este fixture), `RESPUESTA_IA_INVALIDA` y `REQUIERE_REVISION`. Esto es intencional y correcto: `null` distingue "no hay clasificación" de `SIN_TAREAS`, que sí tiene una clasificación real de la IA (aunque sea cero tareas). El defecto está en `verificarClasificacionSimulada_()` (`pruebas/automatizador_integracion_fase8.gs`, sección 7.2): fue diseñada y probada (pruebas O1-O9) solo contra los dos resultados que sí clasifican (`SIN_TAREAS`/`TAREAS_SIMULADAS`), comparando `cantidadObservaciones`/`cantidadTareas` numéricamente contra `fixture.esperado.cantidad_observaciones`/`cantidad_tareas`. `INT-FASE8-07-CUERPO-VACIO` es el primer fixture cuyo resultado real es `NO_ELEGIBLE`, una categoría que esa comparación genérica nunca contempló. **No es un defecto del pipeline real** (`codigo/script_refactorizado.gs` no cambia en esta entrada): el `null` que devuelve es correcto.
+
+Nótese que `esperado.cantidad_observaciones: 0` / `cantidad_tareas: 0` deben **permanecer** en 0 (no pasar a `null`): la verificación formal (`verificarResultadoFormal_()`) los compara contra la celda real de `Log Mensajes` vía `Number(valorLog(...))`, y una celda vacía (nunca escrita para un mensaje `SIN_TAREAS`/`NO_ELEGIBLE`) coacciona a `Number('') === 0` — exactamente el mecanismo ya probado por `INT-FASE8-01-INFORMATIVO`. Cambiar esos campos a `null` habría roto esa verificación formal en vez de arreglar la simulada.
+
+### Segundo hallazgo, en el propio arnés de pruebas locales (detectado al reproducir el fallo antes de corregir)
+El doble compartido `clasificacionSimuladaPorDefecto_()` (usado por **todos** los fixtures que no fijan `estado.clasificacionSimuladaOverride`, incluida la prueba S1 "camino correcto" agregada para CP-16) deriva `resultado: esperado.cantidad_tareas > 0 ? 'TAREAS_SIMULADAS' : 'SIN_TAREAS'` — nunca `NO_ELEGIBLE`. Esto significa que la prueba local S1 aprobaba de forma incorrecta: simulaba un `SIN_TAREAS` con `cantidadObservaciones=0` (no un `NO_ELEGIBLE` con `null`), por lo que nunca podía haber detectado esta discrepancia antes de la corrida real. Se corrige también este doble para que reproduzca fielmente la forma exacta que devuelve el pipeline real en estas categorías.
+
+### Corrección aplicada
+- `pruebas/fixtures_integracion_fase8.gs`: se agrega `esperado.resultadoSimulado: 'NO_ELEGIBLE'` a `INT-FASE8-07-CUERPO-VACIO` (campo nuevo; `cantidad_observaciones`/`cantidad_tareas` **sin cambios**, siguen en 0 para la verificación formal).
+- `pruebas/automatizador_integracion_fase8.gs`:
+  - `verificarClasificacionSimulada_()`: cuando `fixture.esperado.resultadoSimulado` está presente y no es `SIN_TAREAS`/`TAREAS_SIMULADAS`, verifica que `datos.resultado` coincida exactamente (`SIMULACION_RESULTADO_NO_COINCIDE:<valor>` si no) y que `cantidadObservaciones`/`cantidadTareas` sean `null` y `tableros` esté vacío — en vez de la comparación numérica genérica. Ausente ese campo (los seis fixtures ya aprobados/pendientes anteriores), el comportamiento es **idéntico** al previo a esta corrección.
+  - `clasificacionSimuladaPorDefecto_()`: misma condición — si el fixture activo declara `resultadoSimulado` en esa categoría, el doble devuelve `{resultado, cantidadObservaciones: null, cantidadTareas: null, tableros: []}` en vez de derivar `SIN_TAREAS`/`TAREAS_SIMULADAS` genérico. Ausente ese campo, comportamiento idéntico al previo.
+- `pruebas/pruebas_automatizador_integracion_fase8.gs`: se agregan pruebas unitarias directas de `verificarClasificacionSimulada_()` contra la nueva rama (coincidencia exacta; `resultado` distinto; conteos no nulos), además de confirmar que la prueba S1 (camino correcto, ahora fiel al `NO_ELEGIBLE` real) sigue aprobando tras ambas correcciones.
+- `codigo/script_refactorizado.gs`: **sin cambios.**
+
+### Evidencia real conservada (no se repite la corrida)
+`messageId=19f9661d038ea8de`: `DRY_RUN` descartó el mensaje por filtro determinístico, sin escrituras y sin llamada a OpenAI (confirma la particularidad prevista de este fixture); `SIMULAR_FALLIDO` con `SIMULACION_CANTIDAD_OBSERVACIONES:null,SIMULACION_CANTIDAD_TAREAS:null`; la fase formal no se ejecutó. Esta evidencia se conserva íntegra; no se vuelve a ejecutar este `message_id`.
+
+### Estado de CP-16
+**Sin cambios — permanece Pendiente.** Requiere una corrida real nueva completa (`SIMULACION_OK` + `FORMAL_OK`) con un `message_id` nuevo. Como esta corrección toca `pruebas/automatizador_integracion_fase8.gs` (no solo el catálogo de fixtures), el tester debe volver a copiar **ambos** archivos (`fixtures_integracion_fase8.gs` y `automatizador_integracion_fase8.gs`) al proyecto de Apps Script antes del reintento, y cancelar la sesión pendiente (`cancelarSesionIntegracionFase8Visible()`) antes de preparar una nueva.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta corrección. No se modificó `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`.
+
+---
+
 ## [2026-07-24] — Ampliación incremental del automatizador de integración: fixture INT-FASE8-07-CUERPO-VACIO (CP-16)
 
 ### Contexto
