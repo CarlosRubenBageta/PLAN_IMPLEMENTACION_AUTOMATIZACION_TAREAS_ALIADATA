@@ -1,5 +1,28 @@
 # Changelog
 
+## [2026-07-24] — Ampliación incremental del automatizador de integración: fixture INT-FASE8-05-OBSERVACIONES-DUPLICADAS (CP-15)
+
+### Contexto
+Se agrega un tercer fixture con tareas, equivalente a CP-15 (`pruebas/CASOS_DE_PRUEBA.md`): "el mismo pedido repetido en el cuerpo y en una firma citada... una sola tarea (RF-04, consolidación), no dos filas idénticas". A diferencia de CP-03/CP-04 (que ejercitan la generalización a N=2 y N=3 tareas), este fixture ejercita esa misma generalización en **N=1**, y además cubre una regla de negocio distinta y hasta ahora no probada en ningún fixture real de este automatizador: RF-04 (`documentacion/REGLAS_FUNCIONALES.md`), consolidación de observaciones que piden literalmente la misma acción.
+
+### Decisión de diseño: por qué el cuerpo NO usa el formato de cita de Gmail del enunciado original de CP-15
+El enunciado original de CP-15 propone repetir el pedido dentro de un bloque citado tipo respuesta ("El [fecha], [nombre] escribió:\n> [texto]"). Revisando `extraerContenidoNuevo()` (`codigo/script_refactorizado.gs`), ese patrón exacto coincide con uno de sus marcadores de corte (`/^[ \t]*El (?:...) escribió:.../m`) — el bloque citado se recortaría **antes** de llegar a la IA, y el modelo nunca vería el pedido duplicado. Un fixture con esa redacción probaría el recorte de citas (ya cubierto exhaustivamente por 19/19 pruebas locales en `pruebas/pruebas_extraer_contenido_nuevo.gs`), no la consolidación de RF-04.
+
+Para probar RF-04 específicamente, el cuerpo repite el mismo pedido dos veces **sin ningún marcador de cita** ("Como te comentaba antes:"), de modo que `extraerContenidoNuevo()` no recorte nada y el texto completo, con la repetición literal, llegue a la IA. RF-04 sí está codificada en el prompt real (`codigo/prompts_ia.gs`): "Si dos observaciones distintas piden exactamente la misma acción, consolidalas en una sola tarea (no la dupliques)."
+
+### Ambigüedad reconocida (a confirmar con la corrida real)
+El prompt no incluye un ejemplo few-shot de consolidación, y su redacción admite dos lecturas: (a) el modelo consolida también a nivel de observación (`cantidad_observaciones=1`), o (b) mantiene 2 observaciones distintas pero con una única tarea combinada entre ambas (`cantidad_observaciones=2`, `cantidad_tareas=1`). El fixture asume la lectura (a) por ser la más directa de "consolidar" — si la corrida real muestra la lectura (b), se documentará como hallazgo y se ajustará `esperado.cantidad_observaciones` (no una corrección del automatizador, ver la salvedad de `verificarClasificacionSimulada_()` más abajo).
+
+### Cambios
+- `pruebas/fixtures_integracion_fase8.gs`: nuevo fixture `INT-FASE8-05-OBSERVACIONES-DUPLICADAS`, con `esperado.tareasEsperadas` de 1 elemento (`Finanzas`) — primera prueba real de la generalización N-tareas en N=1.
+- `pruebas/pruebas_automatizador_integracion_fase8.gs`: nuevo doble de prueba dedicado para 1 tarea (`efectoFormalUnaTareaFabrica_`), separado de los de 2 y 3 tareas (mismo criterio que CP-04: no arriesgar la cobertura ya aprobada de CP-03/CP-04 generalizando dobles existentes). Una prueba de camino correcto confirmando que N=1 también funciona.
+- `codigo/*.gs`: **sin cambios.**
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta ampliación. No se modificó `codigo/prompts_ia.gs`, `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-15 en esta entrada — requiere una corrida real (`SIMULACION_OK` + `FORMAL_OK`).
+
+---
+
 ## [2026-07-24] — CP-04 Aprobado: corrida real completa de INT-FASE8-04-TRES-TAREAS (SIMULACION_OK + FORMAL_OK)
 
 ### Contexto

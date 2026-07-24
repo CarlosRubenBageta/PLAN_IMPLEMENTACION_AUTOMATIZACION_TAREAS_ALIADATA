@@ -632,6 +632,108 @@ function efectoFormalTresTareasFabrica_(opciones) {
 }
 
 // ============================================================================
+// DOBLES ESPECÍFICOS DE INT-FASE8-05-OBSERVACIONES-DUPLICADAS (CP-15)
+// ============================================================================
+//
+// Deliberadamente SEPARADOS de los dobles de 2 y 3 tareas (mismo criterio que
+// CP-04): evita cualquier riesgo de regresión sobre la cobertura ya aprobada
+// de CP-03/CP-04. Este fixture ejercita la generalización N-tareas en N=1.
+
+/** Crea el estado base seleccionando el fixture de una tarea vía AUTO_FASE8_CASO. */
+function crearEstadoUnaTarea_(overrides) {
+  var estado = crearEstadoIntegracion_(overrides || {});
+  estado.props.AUTO_FASE8_CASO = 'INT-FASE8-05-OBSERVACIONES-DUPLICADAS';
+  return estado;
+}
+
+/** prepararCaso_() + simularEnvioMensaje_() + simularYVerificar_() para el fixture de una tarea. */
+function prepararSimuladoUnaTarea_(overridesEstado) {
+  var estado = crearEstadoUnaTarea_(overridesEstado);
+  var amb = crearAmbFalsoIntegracion_(estado);
+  prepararCaso_(amb);
+  simularEnvioMensaje_(estado);
+  simularYVerificar_(amb);
+  return { estado: estado, amb: amb };
+}
+
+/**
+ * Fábrica del efecto formal para INT-FASE8-05-OBSERVACIONES-DUPLICADAS: aplica,
+ * sobre las hojas falsas, el resultado que el pipeline real escribiría para un
+ * mensaje con 1 observación y 1 tarea (Finanzas), consolidada por RF-04 a
+ * partir de un pedido repetido. Por defecto reproduce el camino correcto.
+ */
+function efectoFormalUnaTareaFabrica_(opciones) {
+  opciones = opciones || {};
+  return function (estado) {
+    var mid = estado.mensaje.id;
+    var t1 = 'taskId1' in opciones ? opciones.taskId1 : mid + '-T1';
+    var tablero1 = opciones.tablero1 || 'Finanzas';
+    var estadoEscritura1 = opciones.estadoEscritura1 || ESTADOS_ESCRITURA_TAREA.ESCRITA;
+    var texto1 = 'texto1' in opciones ? opciones.texto1 : 'CANARIO_OBS_TEXTO_ORIGINAL_no_debe_registrarse_en_logs';
+    var idNegocio1 = 'idNegocio1' in opciones ? opciones.idNegocio1 : t1;
+
+    // --- Log Mensajes: una fila PROCESADO/FINALIZADO ---
+    var log = estado.sheets['Log Mensajes'];
+    var encLog = log._datos()[0];
+    var filaLog = encLog.map(function () { return ''; });
+    function setLog(nombre, val) { var idx = encLog.indexOf(nombre); if (idx !== -1) filaLog[idx] = val; }
+    setLog('message_id', mid);
+    setLog('thread_id', 'TH-1');
+    setLog('estado', opciones.estadoLog || ESTADOS.PROCESADO);
+    setLog('etapa', opciones.etapaLog || ETAPAS.FINALIZADO);
+    setLog('cantidad_observaciones', 'cantidadObservaciones' in opciones ? opciones.cantidadObservaciones : 1);
+    setLog('cantidad_tareas', 'cantidadTareas' in opciones ? opciones.cantidadTareas : 1);
+    setLog('resultado_gmail', opciones.resultadoGmail || 'SOLO_ETIQUETADO');
+    setLog('error', '');
+    log._datos().push(filaLog);
+
+    // --- Registro Tareas: 1 fila ---
+    var registro = estado.sheets['Registro Tareas'];
+    var encRegistro = registro._datos()[0];
+    function filaRegistro(taskId, tablero, estadoEscritura, textoOriginal) {
+      var f = encRegistro.map(function () { return ''; });
+      function setR(nombre, val) { var idx = encRegistro.indexOf(nombre); if (idx !== -1) f[idx] = val; }
+      setR('task_id', taskId);
+      setR('message_id', mid);
+      setR('thread_id', 'TH-1');
+      setR('tablero', tablero);
+      setR('estado_escritura', estadoEscritura);
+      setR('observacion_numero', 1);
+      setR('observacion_texto_original', textoOriginal);
+      return f;
+    }
+    if (!opciones.omitirFilaRegistro1) registro._datos().push(filaRegistro(t1, tablero1, estadoEscritura1, texto1));
+
+    // --- Indice Idempotencia: por defecto, una entrada ---
+    var indice = estado.sheets['Indice Idempotencia'];
+    var idsIndice = opciones.idsIndice || [t1];
+    var estadosIndice = opciones.estadosIndice || [ESTADOS.PROCESADO];
+    idsIndice.forEach(function (taskId, i) {
+      indice._datos().push([mid, taskId, estadosIndice[i] || ESTADOS.PROCESADO, 'FECHA']);
+    });
+
+    // --- Hojas de negocio: una fila nueva, vinculada por "ID" ---
+    var encabezadosNegocioConocidos = encabezadosHojaNegocio_();
+    var idxIdConocido = encabezadosNegocioConocidos.indexOf('ID');
+    function agregarFilaNegocio(tablero, taskId) {
+      var hoja = estado.sheets[tablero];
+      var f = encabezadosNegocioConocidos.map(function () { return ''; });
+      if (idxIdConocido !== -1) f[idxIdConocido] = taskId;
+      hoja._datos().push(f);
+    }
+    if (!opciones.omitirFilaNegocio1) agregarFilaNegocio(opciones.tableroFilaNegocio1 || tablero1, idNegocio1);
+
+    // --- Gmail: etiqueta Procesado (salvo que se pida omitirla) ---
+    if (!opciones.omitirEtiquetaProcesado && estado.mensaje.labelIds.indexOf('L_PROC') === -1) {
+      estado.mensaje.labelIds.push('L_PROC');
+    }
+    (opciones.etiquetasExtra || []).forEach(function (labelId) {
+      if (estado.mensaje.labelIds.indexOf(labelId) === -1) estado.mensaje.labelIds.push(labelId);
+    });
+  };
+}
+
+// ============================================================================
 // SUITE
 // ============================================================================
 
@@ -1639,6 +1741,41 @@ function ejecutarPruebasAutomatizadorIntegracionFase8() {
   (function () {
     var r = ejecutarFormalTresTareas_({ tablero3: 'Desarrollo IT' });
     assert('P4 — tablero duplicado (Desarrollo IT x2, falta Comercial) rechaza', tieneError(r.resultado, 'REGISTRO_TABLEROS_NO_COINCIDEN'), JSON.stringify(r.resultado.errores));
+  })();
+
+  // ==========================================================================
+  // Q: INT-FASE8-05-OBSERVACIONES-DUPLICADAS (CP-15) — confirma que la
+  //    generalización a N tareas también funciona en N=1 (probada en N=2 y N=3
+  //    por las secciones M/N/O y P). La consolidación de RF-04 en sí (si la IA
+  //    real reporta 1 o 2 observaciones) solo puede confirmarse con una
+  //    corrida real — ver auditoria/CHANGELOG.md.
+  // ==========================================================================
+
+  function ejecutarFormalUnaTarea_(opciones) {
+    var ctx = prepararSimuladoUnaTarea_({ efectoFormal: efectoFormalUnaTareaFabrica_(opciones) });
+    return { resultado: ejecutarFormalYVerificar_(ctx.amb), estado: ctx.estado };
+  }
+
+  // Q1: camino correcto — 1 observación, 1 tarea (Finanzas).
+  (function () {
+    var r = ejecutarFormalUnaTarea_({});
+    assert('Q1 — INT-FASE8-05: camino correcto (1 observación, 1 tarea en Finanzas) aprueba',
+      r.resultado.ok === true, JSON.stringify(r.resultado.errores));
+  })();
+
+  // Q2: la simulación (DRY_RUN), con la clasificación derivada por defecto de fixture.esperado, también aprueba a N=1.
+  (function () {
+    var estado = crearEstadoUnaTarea_();
+    var amb = crearAmbFalsoIntegracion_(estado);
+    prepararCaso_(amb);
+    simularEnvioMensaje_(estado);
+    var sim = simularYVerificar_(amb);
+    assert('Q2 — la simulación de INT-FASE8-05 aprueba sin tocar Registro Tareas/Indice/hojas de negocio',
+      sim.ok === true &&
+      estado.sheets['Registro Tareas']._datos().length === 1 &&
+      estado.sheets['Indice Idempotencia']._datos().length === 1 &&
+      estado.sheets['Finanzas']._datos().length === 5,
+      JSON.stringify(sim.errores));
   })();
 
   Logger.log('--- Resumen ---');

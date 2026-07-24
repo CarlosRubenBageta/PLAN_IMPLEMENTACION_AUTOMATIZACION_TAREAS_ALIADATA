@@ -194,6 +194,53 @@ var FIXTURES_INTEGRACION_FASE8 = [
       noArchivar: true,
       clavesEtiquetaProhibidas: ['RevisionSinTareas', 'RevisionErrorProcesamiento', 'RevisionErrorAutomatizacion']
     }
+  },
+  {
+    id: 'INT-FASE8-05-OBSERVACIONES-DUPLICADAS',
+    descripcion: 'Equivalente a CP-15: el mismo pedido repetido dos veces con distinta redacción en el cuerpo, sin ningún marcador de cita/respuesta, debe consolidarse (RF-04) en una única tarea en vez de generar dos filas duplicadas.',
+    remitentePermitido: 'sichar@gmail.com',
+    asuntoBase: '[PRUEBA-AUTOMATIZACION][INTEGRACION] Pedido repetido',
+    // El enunciado original de CP-15/CASOS_DE_PRUEBA.md repite el pedido dentro
+    // de un bloque citado tipo respuesta ("El [fecha], [nombre] escribió:\n>
+    // [texto]"). Ese patrón coincide con uno de los marcadores de corte de
+    // extraerContenidoNuevo() (codigo/script_refactorizado.gs) y se recortaría
+    // ANTES de llegar a la IA, probando el recorte de citas (ya cubierto por
+    // 19/19 pruebas locales en pruebas/pruebas_extraer_contenido_nuevo.gs), no
+    // la consolidación de RF-04. Por eso este cuerpo repite el pedido sin
+    // ningún marcador de cita, para que el texto completo llegue a la IA y
+    // ejercite específicamente RF-04 ("Si dos observaciones distintas piden
+    // exactamente la misma acción, consolidalas en una sola tarea", codigo/prompts_ia.gs).
+    cuerpo: 'Necesitamos el informe de gastos de julio antes del viernes. Como te comentaba antes: necesitamos el informe de gastos de julio antes del viernes.',
+    versionPromptMinima: 'v4-INC-FASE8-011-informativo-sin-tareas',
+    esperado: {
+      // Log Mensajes (por nombre de encabezado).
+      estado: 'PROCESADO',
+      etapa: 'FINALIZADO',
+      // Ambigüedad reconocida (ver auditoria/CHANGELOG.md): el prompt no trae
+      // un ejemplo few-shot de consolidación. Se asume que "consolidar" implica
+      // también unificar la observación (no solo la tarea) — si la corrida
+      // real muestra 2 observaciones con 1 tarea combinada, se documentará
+      // como hallazgo y se ajustará este valor.
+      cantidad_observaciones: 1,
+      cantidad_tareas: 1,
+      resultado_gmail: 'SOLO_ETIQUETADO',
+      // Registro Tareas: exactamente 1 fila — primera prueba de la
+      // generalización N-tareas de verificarResultadoFormal_()/
+      // verificarClasificacionSimulada_() en N=1 (ya probada en N=2 y N=3).
+      filasRegistroTareas: 1,
+      tareasEsperadas: [
+        { tablero: 'Finanzas' }
+      ],
+      // Indice Idempotencia: una entrada por task_id del manifiesto, todas PROCESADO.
+      entradasIndiceIdempotencia: 1,
+      estadoFinalIndice: 'PROCESADO',
+      // Gmail: recibe Procesado; ninguna etiqueta de revisión/error.
+      claveEtiquetaEsperada: 'Procesado',
+      conservaEtiquetaPrueba: true,
+      conservaInbox: true,
+      noArchivar: true,
+      clavesEtiquetaProhibidas: ['RevisionSinTareas', 'RevisionErrorProcesamiento', 'RevisionErrorAutomatizacion']
+    }
   }
 ];
 
