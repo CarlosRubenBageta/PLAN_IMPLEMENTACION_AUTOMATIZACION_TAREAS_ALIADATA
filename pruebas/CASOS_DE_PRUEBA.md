@@ -171,7 +171,7 @@ Este mensaje y sus adjuntos son confidenciales. Si usted no es el destinatario..
 [firma extensa continúa por 15 líneas más con avisos legales]
 ```
 **Resultado esperado:** la IA no genera una tarea falsa a partir del texto de la firma/aviso legal; la observación real (confirmar la reunión) sí se detecta.
-**Estado:** Pendiente.
+**Estado:** Aprobado — 24/07/2026. Ejecutado mediante el automatizador de integración de Fase 2A (`runId b8ed62db-4f41-418e-9acd-276d1bcdd4ee`, `message_id 19f9640b73453584`, fixture `INT-FASE8-06-FIRMA-EXTENSA`): `SIMULACION_OK` confirmó 1 observación/1 tarea simulada (`Gestión General/Alto`), sin escrituras; `FORMAL_OK` confirmó automáticamente `Log Mensajes` (`cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`), 1 fila en `Registro Tareas`, 1 entrada en `Indice Idempotencia`, una fila nueva en la hoja `Gestión General`, y la etiqueta `Procesado` aplicada en Gmail. Confirma, en producción real, tanto la exclusión de firmas/avisos legales (regla del prompt) como que la canonicalización de transporte de cuerpo sostiene un bloque de firma extenso multi-párrafo, sin necesitar ningún ajuste de redacción. Ver detalle completo en `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
 ## CP-15 — Observaciones duplicadas
 

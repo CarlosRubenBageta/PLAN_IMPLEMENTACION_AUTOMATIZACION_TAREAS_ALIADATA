@@ -91,7 +91,7 @@ Nunca se escriben estos valores en `PropertiesService` (verificado por la prueba
 | `INT-FASE8-02-DOS-TAREAS` | CP-03 | Una única observación con dos acciones concretas: `PROCESADO`, 1 observación, 2 tareas (`Desarrollo IT` + `Comercial`) que comparten el mismo `observacion_texto_original`; Gmail recibe `Procesado`. **CP-03 Aprobado (24/07/2026)**, tras tres corridas reales previas que expusieron y permitieron corregir dos falsos negativos del verificador y una ambigüedad del fixture (secciones 9.1.1 a 9.1.3). |
 | `INT-FASE8-04-TRES-TAREAS` | CP-04 | Una única observación con tres acciones concretas: `PROCESADO`, 1 observación, 3 tareas (`Desarrollo IT` + `Finanzas` + `Comercial`) que comparten el mismo `observacion_texto_original`; Gmail recibe `Procesado`. Reutiliza `verificarResultadoFormal_()`/`verificarClasificacionSimulada_()` sin ningún cambio de código (ya generalizados a N tareas por CP-03). **CP-04 Aprobado (24/07/2026)**, tras una corrida real previa que expuso y permitió corregir una ambigüedad del fixture (sección 9.2.1). |
 | `INT-FASE8-05-OBSERVACIONES-DUPLICADAS` | CP-15 | El mismo pedido repetido dos veces sin marcador de cita: `PROCESADO`, 1 observación, 1 tarea (`Finanzas`) consolidada por RF-04 (`documentacion/REGLAS_FUNCIONALES.md`). Primera prueba real de la generalización N-tareas en N=1, y primera prueba de RF-04 en un fixture real de este automatizador. **CP-15 Aprobado (24/07/2026)**, al primer intento, sin necesitar ajuste de redacción (sección 9.3.1). |
-| `INT-FASE8-06-FIRMA-EXTENSA` | CP-14 | Una consulta real breve seguida de una firma de correo y un aviso legal extenso (~15 líneas): `PROCESADO`, 1 observación, 1 tarea (`Gestión General`), sin ninguna tarea fabricada desde la firma/aviso legal (regla explícita del prompt, `codigo/prompts_ia.gs`). Primer fixture con cuerpo multi-párrafo (consulta + firma). Pendiente de corrida real (ver sección 9.4). |
+| `INT-FASE8-06-FIRMA-EXTENSA` | CP-14 | Una consulta real breve seguida de una firma de correo y un aviso legal extenso (~15 líneas): `PROCESADO`, 1 observación, 1 tarea (`Gestión General`), sin ninguna tarea fabricada desde la firma/aviso legal (regla explícita del prompt, `codigo/prompts_ia.gs`). Primer fixture con cuerpo multi-párrafo (consulta + firma). **CP-14 Aprobado (24/07/2026)**, al primer intento, sin necesitar ajuste (sección 9.4.1). |
 
 La propiedad `AUTO_FASE8_CASO` (`ScriptProperties` del proyecto de prueba) selecciona el fixture activo por `id`; si está ausente, se usa `FIXTURE_INTEGRACION_POR_DEFECTO` (`INT-FASE8-01-INFORMATIVO`). El automatizador **solo lee** esta propiedad — nunca la escribe ni modifica ninguna otra propiedad de configuración productiva. Para ejecutar el caso de CP-03, configurar `AUTO_FASE8_CASO=INT-FASE8-02-DOS-TAREAS`; para CP-04, `AUTO_FASE8_CASO=INT-FASE8-04-TRES-TAREAS`; en ambos casos, antes de llamar a `prepararCasoIntegracionFase8Visible()` (ver procedimiento, sección 9).
 
@@ -278,7 +278,7 @@ Esta corrida clasificó exactamente 1 observación / 1 tarea en `Finanzas` — c
 
 ### 9.4. Procedimiento para CP-14 (`INT-FASE8-06-FIRMA-EXTENSA`)
 
-**CP-14 Pendiente** — todavía no tiene ninguna corrida real. El procedimiento es el mismo (pasos 0-6 de la sección 9), con dos diferencias:
+**CP-14 Aprobado — 24/07/2026** (ver sección 9.4.1). El procedimiento que llevó a esa corrida (pasos 0-6 de la sección 9), con dos diferencias:
 
 - Antes del paso 3 (`prepararCasoIntegracionFase8Visible()`), configurar en el proyecto de prueba la propiedad `AUTO_FASE8_CASO=INT-FASE8-06-FIRMA-EXTENSA` (sección 6).
 - El asunto/cuerpo a enviar (paso 4) serán los de este fixture: `[PRUEBA-AUTOMATIZACION][INTEGRACION] Consulta rápida [<marcador>]`, con el cuerpo (varios párrafos, a diferencia de los fixtures anteriores):
@@ -303,11 +303,24 @@ www.alia-data.com
 No responda si el mensaje llegó por error.
 ```
 
-**Riesgo reconocido de antemano:** es el primer fixture con cuerpo multi-párrafo (los anteriores eran un único párrafo continuo). Si Gmail re-envuelve alguna línea larga de forma distinta a lo esperado, la barrera `CUERPO_NO_COINCIDE` podría bloquear la simulación aunque la canonicalización de transporte (probada con el piloto CP-05) esté funcionando correctamente — en ese caso, el ajuste sería de formato/línea, no de lógica.
+**Riesgo reconocido antes de la corrida (ya resuelto, ver sección 9.4.1):** es el primer fixture con cuerpo multi-párrafo (los anteriores eran un único párrafo continuo). Si Gmail re-envuelve alguna línea larga de forma distinta a lo esperado, la barrera `CUERPO_NO_COINCIDE` podría bloquear la simulación aunque la canonicalización de transporte (probada con el piloto CP-05) esté funcionando correctamente. La corrida real confirmó que no se disparó.
 
 **Aserciones del piloto (INT-FASE8-06, equivalente a CP-14).** Dry-run: exactamente un mensaje elegible; cero cambios en Gmail y en las ocho hojas (técnicas y de negocio); clasificación esperada 1 observación / 1 tarea en `Gestión General`. Formal: `Log Mensajes` con una fila, `estado=PROCESADO`, `etapa=FINALIZADO`, `cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`; `Registro Tareas` con exactamente 1 fila para el `message_id`; `Indice Idempotencia` con 1 entrada (`estado_final=PROCESADO`); una fila nueva en `Gestión General` (vinculada por `ID`); Gmail conserva `Pruebas-Automatizacion` e `INBOX`, recibe `Procesado`, no recibe etiquetas de revisión/error, no se archiva.
 
 Tras una corrida real satisfactoria, la aprobación de CP-14 (si corresponde) se registra por separado en `pruebas/CASOS_DE_PRUEBA.md`/`pruebas/resultados/RESULTADOS_FASE_8.md`, con el mismo criterio humano de revisión que el resto de los casos de prueba.
+
+#### 9.4.1. Primer intento real (24/07/2026) — corrida completa exitosa, CP-14 Aprobado
+
+```text
+runId: b8ed62db-4f41-418e-9acd-276d1bcdd4ee
+messageId: 19f9640b73453584 (nuevo)
+simulación: SIMULACION_OK
+formal: FORMAL_OK
+```
+
+Esta corrida clasificó exactamente 1 observación / 1 tarea en `Gestión General` — coincide en su totalidad con lo que exige CP-14, al primer intento, sin necesitar ningún ajuste. Resuelve los dos riesgos reconocidos de antemano: la barrera de cuerpo no se disparó pese al bloque de firma multi-párrafo, y la IA real no fabricó ninguna tarea a partir de la firma/aviso legal. `simularYVerificarCasoIntegracionFase8Visible()` informó `SIMULACION_OK`; `ejecutarFormalYVerificarCasoIntegracionFase8Visible()` informó `FORMAL_OK` sobre el mismo `runId`/`messageId`, sin re-preparar la sesión. `verificarResultadoFormal_()` confirmó automáticamente: `Log Mensajes` (`estado=PROCESADO`, `cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`); `Registro Tareas` con exactamente 1 fila (`task_id` no vacío, `estado_escritura=ESCRITA`, tablero `Gestión General`); `Indice Idempotencia` con 1 entrada (`estado_final=PROCESADO`); una fila nueva en `Gestión General` vinculada por `ID`; Gmail con `Procesado` aplicado, sin etiquetas de error/revisión, sin archivar.
+
+**CP-14 pasa de Pendiente a Aprobado — 24/07/2026.** Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
 ## 10. Sanitización de logs y estado de sesión
 

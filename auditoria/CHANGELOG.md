@@ -1,5 +1,38 @@
 # Changelog
 
+## [2026-07-24] — CP-14 Aprobado: corrida real completa de INT-FASE8-06-FIRMA-EXTENSA (SIMULACION_OK + FORMAL_OK)
+
+### Contexto
+Con el fixture recién agregado (ver entrada inmediatamente anterior), la primera corrida real completó el flujo de dos invocaciones sin ninguna discrepancia, al primer intento:
+
+```text
+runId: b8ed62db-4f41-418e-9acd-276d1bcdd4ee
+messageId: 19f9640b73453584 (nuevo, nunca antes usado)
+simulación: SIMULACION_OK
+formal: FORMAL_OK
+```
+
+`simularYVerificarCasoIntegracionFase8Visible()` reportó `[DRY_RUN] 19f9640b73453584: 1 observación(es), 1 tarea(s) simulada(s) [Gestión General/Alto]` y `[AUTO-FASE8] SIMULACION_OK`. `ejecutarFormalYVerificarCasoIntegracionFase8Visible()` reportó `[AUTO-FASE8] FORMAL_OK` para el mismo `runId`/`messageId`, sin re-preparar la sesión.
+
+### Dos riesgos reconocidos de antemano, ambos resueltos sin iteración
+1. **Cuerpo multi-párrafo:** primer fixture de este automatizador con varios párrafos (consulta + firma/aviso legal), en vez de un único párrafo continuo. La barrera de cuerpo (`CUERPO_NO_COINCIDE`) no se disparó — la canonicalización de transporte (probada con el piloto CP-05) también sostiene un bloque de firma largo.
+2. **Exclusión de firmas/avisos legales:** la IA real clasificó exactamente 1 observación (la consulta), sin fabricar ninguna observación ni tarea a partir de las ~15 líneas de firma/aviso legal — confirma que la regla del prompt ("excluyendo firmas, avisos legales y publicidad", `codigo/prompts_ia.gs`) funciona en producción real.
+
+### Qué certifica `FORMAL_OK` (por construcción de `verificarResultadoFormal_()`, sección 7)
+- **`Log Mensajes`:** una fila para este `message_id`, `estado=PROCESADO`, `etapa=FINALIZADO`, `cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`.
+- **`Registro Tareas`:** exactamente 1 fila; `task_id` no vacío; `estado_escritura=ESCRITA`; `tablero=Gestión General`; `observacion_texto_original` no vacío.
+- **`Indice Idempotencia`:** exactamente 1 entrada, `estado_final=PROCESADO`.
+- **Hojas de negocio:** una fila nueva en `Gestión General`, vinculada por la columna `ID` a ese `task_id`, con todas las filas previas al baseline exactamente intactas.
+- **Gmail:** conserva `Pruebas-Automatizacion` e `INBOX`, recibe `Procesado`, no recibe ninguna etiqueta de revisión/error, no se archiva.
+
+### Aprobación
+**CP-14 pasa de Pendiente a Aprobado — 24/07/2026**, primera corrida real sin necesitar ninguna iteración de ajuste. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### No accedido
+No se modificó ningún archivo de código (`codigo/*.gs` ni `pruebas/*.gs`) en esta entrada — es exclusivamente el registro de una corrida real exitosa y la actualización de los documentos de seguimiento.
+
+---
+
 ## [2026-07-24] — Ampliación incremental del automatizador de integración: fixture INT-FASE8-06-FIRMA-EXTENSA (CP-14)
 
 ### Contexto

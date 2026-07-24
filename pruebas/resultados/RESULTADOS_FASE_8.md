@@ -56,7 +56,7 @@ Captura revisada por Claude Cowork. Muestra:
 | CP-11 | Mismo mensaje dos veces | 21/07/2026, ~21:43 | `procesarCorreosDeTareas()` informó `0 mensajes elegibles, procesando 0` reutilizando los dos mensajes ya cerrados de CP-10. Ver detalle completo debajo de la tabla. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
 | CP-12 | Caída después de escritura parcial | | Criterio revisado por auditoría de INC-FASE8-005: el caso tal como estaba redactado asumía recuperación vía `UMBRAL_ABANDONO_MIN`, sin contemplar el cierre inmediato de `gestionarErrorMensaje()`. Ejecutar recién después de aplicar la corrección de INC-FASE8-005. | | Pendiente (bloqueado por INC-FASE8-005) |
 | CP-13 | Dos ejecuciones simultáneas | | | | Pendiente |
-| CP-14 | Firma extensa | | | | Pendiente |
+| CP-14 | Firma extensa | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: `SIMULACION_OK` confirmó 1 observación/1 tarea (`Gestión General/Alto`), sin escrituras; `FORMAL_OK` confirmó automáticamente `Log Mensajes`, 1 fila en `Registro Tareas`, 1 entrada en `Indice Idempotencia`, fila nueva en `Gestión General`, y etiqueta `Procesado` en Gmail. Aprobó al primer intento, pese a ser el primer cuerpo multi-párrafo del automatizador. | Registro `[AUTO-FASE8]` de la corrida real — `runId b8ed62db-4f41-418e-9acd-276d1bcdd4ee`, `message_id 19f9640b73453584` | Aprobado — 24/07/2026 |
 | CP-15 | Observaciones duplicadas | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: `SIMULACION_OK` confirmó 1 observación/1 tarea (`Finanzas/Alto`), sin escrituras; `FORMAL_OK` confirmó automáticamente `Log Mensajes`, 1 fila en `Registro Tareas`, 1 entrada en `Indice Idempotencia`, fila nueva en `Finanzas`, y etiqueta `Procesado` en Gmail. Aprobó al primer intento. | Registro `[AUTO-FASE8]` de la corrida real — `runId 01fbd80c-a874-4eed-82a6-c21a14b8070f`, `message_id 19f9621b19597350` | Aprobado — 24/07/2026 |
 | CP-16 | Cuerpo vacío | | | | Pendiente |
 | CP-17 | Fecha límite explícita | | | | Pendiente |
@@ -903,6 +903,41 @@ Versión de prompt: v4-INC-FASE8-011-informativo-sin-tareas
 
 **Estado (veredicto final):** Aprobado — 24/07/2026 (`PASA`).
 
+## Detalle de CP-14 — Firma extensa (aprobado vía automatizador de integración Fase 2A)
+
+```text
+Fecha de ejecución: 24/07/2026
+Caso automatizado: INT-FASE8-06-FIRMA-EXTENSA
+runId: b8ed62db-4f41-418e-9acd-276d1bcdd4ee
+message_id: 19f9640b73453584 (nuevo)
+Versión de prompt: v4-INC-FASE8-011-informativo-sin-tareas
+```
+
+**Antecedente:** al igual que CP-03/CP-04/CP-15, se ejecutó íntegramente a través del automatizador de integración de Fase 2A. Este fixture reutiliza la generalización a N=1 (ya confirmada por CP-15), reutilizando sin cambios el mismo doble de prueba (`efectoFormalUnaTareaFabrica_`) con un tablero distinto (`Gestión General`). Es el primer fixture con cuerpo **multi-párrafo** (consulta breve + firma de correo + aviso legal de ~15 líneas), a diferencia de los anteriores (un único párrafo continuo) — dos riesgos se reconocieron de antemano y ambos se resolvieron sin iteración: (1) que Gmail reenvuelva alguna línea larga de forma distinta a la esperada y dispare `CUERPO_NO_COINCIDE`; (2) que la IA fabrique una observación/tarea a partir del texto de la firma/aviso legal, en lugar de excluirlo como indica el prompt real (`codigo/prompts_ia.gs`).
+
+### Simulación (`simularYVerificarCasoIntegracionFase8Visible()`)
+
+- El núcleo informó exactamente 1 mensaje elegible y procesó el `message_id` preparado.
+- La barrera de cuerpo (`CUERPO_NO_COINCIDE`) no se disparó pese al bloque de firma extenso multi-párrafo.
+- `[DRY_RUN] 19f9640b73453584: 1 observación(es), 1 tarea(s) simulada(s) [Gestión General/Alto]` — coincide exactamente con lo exigido por CP-14: la firma/aviso legal no generó ninguna observación ni tarea adicional.
+- `verificarClasificacionSimulada_()` confirmó cantidad de observaciones, cantidad de tareas y tablero contra `fixture.esperado`, sin discrepancias.
+- El automatizador comprobó que no hubo cambios en Gmail ni en las ocho hojas (técnicas y de negocio).
+- Resultado final: `[AUTO-FASE8] SIMULACION_OK`.
+
+### Ejecución formal y comprobaciones automáticas (`ejecutarFormalYVerificarCasoIntegracionFase8Visible()`)
+
+- El núcleo informó exactamente 1 mensaje elegible y procesó el mismo `message_id`, con el mismo `runId`/nonce/fingerprint que la simulación (sin re-preparar sesión).
+- `Log Mensajes`: exactamente una fila, `estado=PROCESADO`, `etapa=FINALIZADO`, `cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`.
+- `Registro Tareas`: exactamente 1 fila para el mensaje; `task_id` no vacío; `estado_escritura=ESCRITA`; tablero exactamente `Gestión General`.
+- `Indice Idempotencia`: exactamente 1 entrada, `estado_final=PROCESADO`.
+- Una fila nueva en `Gestión General`, vinculada por la columna `ID` a ese `task_id`.
+- Gmail conservó `Pruebas-Automatizacion` e `INBOX`, recibió `Procesado`, no recibió ninguna etiqueta de revisión/error y no fue archivado.
+- Resultado final: `[AUTO-FASE8] FORMAL_OK`.
+
+**Conclusión:** CP-14 PASA. La consulta real (confirmar la reunión) generó exactamente 1 tarea en `Gestión General`; la firma y el aviso legal de ~15 líneas no generaron ninguna tarea falsa — confirma que la exclusión de firmas/avisos legales está correctamente codificada en el prompt real y que el modelo la sigue.
+
+**Estado (veredicto final):** Aprobado — 24/07/2026 (`PASA`).
+
 ## Detalle de CP-05 — Correo informativo (aprobado, cierre de INC-FASE8-011)
 
 ```text
@@ -979,7 +1014,7 @@ Total de casos que condicionan la aprobación de esta fase: 36 (CP-01 a CP-29, C
 Diferido a Fase 10 (no condiciona esta fase): 1 (CP-30, DEC-004)
 Bloqueado que todavía condiciona la Fase 8: 1 (CP-35 — ver nota de auditoría abajo)
 Bloqueados pendientes de Lotes 2/3 (no condicionan esta fase): 2 (CP-38, CP-39)
-Aprobados: 19 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-10, CP-11, CP-15, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-27, CP-28, CP-31, CP-36, CP-37)
+Aprobados: 20 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-10, CP-11, CP-14, CP-15, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-27, CP-28, CP-31, CP-36, CP-37)
 Rechazados: 0
   CP-19 pasó de Rechazado (21/07/2026, INC-FASE8-008) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución fallida original se conserva íntegro en el detalle de CP-19.
   CP-23 pasó de Rechazado (22/07/2026, INC-FASE8-009) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución vulnerable original se conserva íntegro en el detalle de CP-23.
@@ -988,20 +1023,23 @@ Rechazados: 0
   CP-03 pasó de Pendiente a Aprobado (24/07/2026, ejecución vía el automatizador de integración de Fase 2A con message_id 19f953e0047d2478, tras tres iteraciones reales de ajuste del fixture/automatizador — ninguna un defecto del pipeline productivo). El registro de las tres corridas previas se conserva íntegro en `auditoria/CHANGELOG.md` y en el detalle de CP-03.
   CP-04 pasó de Pendiente a Aprobado (24/07/2026, ejecución vía el automatizador de integración de Fase 2A con message_id 19f95bc29ad0717d, tras un ajuste de redacción del fixture — no un defecto del pipeline productivo). El registro de la corrida previa se conserva íntegro en `auditoria/CHANGELOG.md` y en el detalle de CP-04.
   CP-15 pasó de Pendiente a Aprobado (24/07/2026, ejecución vía el automatizador de integración de Fase 2A con message_id 19f9621b19597350, al primer intento, sin necesitar ajuste de redacción). Confirma además, en producción real, que RF-04 (consolidación de observaciones duplicadas) está correctamente codificada en el prompt y que el modelo la sigue.
-Pendientes (ejecutables con estado Pendiente, no corridos aún): 16
+  CP-14 pasó de Pendiente a Aprobado (24/07/2026, ejecución vía el automatizador de integración de Fase 2A con message_id 19f9640b73453584, al primer intento, sin necesitar ajuste de redacción, pese a ser el primer fixture con cuerpo multi-párrafo). Confirma además, en producción real, la exclusión de firmas/avisos legales por parte de la IA.
+Pendientes (ejecutables con estado Pendiente, no corridos aún): 15
   [Corregido 22/07/2026: esta lista omitía a CP-27, ya aprobado desde el 20/07/2026 (CP-27 — Modo prueba con ID productivo); no cambia el alcance ni el estado de ningún caso.]
   [Corregido 23/07/2026 (semántica): CP-35 estaba contabilizado dentro de "Pendientes"; su estado individual es Bloqueado (ver nota de auditoría abajo), no Pendiente. Se lo separa como bloqueado que todavía condiciona la Fase 8. Pendientes pasa de 20 a 19; no cambia el estado individual de ningún caso.]
   [Corregido 24/07/2026: CP-03 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 19 a 18.]
   [Corregido 24/07/2026: CP-04 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 18 a 17.]
   [Corregido 24/07/2026: CP-15 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 17 a 16.]
-  CP-01, CP-02, CP-03, CP-04, CP-05, CP-10, CP-11, CP-15, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-27, CP-28, CP-31, CP-36 y CP-37 aprobados
+  [Corregido 24/07/2026: CP-14 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 16 a 15.]
+  CP-01, CP-02, CP-03, CP-04, CP-05, CP-10, CP-11, CP-14, CP-15, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-27, CP-28, CP-31, CP-36 y CP-37 aprobados
   CP-21 ya no está bloqueado por INC-FASE8-008 (CP-19 Aprobado) y fue ejecutado y aprobado el 22/07/2026
   CP-05 ya no está bloqueado por INC-FASE8-011 (cerrada) y fue ejecutado y aprobado el 23/07/2026
   CP-03 fue ejecutado y aprobado el 24/07/2026
   CP-04 fue ejecutado y aprobado el 24/07/2026
   CP-15 fue ejecutado y aprobado el 24/07/2026
-Casos sin aprobación que todavía condicionan la Fase 8: 17 (16 Pendientes + CP-35 Bloqueado)
-Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 20
+  CP-14 fue ejecutado y aprobado el 24/07/2026
+Casos sin aprobación que todavía condicionan la Fase 8: 16 (15 Pendientes + CP-35 Bloqueado)
+Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 19
 
 Nota (auditoría 20/07/2026): CP-35 pasó a "bloqueado" — no puede considerarse
 una verificación válida del criterio "no existen duplicados" hasta que
