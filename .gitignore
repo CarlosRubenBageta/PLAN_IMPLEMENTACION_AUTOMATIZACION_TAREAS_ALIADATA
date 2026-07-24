@@ -1,0 +1,36 @@
+# Dependencias y entornos virtuales
+node_modules/
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Credenciales y secretos — nunca deben subirse al repo
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+credentials.json
+service-account*.json
+token.json
+.clasp.json
+.clasprc.json
+
+# Artefactos de build / salidas generadas
+dist/
+build/
+coverage/
+*.log
+npm-debug.log*
+
+# Sistema operativo / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Configuración local de herramientas (específica de esta máquina, no compartir)
+.claude/settings.local.json

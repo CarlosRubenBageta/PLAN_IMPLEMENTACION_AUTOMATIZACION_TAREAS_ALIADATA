@@ -1,0 +1,209 @@
+/**
+ * ============================================================================
+ * pruebas/fixtures_integracion_fase8.gs
+ * EXCLUSIVO DEL PROYECTO DE PRUEBA / NO DESPLEGAR
+ * ============================================================================
+ * Fase 2A (MVP) del automatizador de integración de Fase 8 (ver
+ * auditoria/CHANGELOG.md, entrada "Fase 2A MVP: automatizador de integración
+ * de Fase 8"). Declara los casos sintéticos de integración de punta a punta
+ * que ejecuta pruebas/automatizador_integracion_fase8.gs.
+ *
+ * A diferencia de pruebas/fixtures_evaluacion_ia_fase8.gs (que solo ejercita
+ * la IA de forma aislada), estos fixtures describen un correo real que el
+ * tester debe ENVIAR manualmente desde la cuenta externa indicada, para que
+ * el pipeline completo (Gmail -> IA -> Sheets -> Gmail) lo procese en el
+ * proyecto de Apps Script de prueba. El envío automático desde la cuenta
+ * externa corresponderá a Fase 3; en Fase 2A el envío es manual.
+ *
+ * Ningún texto de este archivo corresponde a un correo real de Aliadata: son
+ * escenarios sintéticos. El piloto es equivalente a CP-05 (correo
+ * completamente informativo) pero NO reutiliza su message_id ni modifica el
+ * estado documental de CP-05: cada corrida genera su propio marcador y, al
+ * enviarse, un message_id nuevo.
+ *
+ * Este archivo NUNCA debe copiarse al proyecto de Apps Script productivo.
+ * ============================================================================
+ */
+
+/**
+ * Orden cronológico ascendente de versiones de VERSION_PROMPT_SISTEMA
+ * conocidas por el automatizador de integración. AUTOCONTENIDO: no depende de
+ * pruebas/fixtures_evaluacion_ia_fase8.gs (evaluador IA opcional). El
+ * automatizador compara VERSION_PROMPT_SISTEMA (de codigo/prompts_ia.gs, que
+ * ya es dependencia del pipeline) contra la versión mínima del fixture usando
+ * este orden. Una versión ausente de esta lista se trata como desconocida y
+ * aborta (fail-closed), nunca como aceptada.
+ *
+ * Mantenimiento: agregar al FINAL cada nuevo identificador de
+ * VERSION_PROMPT_SISTEMA cuando codigo/prompts_ia.gs cambie de versión.
+ */
+var ORDEN_VERSIONES_PROMPT_INTEGRACION = [
+  'v3-INC-FASE8-010-ejemplo-cobertura',
+  'v4-INC-FASE8-011-informativo-sin-tareas'
+];
+
+/**
+ * Catálogo de casos de integración. Cada fixture declara:
+ * - id: identificador corto no sensible (se registra en logs).
+ * - descripcion: para el tester (no se registra en logs de ejecución).
+ * - remitentePermitido: la ÚNICA dirección desde la que se admite el envío de
+ *   este caso (el automatizador la verifica contra el remitente real del
+ *   mensaje encontrado). Para el piloto: sichar@gmail.com.
+ * - asuntoBase: prefijo del asunto; el automatizador le agrega un marcador
+ *   único por corrida para poder localizar exactamente ese mensaje.
+ * - cuerpo: cuerpo sintético que el tester debe pegar al enviar el correo.
+ * - versionPromptMinima: versión mínima de VERSION_PROMPT_SISTEMA esperada
+ *   (histórico en pruebas/fixtures_evaluacion_ia_fase8.gs,
+ *   ORDEN_VERSIONES_PROMPT_CONOCIDAS_EVAL).
+ * - esperado: forma exacta del resultado tras la ejecución formal, expresada
+ *   por NOMBRE de campo/etiqueta (nunca por número de columna). El
+ *   automatizador compara contra esto.
+ * - esperado.tareasEsperadas (opcional): arreglo de {tablero}, uno por tarea
+ *   esperada en Registro Tareas (multiset, sin importar el orden). Cuando
+ *   está presente y no vacío, activa la verificación multi-tarea de
+ *   verificarResultadoFormal_() (task_id no vacío/distinto, estado_escritura
+ *   ESCRITA, tableros exactos, observacion_texto_original no vacío e
+ *   idéntico entre las tareas del mismo mensaje, Indice Idempotencia con un
+ *   task_id por tarea, y una fila nueva por tarea en la hoja de negocio
+ *   correspondiente, vinculada por la columna "ID"). Cuando está ausente
+ *   (como en INT-FASE8-01-INFORMATIVO), se exige 0 tareas y las cinco hojas
+ *   de negocio idénticas al baseline, igual que antes de esta ampliación.
+ */
+var FIXTURES_INTEGRACION_FASE8 = [
+  {
+    id: 'INT-FASE8-01-INFORMATIVO',
+    descripcion: 'Piloto equivalente a CP-05: correo completamente informativo, sin ninguna acción pendiente. Debe resultar SIN_TAREAS con observaciones: [].',
+    remitentePermitido: 'sichar@gmail.com',
+    asuntoBase: '[PRUEBA-AUTOMATIZACION][INTEGRACION] Aviso informativo de cambio de horario',
+    cuerpo: [
+      'Hola, les comparto un aviso exclusivamente informativo para el equipo de la sede de prueba.',
+      '',
+      'A partir del proximo mes, el horario de atencion al publico de la sede de prueba pasa a ser de 9 a 18 horas.',
+      'No se requiere ninguna accion de nadie del equipo; es solo para que esten al tanto del cambio ya decidido.',
+      '',
+      'Gracias.'
+    ].join('\n'),
+    versionPromptMinima: 'v4-INC-FASE8-011-informativo-sin-tareas',
+    esperado: {
+      // Log Mensajes (por nombre de encabezado).
+      estado: 'SIN_TAREAS',
+      etapa: 'FINALIZADO',
+      cantidad_observaciones: 0,
+      cantidad_tareas: 0,
+      resultado_gmail: 'SOLO_ETIQUETADO',
+      // La columna "error" contiene motivo_sin_tareas (comportamiento vigente
+      // e intencional de finalizarMensajeSinTareas()); el automatizador solo
+      // comprueba que NO esté vacía, sin registrar su texto.
+      errorNoVacio: true,
+      // Registro Tareas: ninguna fila para el message_id.
+      filasRegistroTareas: 0,
+      // Indice Idempotencia: exactamente una entrada, task_id vacío.
+      entradasIndiceIdempotencia: 1,
+      taskIdIndiceVacio: true,
+      estadoFinalIndice: 'SIN_TAREAS',
+      // Gmail: etiquetas por clave interna (el automatizador resuelve la clave
+      // al ID configurado y valida el ID<->nombre por separado).
+      claveEtiquetaEsperada: 'RevisionSinTareas',
+      conservaEtiquetaPrueba: true,
+      conservaInbox: true,
+      noArchivar: true,
+      clavesEtiquetaProhibidas: ['Procesado', 'RevisionErrorProcesamiento', 'RevisionErrorAutomatizacion']
+    }
+  },
+  {
+    id: 'INT-FASE8-02-DOS-TAREAS',
+    descripcion: 'Equivalente a CP-03: una única observación con dos acciones concretas (revisar un error técnico y avisar al cliente), que deben generar dos tareas en tableros distintos a partir del mismo texto_original.',
+    remitentePermitido: 'sichar@gmail.com',
+    asuntoBase: '[PRUEBA-AUTOMATIZACION][INTEGRACION] Error de facturación del cliente',
+    // Redacción ajustada dos veces (24/07/2026, ver auditoria/CHANGELOG.md):
+    // (1) runId=3b2883e9-5f26-4269-a3c1-1cbe4d14a7ed — dejaba implícito quién
+    // debía avisar al cliente, y el modelo clasificó esa acción como
+    // "Soporte" en lugar de "Comercial"; se agregó la mención explícita al
+    // "equipo comercial". (2) messageId=19f95060d93922fb — con esa mención ya
+    // corregida, la estructura de dos pedidos paralelos ("Hay que X y
+    // coordinar Y") se clasificó como 2 observaciones en lugar de 1. Ahora el
+    // error de facturación se ancla como UN ÚNICO tema del que se desprenden
+    // las dos acciones, en vez de presentarlas como dos pedidos
+    // independientes; conserva la mención a "equipo comercial".
+    cuerpo: 'El error de facturación del cliente todavía no fue resuelto: hace falta que el equipo técnico lo revise y que, apenas quede resuelto, el equipo comercial le avise al cliente.',
+    versionPromptMinima: 'v4-INC-FASE8-011-informativo-sin-tareas',
+    esperado: {
+      // Log Mensajes (por nombre de encabezado).
+      estado: 'PROCESADO',
+      etapa: 'FINALIZADO',
+      cantidad_observaciones: 1,
+      cantidad_tareas: 2,
+      resultado_gmail: 'SOLO_ETIQUETADO',
+      // Registro Tareas: exactamente 2 filas, una por tablero, mismo texto_original.
+      filasRegistroTareas: 2,
+      tareasEsperadas: [
+        { tablero: 'Desarrollo IT' },
+        { tablero: 'Comercial' }
+      ],
+      // Indice Idempotencia: una entrada por task_id del manifiesto, todas PROCESADO.
+      entradasIndiceIdempotencia: 2,
+      estadoFinalIndice: 'PROCESADO',
+      // Gmail: recibe Procesado; ninguna etiqueta de revisión/error.
+      claveEtiquetaEsperada: 'Procesado',
+      conservaEtiquetaPrueba: true,
+      conservaInbox: true,
+      noArchivar: true,
+      clavesEtiquetaProhibidas: ['RevisionSinTareas', 'RevisionErrorProcesamiento', 'RevisionErrorAutomatizacion']
+    }
+  },
+  {
+    id: 'INT-FASE8-04-TRES-TAREAS',
+    descripcion: 'Equivalente a CP-04: una única observación con tres acciones concretas (revisar un error técnico, procesar una devolución y confirmarle al cliente), que deben generar tres tareas en tableros distintos (Desarrollo IT, Finanzas, Comercial) a partir del mismo texto_original.',
+    remitentePermitido: 'sichar@gmail.com',
+    asuntoBase: '[PRUEBA-AUTOMATIZACION][INTEGRACION] Cobro duplicado a un cliente',
+    // Redacción ajustada (24/07/2026, ver auditoria/CHANGELOG.md,
+    // messageId=19f95a4113a1fb97): la primera versión abría con una cláusula
+    // de encuadre separada ("...todavía no está resuelto:") que el modelo
+    // aparentemente extrajo como su propia observación informativa, además de
+    // las 3 accionables (4 observaciones en vez de 1). Ahora el encuadre y las
+    // tres acciones son una única instrucción imperativa continua ("Hay que
+    // resolver..."), sin ninguna cláusula separable como afirmación
+    // informativa. Conserva las menciones explícitas a "Finanzas" y "equipo
+    // comercial" — los dos tableros con riesgo real de ambigüedad; la primera
+    // acción no necesita nombrar el equipo explícitamente: su naturaleza
+    // técnica ya la clasifica en Desarrollo IT (criterio existente para
+    // distinguir Soporte de Desarrollo IT, codigo/prompts_ia.gs).
+    cuerpo: 'Hay que resolver el cobro duplicado que sufrió un cliente: revisar técnicamente el error de facturación, procesar en el área de Finanzas la devolución del monto cobrado de más, y que el equipo comercial le confirme al cliente cuando quede solucionado.',
+    versionPromptMinima: 'v4-INC-FASE8-011-informativo-sin-tareas',
+    esperado: {
+      // Log Mensajes (por nombre de encabezado).
+      estado: 'PROCESADO',
+      etapa: 'FINALIZADO',
+      cantidad_observaciones: 1,
+      cantidad_tareas: 3,
+      resultado_gmail: 'SOLO_ETIQUETADO',
+      // Registro Tareas: exactamente 3 filas, una por tablero, mismo texto_original.
+      filasRegistroTareas: 3,
+      tareasEsperadas: [
+        { tablero: 'Desarrollo IT' },
+        { tablero: 'Finanzas' },
+        { tablero: 'Comercial' }
+      ],
+      // Indice Idempotencia: una entrada por task_id del manifiesto, todas PROCESADO.
+      entradasIndiceIdempotencia: 3,
+      estadoFinalIndice: 'PROCESADO',
+      // Gmail: recibe Procesado; ninguna etiqueta de revisión/error.
+      claveEtiquetaEsperada: 'Procesado',
+      conservaEtiquetaPrueba: true,
+      conservaInbox: true,
+      noArchivar: true,
+      clavesEtiquetaProhibidas: ['RevisionSinTareas', 'RevisionErrorProcesamiento', 'RevisionErrorAutomatizacion']
+    }
+  }
+];
+
+/** Devuelve el fixture de integración por id, o null si no existe. */
+function obtenerFixtureIntegracion_(id) {
+  for (var i = 0; i < FIXTURES_INTEGRACION_FASE8.length; i++) {
+    if (FIXTURES_INTEGRACION_FASE8[i].id === id) return FIXTURES_INTEGRACION_FASE8[i];
+  }
+  return null;
+}
+
+/** Id del fixture por defecto cuando la propiedad AUTO_FASE8_CASO no está definida. */
+var FIXTURE_INTEGRACION_POR_DEFECTO = 'INT-FASE8-01-INFORMATIVO';
