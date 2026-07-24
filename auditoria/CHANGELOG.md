@@ -1,5 +1,31 @@
 # Changelog
 
+## [2026-07-24] — CP-16 Aprobado: corrida real completa de INT-FASE8-07-CUERPO-VACIO (SIMULACION_OK + FORMAL_OK)
+
+### Contexto
+Tras la corrección del verificador (ver entrada inmediatamente anterior), el segundo intento completó el flujo de dos invocaciones sin ninguna discrepancia, con un `message_id` nuevo:
+
+```text
+runId: 7efa4045-e9c8-4815-974c-b80eca8ee56f
+messageId: 19f9677c994bf546 (nuevo, nunca antes usado)
+formal: FORMAL_OK
+```
+
+`ejecutarFormalYVerificarCasoIntegracionFase8Visible()` reportó `[AUTO-FASE8] FORMAL_OK runId=7efa4045-e9c8-4815-974c-b80eca8ee56f caso=INT-FASE8-07-CUERPO-VACIO messageId=19f9677c994bf546`. Por construcción, `ejecutarFormalYVerificar_()` exige que la sesión esté en `SIMULACION_OK` para el mismo `message_id`/nonce/fingerprint antes de autorizar la formal (`SIN_SIMULACION_OK` en caso contrario) — este `FORMAL_OK` confirma, sin ambigüedad, que la simulación también aprobó para este mismo `runId`/`messageId` con el verificador ya corregido. **Nota de trazabilidad:** a diferencia de CP-03/CP-04/CP-15/CP-14, no se recibió por separado el texto del log de `SIMULACION_OK` de este segundo intento (sí el de la formal); no es necesario para la aprobación (la garantía anterior es suficiente), pero esta entrada lo deja explícito para no sobre-citar un log que no se tuvo a la vista.
+
+### Qué confirma esta corrida
+- **El pipeline real** (`codigo/script_refactorizado.gs`, sin cambios en esta ampliación) rechaza correctamente, mediante `evaluarFiltroDeterministico()`, un mensaje cuyo cuerpo queda vacío tras `extraerContenidoNuevo()` — **antes** de `consultarIAExtractora()`. Confirma en producción real la particularidad reconocida de antemano: **esta es la primera corrida real de este automatizador que no generó ninguna llamada a la API de OpenAI.**
+- **El verificador corregido** (`verificarClasificacionSimulada_()`, sección 7.2) reconoce correctamente la categoría `NO_ELEGIBLE` (cantidades `null`, no `0`) y ya no bloquea con un falso negativo un resultado que el pipeline siempre produjo correctamente.
+- **Qué certifica `FORMAL_OK`** (por construcción de `verificarResultadoFormal_()`, sección 7): `Log Mensajes` con una fila, `estado=SIN_TAREAS`, `etapa=FINALIZADO`, `cantidad_observaciones`/`cantidad_tareas` en blanco, `resultado_gmail=SOLO_ETIQUETADO`; `Registro Tareas` sin ninguna fila nueva; `Indice Idempotencia` con exactamente 1 entrada (`estado_final=SIN_TAREAS`, `task_id` vacío); ninguna hoja de negocio modificada; Gmail conserva `Pruebas-Automatizacion` e `INBOX`, recibe `Revisión manual/Sin tareas detectadas`, sin `Procesado` ni etiquetas de error, sin archivar.
+
+### Aprobación
+**CP-16 pasa de Pendiente a Aprobado — 24/07/2026**, en el segundo intento (el primero expuso y permitió corregir el defecto del verificador documentado en la entrada anterior; nunca un defecto del pipeline productivo). Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### No accedido
+No se modificó ningún archivo de código (`codigo/*.gs` ni `pruebas/*.gs`) en esta entrada — es exclusivamente el registro de una corrida real exitosa y la actualización de los documentos de seguimiento.
+
+---
+
 ## [2026-07-24] — Primer hallazgo real en INT-FASE8-07-CUERPO-VACIO: verificarClasificacionSimulada_() no contempla NO_ELEGIBLE
 
 ### Contexto

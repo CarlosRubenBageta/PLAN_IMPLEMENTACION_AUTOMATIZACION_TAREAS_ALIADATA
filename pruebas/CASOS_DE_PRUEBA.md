@@ -189,7 +189,7 @@ El mar, 21 jul 2026, Juan escribió:
 ## CP-16 — Cuerpo vacío
 
 Reutiliza **FC-07** (`pruebas/CASOS_CORREOS_NO_OPERATIVOS.md`).
-**Estado:** Pendiente.
+**Estado:** Aprobado — 24/07/2026. Ejecutado mediante el automatizador de integración de Fase 2A (`runId 7efa4045-e9c8-4815-974c-b80eca8ee56f`, `message_id 19f9677c994bf546`, fixture `INT-FASE8-07-CUERPO-VACIO`): `FORMAL_OK` confirmó automáticamente `Log Mensajes` (`estado=SIN_TAREAS`, `resultado_gmail=SOLO_ETIQUETADO`), ninguna fila nueva en `Registro Tareas`, 1 entrada en `Indice Idempotencia` (`task_id` vacío), ninguna hoja de negocio modificada, y la etiqueta `Revisión manual/Sin tareas detectadas` aplicada en Gmail — lo que por construcción de `ejecutarFormalYVerificar_()` confirma también que la simulación previa (`SIMULACION_OK`) aprobó para el mismo `message_id`/fingerprint. Primer fixture de este automatizador cuyo rechazo depende de un filtro determinístico (`evaluarFiltroDeterministico()`, antes de la IA) en lugar de una clasificación de la IA, y por lo tanto la primera corrida real que no generó ninguna llamada a la API de OpenAI. **Nota sobre el primer intento:** un intento previo (`message_id 19f9661d038ea8de`, retirado, nunca reutilizado) expuso que `verificarClasificacionSimulada_()` no contemplaba la categoría `NO_ELEGIBLE` — el pipeline real ya rechazaba correctamente el mensaje por el filtro determinístico; la brecha era del verificador, no del pipeline productivo. Corregido antes de este segundo intento (ver `auditoria/CHANGELOG.md` y `documentacion/AUTOMATIZACION_INTEGRACION_FASE8.md`, secciones 7.2/9.5.1). Ver detalle completo en `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
 ## CP-17 — Fecha límite explícita
 
