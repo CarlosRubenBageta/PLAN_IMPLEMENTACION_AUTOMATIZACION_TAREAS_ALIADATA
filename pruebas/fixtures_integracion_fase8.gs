@@ -301,6 +301,51 @@ var FIXTURES_INTEGRACION_FASE8 = [
       noArchivar: true,
       clavesEtiquetaProhibidas: ['RevisionSinTareas', 'RevisionErrorProcesamiento', 'RevisionErrorAutomatizacion']
     }
+  },
+  {
+    id: 'INT-FASE8-07-CUERPO-VACIO',
+    descripcion: 'Equivalente a CP-16 (reutiliza el escenario FC-07, pruebas/CASOS_CORREOS_NO_OPERATIVOS.md): una respuesta que solo contiene una cita, sin ningún texto propio antes. Tras extraerContenidoNuevo() el contenido queda vacío, y evaluarFiltroDeterministico() debe rechazarlo (RevisionSinTareas) ANTES de llegar a la IA.',
+    remitentePermitido: 'sichar@gmail.com',
+    asuntoBase: '[PRUEBA-AUTOMATIZACION][INTEGRACION] RE: Reunión de mañana',
+    // Único fixture cuyo cuerpo es ÚNICAMENTE un bloque de cita (sin ningún
+    // texto propio antes): extraerContenidoNuevo() (codigo/script_refactorizado.gs)
+    // recorta desde el inicio del marcador "El [fecha], [nombre] escribió:",
+    // dejando el contenido nuevo vacío. evaluarFiltroDeterministico()
+    // (codigo/filtros_correo.gs, regla 6) rechaza el mensaje por cuerpo vacío
+    // ANTES de llegar a la IA — a diferencia de todos los fixtures anteriores,
+    // este NO hace ninguna llamada real a OpenAI.
+    cuerpo: [
+      'El lun, 21 jul 2026, Juan escribió:',
+      '> Confirmamos la reunión de mañana a las 15hs, ¿les parece?'
+    ].join('\n'),
+    versionPromptMinima: 'v4-INC-FASE8-011-informativo-sin-tareas',
+    esperado: {
+      // Log Mensajes (por nombre de encabezado). Misma forma que
+      // INT-FASE8-01-INFORMATIVO (0 tareas, sin tareasEsperadas): ambos son
+      // casos "SIN_TAREAS", aunque este llega por el filtro determinístico,
+      // no por decisión de la IA.
+      estado: 'SIN_TAREAS',
+      etapa: 'FINALIZADO',
+      cantidad_observaciones: 0,
+      cantidad_tareas: 0,
+      resultado_gmail: 'SOLO_ETIQUETADO',
+      // La columna "error" contiene el motivo del filtro determinístico
+      // ("Cuerpo vacío tras extraer contenido nuevo..."); el automatizador
+      // solo comprueba que NO esté vacía, sin registrar su texto.
+      errorNoVacio: true,
+      // Registro Tareas: ninguna fila para el message_id.
+      filasRegistroTareas: 0,
+      // Indice Idempotencia: exactamente una entrada, task_id vacío.
+      entradasIndiceIdempotencia: 1,
+      taskIdIndiceVacio: true,
+      estadoFinalIndice: 'SIN_TAREAS',
+      // Gmail: etiquetas por clave interna.
+      claveEtiquetaEsperada: 'RevisionSinTareas',
+      conservaEtiquetaPrueba: true,
+      conservaInbox: true,
+      noArchivar: true,
+      clavesEtiquetaProhibidas: ['Procesado', 'RevisionErrorProcesamiento', 'RevisionErrorAutomatizacion']
+    }
   }
 ];
 

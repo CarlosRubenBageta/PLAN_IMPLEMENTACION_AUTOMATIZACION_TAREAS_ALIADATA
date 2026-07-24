@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-07-24] — Ampliación incremental del automatizador de integración: fixture INT-FASE8-07-CUERPO-VACIO (CP-16)
+
+### Contexto
+Se agrega un quinto fixture, equivalente a CP-16 (`pruebas/CASOS_DE_PRUEBA.md`), que reutiliza el escenario FC-07 (`pruebas/CASOS_CORREOS_NO_OPERATIVOS.md`): una respuesta que solo contiene una cita, sin ningún texto propio antes — tras `extraerContenidoNuevo()`, el contenido queda vacío, y `evaluarFiltroDeterministico()` (`codigo/filtros_correo.gs`, regla 6: "Cuerpo vacío tras extraer contenido nuevo") rechaza el mensaje ANTES de llegar a la IA (`elegible:false`, `claveEtiqueta:RevisionSinTareas`). A diferencia de los cinco fixtures anteriores (CP-03/CP-04/CP-15/CP-14), este es el **primero que no hace ninguna llamada real a OpenAI** — la ruta de rechazo determinístico corta el flujo antes de `consultarIAExtractora()`.
+
+### Diseño del fixture
+El cuerpo es únicamente un bloque de cita de dos líneas ("El [fecha], [nombre] escribió:\n> [texto]"), sin ningún texto antes — el mismo patrón de marcador de corte de `extraerContenidoNuevo()` ya identificado y evitado deliberadamente en el diseño de CP-15 (donde se buscaba lo opuesto: que el texto llegara íntegro a la IA). Acá se usa exactamente ese patrón a propósito, para que el contenido nuevo quede vacío. El resultado esperado (`esperado`) reutiliza la misma forma que `INT-FASE8-01-INFORMATIVO` (`SIN_TAREAS`, 0 observaciones, 0 tareas, `RevisionSinTareas`) — ambos son casos de "0 tareas" sin `tareasEsperadas`, aunque llegan a ese resultado por rutas de código distintas (filtro determinístico vs. decisión de la IA).
+
+### Cambios
+- `pruebas/fixtures_integracion_fase8.gs`: nuevo fixture `INT-FASE8-07-CUERPO-VACIO`.
+- `pruebas/pruebas_automatizador_integracion_fase8.gs`: nuevo `crearEstadoCuerpoVacio_`/`prepararSimuladoCuerpoVacio_`, reutilizando **sin cambios** el efecto formal por defecto (`efectoFormalSinTareasCorrecto_`, ya usado por `INT-FASE8-01-INFORMATIVO`) — no hizo falta ninguna fábrica nueva. Una prueba de camino correcto confirma que este fixture también aprueba.
+- `codigo/*.gs`: **sin cambios.**
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta ampliación. No se modificó `codigo/prompts_ia.gs`, `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-16 en esta entrada — requiere una corrida real (`SIMULACION_OK` + `FORMAL_OK`).
+
+---
+
 ## [2026-07-24] — CP-14 Aprobado: corrida real completa de INT-FASE8-06-FIRMA-EXTENSA (SIMULACION_OK + FORMAL_OK)
 
 ### Contexto

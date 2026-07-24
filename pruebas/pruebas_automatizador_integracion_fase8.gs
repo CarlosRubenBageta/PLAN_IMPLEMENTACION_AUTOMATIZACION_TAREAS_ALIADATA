@@ -43,6 +43,16 @@
  *     candidatas; encabezado parcial; el pipeline corrompiendo una fila del
  *     preámbulo (detectado por el prefijo del baseline); y compatibilidad
  *     con una hoja cuyo encabezado está en la fila 1 (sin preámbulo).
+ *  O. verificarClasificacionSimulada_(): SIMULACION_FALLIDA sin autorizar la
+ *     formal cuando la clasificación simulada no coincide con fixture.esperado.
+ *  P. INT-FASE8-04-TRES-TAREAS (CP-04): generalización a N=3.
+ *  Q. INT-FASE8-05-OBSERVACIONES-DUPLICADAS (CP-15): generalización a N=1
+ *     (consolidación RF-04).
+ *  R. INT-FASE8-06-FIRMA-EXTENSA (CP-14): N=1 reutilizando
+ *     efectoFormalUnaTareaFabrica_ sin cambios (exclusión de firma del prompt).
+ *  S. INT-FASE8-07-CUERPO-VACIO (CP-16): rechazo por filtro determinístico
+ *     (regla 6, cuerpo vacío tras extraerContenidoNuevo()) ANTES de la IA,
+ *     reutilizando efectoFormalSinTareasCorrecto_ sin cambios.
  * ============================================================================
  */
 
@@ -751,6 +761,35 @@ function crearEstadoFirmaExtensa_(overrides) {
 /** prepararCaso_() + simularEnvioMensaje_() + simularYVerificar_() para el fixture de firma extensa. */
 function prepararSimuladoFirmaExtensa_(overridesEstado) {
   var estado = crearEstadoFirmaExtensa_(overridesEstado);
+  var amb = crearAmbFalsoIntegracion_(estado);
+  prepararCaso_(amb);
+  simularEnvioMensaje_(estado);
+  simularYVerificar_(amb);
+  return { estado: estado, amb: amb };
+}
+
+// ============================================================================
+// DOBLES ESPECÍFICOS DE INT-FASE8-07-CUERPO-VACIO (CP-16)
+// ============================================================================
+//
+// No requiere una fábrica de efecto formal propia: reutiliza SIN CAMBIOS
+// efectoFormalSinTareasCorrecto_ (ya el valor por defecto de estado.efectoFormal
+// en crearEstadoIntegracion_), porque el resultado esperado es idéntico al de
+// INT-FASE8-01-INFORMATIVO (0 observaciones, 0 tareas, SOLO_ETIQUETADO,
+// RevisionSinTareas): lo único que cambia es CÓMO se llega a SIN_TAREAS (un
+// filtro determinístico que rechaza el cuerpo vacío ANTES de invocar a la IA,
+// en vez de una clasificación de la IA con observaciones=[]).
+
+/** Crea el estado base seleccionando el fixture de cuerpo vacío vía AUTO_FASE8_CASO. */
+function crearEstadoCuerpoVacio_(overrides) {
+  var estado = crearEstadoIntegracion_(overrides || {});
+  estado.props.AUTO_FASE8_CASO = 'INT-FASE8-07-CUERPO-VACIO';
+  return estado;
+}
+
+/** prepararCaso_() + simularEnvioMensaje_() + simularYVerificar_() para el fixture de cuerpo vacío. */
+function prepararSimuladoCuerpoVacio_(overridesEstado) {
+  var estado = crearEstadoCuerpoVacio_(overridesEstado);
   var amb = crearAmbFalsoIntegracion_(estado);
   prepararCaso_(amb);
   simularEnvioMensaje_(estado);
@@ -1823,6 +1862,25 @@ function ejecutarPruebasAutomatizadorIntegracionFase8() {
     var r = ejecutarFormalFirmaExtensa_({});
     assert('R1 — INT-FASE8-06: camino correcto (1 observación, 1 tarea en Gestión General) aprueba',
       r.resultado.ok === true, JSON.stringify(r.resultado.errores));
+  })();
+
+  // ==========================================================================
+  // S: INT-FASE8-07-CUERPO-VACIO (CP-16) — confirma que un mensaje cuyo cuerpo
+  //    queda vacío tras extraerContenidoNuevo() (solo cita, sin texto propio)
+  //    es rechazado por evaluarFiltroDeterministico() (regla 6, RevisionSinTareas)
+  //    ANTES de cualquier llamada a la IA, reutilizando sin cambios
+  //    efectoFormalSinTareasCorrecto_ (mismo resultado que INT-FASE8-01). La
+  //    confirmación de que el filtro determinístico realmente dispara con este
+  //    cuerpo (en vez de llegar a la IA) solo puede hacerse con una corrida
+  //    real — ver auditoria/CHANGELOG.md.
+  // ==========================================================================
+
+  // S1: camino correcto — 0 observaciones, 0 tareas, SIN_TAREAS/RevisionSinTareas.
+  (function () {
+    var ctx = prepararSimuladoCuerpoVacio_({});
+    var r = ejecutarFormalYVerificar_(ctx.amb);
+    assert('S1 — INT-FASE8-07: camino correcto (cuerpo vacío tras la cita, 0 observaciones/0 tareas) aprueba (SIMULACION_OK + FORMAL_OK)',
+      r.ok === true, JSON.stringify(r.errores));
   })();
 
   Logger.log('--- Resumen ---');
