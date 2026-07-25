@@ -93,7 +93,7 @@ Nunca se escriben estos valores en `PropertiesService` (verificado por la prueba
 | `INT-FASE8-05-OBSERVACIONES-DUPLICADAS` | CP-15 | El mismo pedido repetido dos veces sin marcador de cita: `PROCESADO`, 1 observación, 1 tarea (`Finanzas`) consolidada por RF-04 (`documentacion/REGLAS_FUNCIONALES.md`). Primera prueba real de la generalización N-tareas en N=1, y primera prueba de RF-04 en un fixture real de este automatizador. **CP-15 Aprobado (24/07/2026)**, al primer intento, sin necesitar ajuste de redacción (sección 9.3.1). |
 | `INT-FASE8-06-FIRMA-EXTENSA` | CP-14 | Una consulta real breve seguida de una firma de correo y un aviso legal extenso (~15 líneas): `PROCESADO`, 1 observación, 1 tarea (`Gestión General`), sin ninguna tarea fabricada desde la firma/aviso legal (regla explícita del prompt, `codigo/prompts_ia.gs`). Primer fixture con cuerpo multi-párrafo (consulta + firma). **CP-14 Aprobado (24/07/2026)**, al primer intento, sin necesitar ajuste (sección 9.4.1). |
 | `INT-FASE8-07-CUERPO-VACIO` | CP-16 | Equivalente a FC-07 (`pruebas/CASOS_CORREOS_NO_OPERATIVOS.md`): una respuesta que solo contiene una cita ("El ... escribió:" + línea citada con `>`), sin ningún texto propio antes. Tras `extraerContenidoNuevo()` el contenido queda vacío, y `evaluarFiltroDeterministico()` (regla 6) lo rechaza como `RevisionSinTareas` **antes** de invocar a la IA: `SIN_TAREAS`, 0 observaciones, 0 tareas. Primer fixture cuyo rechazo es determinístico (filtro), no una clasificación de la IA — la corrida real de este caso **no generó ninguna llamada a OpenAI**. Reutiliza `efectoFormalSinTareasCorrecto_` sin ningún cambio de código. **CP-16 Aprobado (24/07/2026)**, en el segundo intento — el primero expuso y permitió corregir una brecha de `verificarClasificacionSimulada_()` (nunca del pipeline productivo, sección 9.5.1). |
-| `INT-FASE8-08-FECHA-LIMITE-EXPLICITA` | CP-17 | Equivalente a PE-04 (`pruebas/PRUEBAS_ESCRITURA.md`): una tarea con fecha límite explícita y concreta (31 de julio de 2026, NO una referencia relativa de día): `PROCESADO`, 1 observación, 1 tarea (`Comercial`). Primer fixture cuyo `esperado` verifica el contenido de la columna "Fecha límite" (`fechaLimiteEsperada`), confirmando que `construirFechaLocal()` (`codigo/escritura_sheets.gs`) no produce el corrimiento de un día documentado en `documentacion/MAPA_ESCRITURA.md`, sección 2. **Pendiente de corrida real.** |
+| `INT-FASE8-08-FECHA-LIMITE-EXPLICITA` | CP-17 | Equivalente a PE-04 (`pruebas/PRUEBAS_ESCRITURA.md`): una tarea con fecha límite explícita y concreta (31 de julio de 2026, NO una referencia relativa de día): `PROCESADO`, 1 observación, 1 tarea (`Comercial`). Primer fixture cuyo `esperado` verifica el contenido de la columna "Fecha límite" (`fechaLimiteEsperada`), confirmando que `construirFechaLocal()` (`codigo/escritura_sheets.gs`) no produce el corrimiento de un día documentado en `documentacion/MAPA_ESCRITURA.md`, sección 2. **CP-17 Aprobado (24/07/2026)**, al primer intento, sin necesitar ajuste, con confirmación visual directa de la fecha en la hoja `Comercial` (sección 9.6.1). |
 
 La propiedad `AUTO_FASE8_CASO` (`ScriptProperties` del proyecto de prueba) selecciona el fixture activo por `id`; si está ausente, se usa `FIXTURE_INTEGRACION_POR_DEFECTO` (`INT-FASE8-01-INFORMATIVO`). El automatizador **solo lee** esta propiedad — nunca la escribe ni modifica ninguna otra propiedad de configuración productiva. Para ejecutar el caso de CP-03, configurar `AUTO_FASE8_CASO=INT-FASE8-02-DOS-TAREAS`; para CP-04, `AUTO_FASE8_CASO=INT-FASE8-04-TRES-TAREAS`; para CP-16, `AUTO_FASE8_CASO=INT-FASE8-07-CUERPO-VACIO`; para CP-17, `AUTO_FASE8_CASO=INT-FASE8-08-FECHA-LIMITE-EXPLICITA`; en todos los casos, antes de llamar a `prepararCasoIntegracionFase8Visible()` (ver procedimiento, sección 9).
 
@@ -385,7 +385,7 @@ Tras la corrección de la sección 9.5.1, el segundo intento completó `FORMAL_O
 
 ### 9.6. Procedimiento para CP-17 (`INT-FASE8-08-FECHA-LIMITE-EXPLICITA`)
 
-**CP-17 Pendiente de corrida real.** El procedimiento base (pasos 0-6 de la sección 9), con dos diferencias:
+**CP-17 Aprobado — 24/07/2026** (ver sección 9.6.1). El procedimiento que llevó a esa corrida (pasos 0-6 de la sección 9), con dos diferencias:
 
 - Antes del paso 3 (`prepararCasoIntegracionFase8Visible()`), configurar en el proyecto de prueba la propiedad `AUTO_FASE8_CASO=INT-FASE8-08-FECHA-LIMITE-EXPLICITA` (sección 6).
 - El asunto/cuerpo a enviar (paso 4) serán los de este fixture: `[PRUEBA-AUTOMATIZACION][INTEGRACION] Confirmación de pedido con fecha límite [<marcador>]`, con el cuerpo: "Necesitamos que el equipo comercial confirme el pedido del cliente antes del 31 de julio de 2026."
@@ -397,6 +397,20 @@ Tras la corrección de la sección 9.5.1, el segundo intento completó `FORMAL_O
 **Aserciones del piloto (INT-FASE8-08, equivalente a CP-17).** Dry-run: exactamente un mensaje elegible; cero cambios en Gmail y en las ocho hojas (técnicas y de negocio); clasificación esperada 1 observación / 1 tarea en `Comercial`. Formal: `Log Mensajes` con una fila, `estado=PROCESADO`, `etapa=FINALIZADO`, `cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`; `Registro Tareas` con exactamente 1 fila para el `message_id`; `Indice Idempotencia` con 1 entrada (`estado_final=PROCESADO`); una fila nueva en `Comercial` (vinculada por `ID`) cuya columna "Fecha límite" muestra `31/07/2026`; Gmail conserva `Pruebas-Automatizacion` e `INBOX`, recibe `Procesado`, no recibe etiquetas de revisión/error, no se archiva.
 
 Tras una corrida real satisfactoria, la aprobación de CP-17 (si corresponde) se registra por separado en `pruebas/CASOS_DE_PRUEBA.md`/`pruebas/resultados/RESULTADOS_FASE_8.md`, con el mismo criterio humano de revisión que el resto de los casos de prueba.
+
+#### 9.6.1. Primer intento real (24/07/2026) — corrida completa exitosa, CP-17 Aprobado
+
+```text
+runId: 3a917b4c-50e3-4387-b898-4556f4edd6c7
+messageId: 19f9699bac4232c8 (nuevo)
+formal: FORMAL_OK
+```
+
+`consultarIAExtractora(): usando prompt versión v4-INC-FASE8-011-informativo-sin-tareas` confirmó que este fixture llegó a la IA (a diferencia de CP-16); `ejecutarFormalYVerificarCasoIntegracionFase8Visible()` informó `[AUTO-FASE8] FORMAL_OK` para ese `runId`/`messageId`. `verificarResultadoFormal_()` confirmó automáticamente: `Log Mensajes` (`estado=PROCESADO`, `cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`); `Registro Tareas` con exactamente 1 fila (`task_id` no vacío, `estado_escritura=ESCRITA`, tablero `Comercial`); `Indice Idempotencia` con 1 entrada (`estado_final=PROCESADO`); una fila nueva en `Comercial` vinculada por `ID`, con la columna "Fecha límite" coincidiendo por componentes de fecha local con `2026-07-31`; Gmail con `Procesado` aplicado, sin etiquetas de error/revisión, sin archivar.
+
+**Confirmación visual directa:** el tester revisó la hoja `Comercial` y confirmó que la celda "Fecha límite" de la fila nueva muestra `31/07/2026` — exactamente la fecha esperada, sin el corrimiento de un día. Primera corrida de este automatizador con confirmación visual directa de un valor de columna, más allá del veredicto automático.
+
+**CP-17 pasa de Pendiente a Aprobado — 24/07/2026**, al primer intento, sin necesitar ningún ajuste de redacción. Confirma en producción real que `construirFechaLocal()` no produce el corrimiento de un día documentado en `documentacion/MAPA_ESCRITURA.md`, sección 2. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
 ## 10. Sanitización de logs y estado de sesión
 

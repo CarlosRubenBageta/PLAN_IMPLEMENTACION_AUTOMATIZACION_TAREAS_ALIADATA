@@ -1,5 +1,36 @@
 # Changelog
 
+## [2026-07-24] — CP-17 Aprobado: corrida real completa de INT-FASE8-08-FECHA-LIMITE-EXPLICITA (SIMULACION_OK + FORMAL_OK)
+
+### Contexto
+Con el fixture recién agregado (ver entrada inmediatamente anterior), la primera corrida real completó el flujo de dos invocaciones sin ninguna discrepancia, al primer intento:
+
+```text
+runId: 3a917b4c-50e3-4387-b898-4556f4edd6c7
+messageId: 19f9699bac4232c8 (nuevo, nunca antes usado)
+formal: FORMAL_OK
+```
+
+`ejecutarFormalYVerificarCasoIntegracionFase8Visible()` reportó `consultarIAExtractora(): usando prompt versión v4-INC-FASE8-011-informativo-sin-tareas` (confirma que, a diferencia de CP-16, este fixture sí llega a la IA) y `[AUTO-FASE8] FORMAL_OK runId=3a917b4c-50e3-4387-b898-4556f4edd6c7 caso=INT-FASE8-08-FECHA-LIMITE-EXPLICITA messageId=19f9699bac4232c8`. No se recibió por separado el texto del log de `SIMULACION_OK`; por construcción, `ejecutarFormalYVerificar_()` exige esa sesión para el mismo `message_id`/nonce/fingerprint antes de autorizar la formal, por lo que este `FORMAL_OK` confirma sin ambigüedad que también aprobó.
+
+### Confirmación visual directa (más allá del veredicto automático)
+El tester revisó manualmente la hoja `Comercial` y confirmó que la columna "Fecha límite" de la fila nueva muestra **31/07/2026** — exactamente la fecha esperada, sin el corrimiento de un día que este caso existe para detectar. Esta es la primera corrida de este automatizador con una confirmación visual directa de un valor de columna más allá de lo que certifica automáticamente `verificarResultadoFormal_()` (sección 7.3).
+
+### Qué certifica `FORMAL_OK` (por construcción de `verificarResultadoFormal_()`, secciones 7 y 7.3)
+- **`Log Mensajes`:** una fila para este `message_id`, `estado=PROCESADO`, `etapa=FINALIZADO`, `cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`.
+- **`Registro Tareas`:** exactamente 1 fila; `task_id` no vacío; `estado_escritura=ESCRITA`; `tablero=Comercial`; `observacion_texto_original` no vacío.
+- **`Indice Idempotencia`:** exactamente 1 entrada, `estado_final=PROCESADO`.
+- **Hoja de negocio `Comercial`:** una fila nueva, vinculada por la columna `ID` a ese `task_id`, con las filas previas al baseline exactamente intactas, y la columna "Fecha límite" coincidiendo con `2026-07-31` (verificado automáticamente por componentes de fecha local, y ahora también confirmado visualmente).
+- **Gmail:** conserva `Pruebas-Automatizacion` e `INBOX`, recibe `Procesado`, no recibe ninguna etiqueta de revisión/error, no se archiva.
+
+### Aprobación
+**CP-17 pasa de Pendiente a Aprobado — 24/07/2026**, al primer intento, sin necesitar ningún ajuste de redacción. Confirma en producción real que `construirFechaLocal()` (`codigo/escritura_sheets.gs`) no produce el corrimiento de un día documentado en `documentacion/MAPA_ESCRITURA.md`, sección 2. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### No accedido
+No se modificó ningún archivo de código (`codigo/*.gs` ni `pruebas/*.gs`) en esta entrada — es exclusivamente el registro de una corrida real exitosa y la actualización de los documentos de seguimiento.
+
+---
+
 ## [2026-07-24] — Ampliación incremental del automatizador de integración: fixture INT-FASE8-08-FECHA-LIMITE-EXPLICITA (CP-17)
 
 ### Contexto

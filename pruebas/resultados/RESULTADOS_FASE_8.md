@@ -59,7 +59,7 @@ Captura revisada por Claude Cowork. Muestra:
 | CP-14 | Firma extensa | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: `SIMULACION_OK` confirmó 1 observación/1 tarea (`Gestión General/Alto`), sin escrituras; `FORMAL_OK` confirmó automáticamente `Log Mensajes`, 1 fila en `Registro Tareas`, 1 entrada en `Indice Idempotencia`, fila nueva en `Gestión General`, y etiqueta `Procesado` en Gmail. Aprobó al primer intento, pese a ser el primer cuerpo multi-párrafo del automatizador. | Registro `[AUTO-FASE8]` de la corrida real — `runId b8ed62db-4f41-418e-9acd-276d1bcdd4ee`, `message_id 19f9640b73453584` | Aprobado — 24/07/2026 |
 | CP-15 | Observaciones duplicadas | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: `SIMULACION_OK` confirmó 1 observación/1 tarea (`Finanzas/Alto`), sin escrituras; `FORMAL_OK` confirmó automáticamente `Log Mensajes`, 1 fila en `Registro Tareas`, 1 entrada en `Indice Idempotencia`, fila nueva en `Finanzas`, y etiqueta `Procesado` en Gmail. Aprobó al primer intento. | Registro `[AUTO-FASE8]` de la corrida real — `runId 01fbd80c-a874-4eed-82a6-c21a14b8070f`, `message_id 19f9621b19597350` | Aprobado — 24/07/2026 |
 | CP-16 | Cuerpo vacío | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: `FORMAL_OK` confirmó automáticamente `Log Mensajes` (`SIN_TAREAS`), ninguna fila nueva en `Registro Tareas`, 1 entrada en `Indice Idempotencia` (`task_id` vacío), y etiqueta `Revisión manual/Sin tareas detectadas` en Gmail — primer caso rechazado por filtro determinístico (sin llamada a OpenAI). Aprobó en el segundo intento (el primero expuso un defecto del verificador, no del pipeline). | Registro `[AUTO-FASE8]` de la corrida real — `runId 7efa4045-e9c8-4815-974c-b80eca8ee56f`, `message_id 19f9677c994bf546` | Aprobado — 24/07/2026 |
-| CP-17 | Fecha límite explícita | | | | Pendiente |
+| CP-17 | Fecha límite explícita | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: `FORMAL_OK` confirmó automáticamente `Log Mensajes`, 1 fila en `Registro Tareas`, 1 entrada en `Indice Idempotencia`, fila nueva en `Comercial` con "Fecha límite" verificada por componentes de fecha local (`2026-07-31`), y etiqueta `Procesado` en Gmail. El tester confirmó visualmente `31/07/2026` en la hoja `Comercial` — sin corrimiento de un día. Aprobó al primer intento. | Registro `[AUTO-FASE8]` de la corrida real — `runId 3a917b4c-50e3-4387-b898-4556f4edd6c7`, `message_id 19f9699bac4232c8` | Aprobado — 24/07/2026 |
 | CP-18 | Fecha no explícita | | | | Pendiente |
 | CP-19 | Respuesta nueva en hilo ya procesado | 21/07/2026 (ejecución fallida) y 22/07/2026 (regresión aprobada) | Ejecución original (21/07/2026): descubrimiento por `message_id` correcto, pero `extraerContenidoNuevo()` no recortó el historial citado (INC-FASE8-008) — la IA generó 2 tareas en vez de 1. Corrección aplicada en `codigo/script_refactorizado.gs`. Regresión (22/07/2026, hilo sintético nuevo, `message_id 19f87e72c61fcf01`): exactamente 1 tarea generada (`Comercial`), sin ninguna fila basada en el contenido histórico citado. Ver detalle completo (ambas ejecuciones) debajo de la tabla. | Ejecución fallida: `Log Mensajes` (`19f876c74f7f71ae`), `Registro Tareas` (P13/P14), `Indice Idempotencia` (`ALI-E7FF66FDAE16DEA1-001`/`002`) — evidencia real, conservada sin modificar. Regresión: `Registro Tareas`/`Log Mensajes`/`Indice Idempotencia` para `19f87e72c61fcf01` — verificación manual de Carlos Rubén Bageta, sin captura archivada | Aprobado — 22/07/2026 (regresión real, tras corrección de INC-FASE8-008) |
 | CP-20 | Mensaje anterior a FECHA_INICIO_CORTE | 22/07/2026 | `FECHA_INICIO_CORTE=2026-07-23T00:00:00-03:00` (normalizada `2026-07-23T03:00:00.000Z`); mensaje sintético del 22/07/2026 (`message_id 19f8a791041de0d4`), anterior al corte. Registro: "Mensaje 19f8a791041de0d4 excluido por antigüedad (anterior a FECHA_INICIO_CORTE)."; "procesarCorreosDeTareas(): 0 mensajes elegibles, procesando 0." Sin llamada a IA; sin fila en `Log Mensajes`/`Registro Tareas`/`Indice Idempotencia`; Gmail no modificado. No requirió ejecución `DRY_RUN=false` (el filtro ocurre antes de seleccionar el camino simulado o formal). Configuración restaurada y revalidada después. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
@@ -903,6 +903,30 @@ Versión de prompt: v4-INC-FASE8-011-informativo-sin-tareas
 
 **Estado (veredicto final):** Aprobado — 24/07/2026 (`PASA`).
 
+## Detalle de CP-17 — Fecha límite explícita (aprobado vía automatizador de integración Fase 2A)
+
+```text
+Fecha de ejecución: 24/07/2026
+Caso automatizado: INT-FASE8-08-FECHA-LIMITE-EXPLICITA
+runId: 3a917b4c-50e3-4387-b898-4556f4edd6c7
+message_id: 19f9699bac4232c8 (nuevo)
+Versión de prompt: v4-INC-FASE8-011-informativo-sin-tareas
+```
+
+**Antecedente:** al igual que CP-03/CP-04/CP-15/CP-14/CP-16, se ejecutó íntegramente a través del automatizador de integración de Fase 2A. Reutiliza PE-04 (`pruebas/PRUEBAS_ESCRITURA.md`): una tarea con fecha límite explícita y concreta ("antes del 31 de julio de 2026"), no una referencia relativa de día — el prompt real trae un ejemplo few-shot donde una referencia relativa ("antes del viernes") se clasifica con `fecha_limite: null`. Primer fixture cuyo `esperado` verifica el contenido de la columna "Fecha límite" de una hoja de negocio (`fixture.esperado.fechaLimiteEsperada`, sección 7.3) — hasta esta ampliación, `verificarResultadoFormal_()` solo verificaba la columna `ID`.
+
+### Simulación y ejecución formal
+
+- El núcleo informó exactamente 1 mensaje elegible y procesó el `message_id` preparado; `consultarIAExtractora(): usando prompt versión v4-INC-FASE8-011-informativo-sin-tareas` confirma que este fixture sí llega a la IA (a diferencia de CP-16).
+- No se recibió por separado el texto del log de `SIMULACION_OK` de esta corrida (sí el de la ejecución formal). Esto no impide la aprobación: por construcción, `ejecutarFormalYVerificar_()` exige una sesión en `SIMULACION_OK` para el mismo `message_id`/nonce/fingerprint antes de autorizar la formal — el `FORMAL_OK` recibido confirma, sin ambigüedad, que la simulación también aprobó.
+- Log recibido de la ejecución formal: `procesarCorreosDeTareasConConfiguracion_(): recuperación de abandonados omitida por opciones.omitirRecuperacion.`; `procesarCorreosDeTareas(): 1 mensajes elegibles, procesando 1.`; `consultarIAExtractora(): usando prompt versión v4-INC-FASE8-011-informativo-sin-tareas`; `[AUTO-FASE8] FORMAL_OK runId=3a917b4c-50e3-4387-b898-4556f4edd6c7 caso=INT-FASE8-08-FECHA-LIMITE-EXPLICITA messageId=19f9699bac4232c8`.
+- Por construcción de `verificarResultadoFormal_()` (secciones 7 y 7.3), este `FORMAL_OK` certifica: `Log Mensajes` (`estado=PROCESADO`, `cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`); `Registro Tareas` con exactamente 1 fila (`task_id` no vacío, `estado_escritura=ESCRITA`, tablero `Comercial`); `Indice Idempotencia` con 1 entrada (`estado_final=PROCESADO`); una fila nueva en `Comercial` vinculada por `ID`, con la columna "Fecha límite" coincidiendo por componentes de fecha local con `2026-07-31`; Gmail con `Procesado` aplicado, sin etiquetas de error/revisión, sin archivar.
+- **Confirmación visual directa del tester:** la celda "Fecha límite" de la fila nueva en la hoja `Comercial` muestra `31/07/2026` — exactamente la fecha esperada. Primera corrida de este automatizador con una confirmación visual directa de un valor de columna, más allá del veredicto automático de `verificarResultadoFormal_()`.
+
+**Conclusión:** CP-17 PASA. Confirma, en producción real, que `construirFechaLocal()` (`codigo/escritura_sheets.gs`) escribe la fecha límite correcta en la hoja de negocio, sin el corrimiento de un día documentado en `documentacion/MAPA_ESCRITURA.md`, sección 2.
+
+**Estado (veredicto final):** Aprobado — 24/07/2026 (`PASA`).
+
 ## Detalle de CP-16 — Cuerpo vacío (aprobado vía automatizador de integración Fase 2A)
 
 ```text
@@ -1038,7 +1062,7 @@ Total de casos que condicionan la aprobación de esta fase: 36 (CP-01 a CP-29, C
 Diferido a Fase 10 (no condiciona esta fase): 1 (CP-30, DEC-004)
 Bloqueado que todavía condiciona la Fase 8: 1 (CP-35 — ver nota de auditoría abajo)
 Bloqueados pendientes de Lotes 2/3 (no condicionan esta fase): 2 (CP-38, CP-39)
-Aprobados: 21 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-10, CP-11, CP-14, CP-15, CP-16, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-27, CP-28, CP-31, CP-36, CP-37)
+Aprobados: 22 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-10, CP-11, CP-14, CP-15, CP-16, CP-17, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-27, CP-28, CP-31, CP-36, CP-37)
 Rechazados: 0
   CP-19 pasó de Rechazado (21/07/2026, INC-FASE8-008) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución fallida original se conserva íntegro en el detalle de CP-19.
   CP-23 pasó de Rechazado (22/07/2026, INC-FASE8-009) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución vulnerable original se conserva íntegro en el detalle de CP-23.
@@ -1049,7 +1073,8 @@ Rechazados: 0
   CP-15 pasó de Pendiente a Aprobado (24/07/2026, ejecución vía el automatizador de integración de Fase 2A con message_id 19f9621b19597350, al primer intento, sin necesitar ajuste de redacción). Confirma además, en producción real, que RF-04 (consolidación de observaciones duplicadas) está correctamente codificada en el prompt y que el modelo la sigue.
   CP-14 pasó de Pendiente a Aprobado (24/07/2026, ejecución vía el automatizador de integración de Fase 2A con message_id 19f9640b73453584, al primer intento, sin necesitar ajuste de redacción, pese a ser el primer fixture con cuerpo multi-párrafo). Confirma además, en producción real, la exclusión de firmas/avisos legales por parte de la IA.
   CP-16 pasó de Pendiente a Aprobado (24/07/2026, ejecución vía el automatizador de integración de Fase 2A con message_id 19f9677c994bf546, en el segundo intento — el primero expuso un defecto del verificador (`verificarClasificacionSimulada_()` no contemplaba `NO_ELEGIBLE`), nunca un defecto del pipeline productivo, que ya rechazaba correctamente el mensaje). Confirma además, en producción real, que el filtro determinístico rechaza un cuerpo vacío antes de la IA, sin generar ninguna llamada a OpenAI — primer caso de este automatizador con esa característica.
-Pendientes (ejecutables con estado Pendiente, no corridos aún): 14
+  CP-17 pasó de Pendiente a Aprobado (24/07/2026, ejecución vía el automatizador de integración de Fase 2A con message_id 19f9699bac4232c8, al primer intento, sin necesitar ningún ajuste de redacción). Confirma además, en producción real, que `construirFechaLocal()` no produce el corrimiento de un día en la columna "Fecha límite" — el tester confirmó visualmente `31/07/2026` en la hoja `Comercial`.
+Pendientes (ejecutables con estado Pendiente, no corridos aún): 13
   [Corregido 22/07/2026: esta lista omitía a CP-27, ya aprobado desde el 20/07/2026 (CP-27 — Modo prueba con ID productivo); no cambia el alcance ni el estado de ningún caso.]
   [Corregido 23/07/2026 (semántica): CP-35 estaba contabilizado dentro de "Pendientes"; su estado individual es Bloqueado (ver nota de auditoría abajo), no Pendiente. Se lo separa como bloqueado que todavía condiciona la Fase 8. Pendientes pasa de 20 a 19; no cambia el estado individual de ningún caso.]
   [Corregido 24/07/2026: CP-03 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 19 a 18.]
@@ -1057,7 +1082,8 @@ Pendientes (ejecutables con estado Pendiente, no corridos aún): 14
   [Corregido 24/07/2026: CP-15 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 17 a 16.]
   [Corregido 24/07/2026: CP-14 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 16 a 15.]
   [Corregido 24/07/2026: CP-16 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 15 a 14.]
-  CP-01, CP-02, CP-03, CP-04, CP-05, CP-10, CP-11, CP-14, CP-15, CP-16, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-27, CP-28, CP-31, CP-36 y CP-37 aprobados
+  [Corregido 24/07/2026: CP-17 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 14 a 13.]
+  CP-01, CP-02, CP-03, CP-04, CP-05, CP-10, CP-11, CP-14, CP-15, CP-16, CP-17, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-27, CP-28, CP-31, CP-36 y CP-37 aprobados
   CP-21 ya no está bloqueado por INC-FASE8-008 (CP-19 Aprobado) y fue ejecutado y aprobado el 22/07/2026
   CP-05 ya no está bloqueado por INC-FASE8-011 (cerrada) y fue ejecutado y aprobado el 23/07/2026
   CP-03 fue ejecutado y aprobado el 24/07/2026
@@ -1065,8 +1091,9 @@ Pendientes (ejecutables con estado Pendiente, no corridos aún): 14
   CP-15 fue ejecutado y aprobado el 24/07/2026
   CP-14 fue ejecutado y aprobado el 24/07/2026
   CP-16 fue ejecutado y aprobado el 24/07/2026
-Casos sin aprobación que todavía condicionan la Fase 8: 15 (14 Pendientes + CP-35 Bloqueado)
-Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 18
+  CP-17 fue ejecutado y aprobado el 24/07/2026
+Casos sin aprobación que todavía condicionan la Fase 8: 14 (13 Pendientes + CP-35 Bloqueado)
+Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 17
 
 Nota (auditoría 20/07/2026): CP-35 pasó a "bloqueado" — no puede considerarse
 una verificación válida del criterio "no existen duplicados" hasta que
