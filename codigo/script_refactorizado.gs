@@ -676,20 +676,6 @@ function procesarUnMensaje(mensajeDescriptor, cfg) {
   marcarTareasEscritas(tareas, resultadoEscritura, cfg);
   actualizarLogMensajes(mensajeDescriptor, { etapa: ETAPAS.ESCRITURA_COMPLETADA }, cfg);
 
-  // INICIO INSTRUMENTACIÓN TEMPORAL CP-12-B (auditoria/CHANGELOG.md, 24/07/2026) — RETIRAR TRAS LA CORRIDA REAL.
-  // Simula un runtime realmente interrumpido justo después de escribirFilasPorLote()
-  // (tareas ya ESCRITA): un return simple, NUNCA una excepción, para que el
-  // try/catch del llamador no se entere y gestionarErrorMensaje() no corra —
-  // el mensaje queda genuinamente en EN_PROCESO/ESCRITURA_COMPLETADA, con
-  // datos reales, tal como quedaría si Apps Script matara la ejecución en
-  // este punto exacto. Gateada por cfg.modoPrueba (nunca en la cuenta
-  // productiva) y por una property exclusiva de esta prueba.
-  if (cfg.modoPrueba && PropertiesService.getScriptProperties().getProperty('CP12B_DETENER_TRAS_ESCRITURA') === 'true') {
-    Logger.log('CP-12-B: deteniendo procesarUnMensaje() tras ESCRITURA_COMPLETADA, simulando runtime interrumpido (instrumentación temporal de prueba).');
-    return;
-  }
-  // FIN INSTRUMENTACIÓN TEMPORAL CP-12-B
-
   // Fase 7: si alguna tarea no pudo escribirse (p. ej. la hoja de destino no
   // existe), el mensaje se envía a revisión manual en lugar de marcarse
   // PROCESADO, aunque otras tareas del mismo mensaje sí se hayan escrito

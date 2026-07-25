@@ -1,5 +1,50 @@
 # Changelog
 
+## [2026-07-25] — CP-12 (Variante B) Aprobado: corrida real completa, instrumentación temporal retirada — CP-12 completo
+
+### Contexto
+Con la instrumentación agregada en la entrada anterior, la corrida real confirmó exactamente el comportamiento esperado: un runtime interrumpido sin excepción se recupera por la vía original de abandono (`recuperarProcesamientosAbandonados()`/`UMBRAL_ABANDONO_MIN`), sin duplicar tareas ni volver a consultar la IA — el mismo resultado final que la Variante A, por un camino distinto.
+
+```text
+Correo sintético: "[PRUEBA-AUTOMATIZACION] Enlace roto en la página de contacto" (message_id 19f9734c63bb0299, nuevo)
+2 observaciones / 2 tareas: Desarrollo IT ("Corregir el enlace roto en la página de contacto"),
+Comercial ("Informar al cliente que se solucionó el problema de acceso")
+
+Primera corrida (CP12B_DETENER_TRAS_ESCRITURA=true):
+"1 mensajes elegibles, procesando 1."
+"CP-12-B: deteniendo procesarUnMensaje() tras ESCRITURA_COMPLETADA, simulando runtime interrumpido (instrumentación temporal de prueba)."
+Log Mensajes: estado=EN_PROCESO (nunca tocado desde registrarInicioProcesamiento()), etapa=ESCRITURA_COMPLETADA,
+cantidad_observaciones=2, cantidad_tareas=2. Sin entrada en Indice Idempotencia.
+Registro Tareas: 2 filas ESCRITA, con fila_destino real en Desarrollo IT y Comercial.
+
+Preparación manual: CP12B_DETENER_TRAS_ESCRITURA=false; fecha_inicio de esa fila atrasada a
+24/7/2026 23:18:51 (~40 minutos antes de la ejecución original, por encima de UMBRAL_ABANDONO_MIN=20).
+
+Segunda corrida (recuperación por abandono):
+"Mensaje abandonado 19f9734c63bb0299 con manifiesto persistido (etapa ESCRITURA_COMPLETADA); reanudando sin volver a consultar la IA."
+"reanudarDesdeManifiesto(): todas las tareas de 19f9734c63bb0299 ya estaban ESCRITA; se repite únicamente la actualización de Gmail."
+"recuperarProcesamientosAbandonados(): 1 reanudado(s) desde manifiesto, 0 reabierto(s) para reprocesamiento completo."
+"procesarCorreosDeTareas(): 0 mensajes elegibles, procesando 0."
+Log Mensajes: estado=PROCESADO, etapa=FINALIZADO, resultado_gmail=SOLO_ETIQUETADO, cantidad_tareas=2 (sin cambios).
+```
+
+### Verificación de no duplicación
+Confirmado visualmente en las hojas de negocio tras la segunda corrida: `Desarrollo IT` y `Comercial` tienen exactamente **1 fila cada una** para este mensaje (`ALI-0A0C9963ED166AAE-001` y `-002`) — las mismas 2 filas escritas en la primera corrida, ninguna duplicada por la recuperación.
+
+### Diferencia confirmada respecto de la Variante A
+El resumen de `recuperarProcesamientosAbandonados()` ("1 reanudado(s) desde manifiesto, 0 reabierto(s) para reprocesamiento completo") y la ausencia total de `consultarIAExtractora()` en la segunda corrida confirman que esta vez la recuperación se disparó por `UMBRAL_ABANDONO_MIN` (el mensaje seguía genuinamente `EN_PROCESO`, ningún `catch` había actuado), no por la comprobación de manifiesto que `gestionarErrorMensaje()` deja lista en la Variante A (`ERROR_TEMPORAL`). Además, el bucle normal de elegibilidad de la misma ejecución informó correctamente "0 mensajes elegibles" — el mensaje ya había sido cerrado por la recuperación antes de llegar a ese punto, confirmando que `recuperarProcesamientosAbandonados()` corre antes del fetch normal dentro de la misma ejecución (`documentacion/RECUPERACION_INTERRUPCIONES.md`).
+
+### Aprobación
+**CP-12 (Variante B) pasa de Pendiente a Aprobado — 25/07/2026.** Confirma en producción real que un runtime interrumpido sin excepción (mensaje genuinamente `EN_PROCESO`, ningún `catch` involucrado) se recupera correctamente vía `recuperarProcesamientosAbandonados()` → `reanudarDesdeManifiesto()`, sin duplicar tareas ni volver a consultar la IA. **Con esto, CP-12 queda completo: ambas variantes (A y B) convergieron al mismo resultado final** (`PROCESADO`, sin duplicados, sin nueva consulta a la IA), por sus dos caminos de recuperación distintos. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### Retiro de la instrumentación temporal
+Con la Variante B aprobada, se retira de `codigo/script_refactorizado.gs` el gancho `INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-12-B` agregado en la entrada anterior (`procesarUnMensaje()` vuelve exactamente a su forma previa a esa entrada). La property `CP12B_DETENER_TRAS_ESCRITURA` queda sin efecto en el código; el usuario puede eliminarla de `ScriptProperties` cuando quiera, sin urgencia. Verificado antes y después del retiro: `node --check` sobre el archivo y las 5 suites locales (166/60/19/46/17 verificaciones), sin regresiones.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada — es exclusivamente el registro de la corrida real, la aprobación, y el retiro de la instrumentación.
+
+---
+
 ## [2026-07-24] — Instrumentación temporal de prueba para CP-12 (Variante B): runtime realmente interrumpido
 
 ### Contexto
