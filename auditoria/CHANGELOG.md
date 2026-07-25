@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-07-24] — Ampliación incremental del automatizador de integración: fixture INT-FASE8-09-FECHA-LIMITE-NO-EXPLICITA (CP-18)
+
+### Contexto
+Se agrega un noveno fixture, equivalente a CP-18 (reutiliza **PE-05**, `pruebas/PRUEBAS_ESCRITURA.md`): el complemento exacto de CP-17 — una tarea **sin** ninguna fecha mencionada en el cuerpo, para confirmar que la columna "Fecha límite" queda vacía (no `0`, no la cadena `"null"`, no una fecha por defecto).
+
+### Por qué no hizo falta ningún cambio de código
+La rama `fechaLimiteEsperada: null` de `verificarResultadoFormal_()` (sección 7.3) ya se agregó y probó localmente durante la ampliación de CP-17 (pruebas T4/T5, mediante mutación temporal del fixture de CP-17) — este fixture es la primera vez que esa rama se ejercita con un fixture propio y con una corrida real, pero el código del verificador no cambia. Tampoco hizo falta una fábrica de efecto formal nueva: `efectoFormalUnaTareaConFechaFabrica_` (creada para CP-17) ya acepta `opciones.fechaLimite: ''` para dejar la celda vacía — se reutiliza **sin ningún cambio**, con un `tablero1` distinto (`Desarrollo IT`), igual que CP-14 reutilizó la fábrica de CP-15.
+
+### Cambios
+- `pruebas/fixtures_integracion_fase8.gs`: nuevo fixture `INT-FASE8-09-FECHA-LIMITE-NO-EXPLICITA` (`esperado.fechaLimiteEsperada: null`, `tareasEsperadas: [{tablero:'Desarrollo IT'}]`).
+- `pruebas/pruebas_automatizador_integracion_fase8.gs`: nuevos `crearEstadoFechaLimiteNoExplicita_`/`prepararSimuladoFechaLimiteNoExplicita_`, reutilizando **sin cambios** `efectoFormalUnaTareaConFechaFabrica_` (con `fechaLimite: ''` y `tablero1: 'Desarrollo IT'`). Una prueba de camino correcto confirma que este fixture también aprueba.
+- `pruebas/automatizador_integracion_fase8.gs` / `codigo/*.gs`: **sin cambios.**
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta ampliación. No se modificó `codigo/prompts_ia.gs`, `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-18 en esta entrada — requiere una corrida real (`SIMULACION_OK` + `FORMAL_OK`).
+
+---
+
 ## [2026-07-24] — CP-17 Aprobado: corrida real completa de INT-FASE8-08-FECHA-LIMITE-EXPLICITA (SIMULACION_OK + FORMAL_OK)
 
 ### Contexto

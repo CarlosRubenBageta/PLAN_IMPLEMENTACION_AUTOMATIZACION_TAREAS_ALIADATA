@@ -396,6 +396,41 @@ var FIXTURES_INTEGRACION_FASE8 = [
       noArchivar: true,
       clavesEtiquetaProhibidas: ['RevisionSinTareas', 'RevisionErrorProcesamiento', 'RevisionErrorAutomatizacion']
     }
+  },
+  {
+    id: 'INT-FASE8-09-FECHA-LIMITE-NO-EXPLICITA',
+    descripcion: 'Equivalente a CP-18 (reutiliza PE-05, pruebas/PRUEBAS_ESCRITURA.md): complemento exacto de CP-17 — una tarea SIN ninguna fecha mencionada en el cuerpo. Verifica que la columna "Fecha límite" quede vacía (no 0, no la cadena "null", no una fecha por defecto).',
+    remitentePermitido: 'sichar@gmail.com',
+    asuntoBase: '[PRUEBA-AUTOMATIZACION][INTEGRACION] Actualización de la lista de precios',
+    // Sin ninguna fecha, ni siquiera relativa: a diferencia de CP-17, este
+    // cuerpo no da ninguna pista temporal, para que fecha_limite quede en
+    // null sin ambigüedad.
+    cuerpo: 'Hay que actualizar la lista de precios que aparece en la sección de productos del sitio web.',
+    versionPromptMinima: 'v4-INC-FASE8-011-informativo-sin-tareas',
+    esperado: {
+      // Log Mensajes (por nombre de encabezado).
+      estado: 'PROCESADO',
+      etapa: 'FINALIZADO',
+      cantidad_observaciones: 1,
+      cantidad_tareas: 1,
+      resultado_gmail: 'SOLO_ETIQUETADO',
+      // Registro Tareas: exactamente 1 fila.
+      filasRegistroTareas: 1,
+      tareasEsperadas: [
+        { tablero: 'Desarrollo IT' }
+      ],
+      // Sin fecha límite: la columna debe quedar vacía (sección 7.3).
+      fechaLimiteEsperada: null,
+      // Indice Idempotencia: una entrada por task_id del manifiesto, todas PROCESADO.
+      entradasIndiceIdempotencia: 1,
+      estadoFinalIndice: 'PROCESADO',
+      // Gmail: recibe Procesado; ninguna etiqueta de revisión/error.
+      claveEtiquetaEsperada: 'Procesado',
+      conservaEtiquetaPrueba: true,
+      conservaInbox: true,
+      noArchivar: true,
+      clavesEtiquetaProhibidas: ['RevisionSinTareas', 'RevisionErrorProcesamiento', 'RevisionErrorAutomatizacion']
+    }
   }
 ];
 

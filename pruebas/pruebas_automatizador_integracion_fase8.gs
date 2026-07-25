@@ -56,6 +56,8 @@
  *  T. INT-FASE8-08-FECHA-LIMITE-EXPLICITA (CP-17): nueva verificación opcional
  *     de la columna "Fecha límite" en verificarResultadoFormal_() (camino
  *     correcto, día equivocado, celda vacía, y la rama fechaLimiteEsperada=null).
+ *  U. INT-FASE8-09-FECHA-LIMITE-NO-EXPLICITA (CP-18): complemento exacto de
+ *     CP-17, reutilizando sin cambios efectoFormalUnaTareaConFechaFabrica_.
  * ============================================================================
  */
 
@@ -915,6 +917,34 @@ function efectoFormalUnaTareaConFechaFabrica_(opciones) {
       if (estado.mensaje.labelIds.indexOf(labelId) === -1) estado.mensaje.labelIds.push(labelId);
     });
   };
+}
+
+// ============================================================================
+// DOBLES ESPECÍFICOS DE INT-FASE8-09-FECHA-LIMITE-NO-EXPLICITA (CP-18)
+// ============================================================================
+//
+// Reutiliza SIN CAMBIOS efectoFormalUnaTareaConFechaFabrica_ (creada para
+// CP-17): la forma del resultado (1 observación, 1 tarea) es idéntica; solo
+// cambia el fixture activo, el tablero esperado (Desarrollo IT en vez de
+// Comercial) y la fecha límite (vacía en vez de una fecha) — ya soportado por
+// esa fábrica vía opciones.fechaLimite. Mismo criterio que CP-14 reutilizando
+// la fábrica de CP-15.
+
+/** Crea el estado base seleccionando el fixture de fecha límite no explícita vía AUTO_FASE8_CASO. */
+function crearEstadoFechaLimiteNoExplicita_(overrides) {
+  var estado = crearEstadoIntegracion_(overrides || {});
+  estado.props.AUTO_FASE8_CASO = 'INT-FASE8-09-FECHA-LIMITE-NO-EXPLICITA';
+  return estado;
+}
+
+/** prepararCaso_() + simularEnvioMensaje_() + simularYVerificar_() para el fixture de fecha límite no explícita. */
+function prepararSimuladoFechaLimiteNoExplicita_(overridesEstado) {
+  var estado = crearEstadoFechaLimiteNoExplicita_(overridesEstado);
+  var amb = crearAmbFalsoIntegracion_(estado);
+  prepararCaso_(amb);
+  simularEnvioMensaje_(estado);
+  simularYVerificar_(amb);
+  return { estado: estado, amb: amb };
 }
 
 // ============================================================================
@@ -2070,9 +2100,10 @@ function ejecutarPruebasAutomatizadorIntegracionFase8() {
       tieneError(r.resultado, 'HOJA_NEGOCIO_FECHA_LIMITE_NO_COINCIDE:Comercial:VACIO'), JSON.stringify(r.resultado.errores));
   })();
 
-  // T4/T5: rama fechaLimiteEsperada=null (aún sin un fixture propio — CP-18 lo
-  // usará) — mutación temporal del fixture de CP-17, con restauración en
-  // finally (mismo patrón que las pruebas L32-L33).
+  // T4/T5: rama fechaLimiteEsperada=null, ejercitada aquí mediante mutación
+  // temporal del fixture de CP-17 (con restauración en finally, mismo patrón
+  // que las pruebas L32-L33) — antes de que existiera el fixture propio de
+  // CP-18 (sección U, más abajo), que ahora la ejercita también con datos reales.
   (function () {
     var fixture = obtenerFixtureIntegracion_('INT-FASE8-08-FECHA-LIMITE-EXPLICITA');
     var original = fixture.esperado.fechaLimiteEsperada;
@@ -2087,6 +2118,31 @@ function ejecutarPruebasAutomatizadorIntegracionFase8() {
     } finally {
       fixture.esperado.fechaLimiteEsperada = original;
     }
+  })();
+
+  // ==========================================================================
+  // U: INT-FASE8-09-FECHA-LIMITE-NO-EXPLICITA (CP-18) — complemento exacto de
+  //    CP-17: confirma que la rama fechaLimiteEsperada=null (secciones 7.3,
+  //    T4/T5) también aprueba con un fixture propio, reutilizando sin cambios
+  //    efectoFormalUnaTareaConFechaFabrica_ con un tablero distinto
+  //    (Desarrollo IT) y la celda vacía. Que la IA real no invente una fecha
+  //    cuando el cuerpo no menciona ninguna solo puede confirmarse con una
+  //    corrida real — ver auditoria/CHANGELOG.md.
+  // ==========================================================================
+
+  function ejecutarFormalFechaLimiteNoExplicita_(opciones) {
+    opciones = opciones || {};
+    opciones.tablero1 = opciones.tablero1 || 'Desarrollo IT';
+    opciones.fechaLimite = 'fechaLimite' in opciones ? opciones.fechaLimite : '';
+    var ctx = prepararSimuladoFechaLimiteNoExplicita_({ efectoFormal: efectoFormalUnaTareaConFechaFabrica_(opciones) });
+    return { resultado: ejecutarFormalYVerificar_(ctx.amb), estado: ctx.estado };
+  }
+
+  // U1: camino correcto — 1 observación, 1 tarea (Desarrollo IT), Fecha límite vacía.
+  (function () {
+    var r = ejecutarFormalFechaLimiteNoExplicita_({});
+    assert('U1 — INT-FASE8-09: camino correcto (1 observación, 1 tarea en Desarrollo IT, Fecha límite vacía) aprueba',
+      r.resultado.ok === true, JSON.stringify(r.resultado.errores));
   })();
 
   Logger.log('--- Resumen ---');
