@@ -1,5 +1,32 @@
 # Changelog
 
+## [2026-07-24] — Instrumentación temporal de prueba para CP-12 (Variante B): runtime realmente interrumpido
+
+### Contexto
+Variante A (entrada anterior) probó el camino nuevo y más común: una excepción **capturada** dentro de la misma ejecución. Variante B prueba el camino **original**: el runtime muere antes de que cualquier `catch` pueda actuar, así que `gestionarErrorMensaje()` nunca corre y el mensaje queda en `EN_PROCESO` (no `ERROR_TEMPORAL`) hasta que `recuperarProcesamientosAbandonados()` lo detecta por `UMBRAL_ABANDONO_MIN`.
+
+### Por qué la instrumentación es distinta de la de Variante A
+Ninguna excepción lanzada desde dentro del script puede simular esto: el `try/catch` de `procesarCorreosDeTareasConConfiguracion_()` siempre atrapa cualquier `throw` y siempre llama a `gestionarErrorMensaje()`, que siempre transiciona el estado fuera de `EN_PROCESO`. La única forma de dejar la fila realmente en `EN_PROCESO` sin que ningún `catch` actúe es un `return` simple (no una excepción) — exactamente lo que pasaría si Apps Script matara el runtime en ese punto exacto, salvo que acá se hace de forma controlada y reversible.
+
+### Instrumentación temporal (`codigo/script_refactorizado.gs`)
+Gancho nuevo en `procesarUnMensaje()`, justo después de que `actualizarLogMensajes(..., { etapa: ETAPAS.ESCRITURA_COMPLETADA })` corre (tareas ya `ESCRITA`) y antes de `aplicarResultadoGmail()`:
+
+- Se activa **solo** si `cfg.modoPrueba === true` **y** la property `CP12B_DETENER_TRAS_ESCRITURA === 'true'` — mismo criterio de seguridad que la Variante A (nunca en la cuenta productiva).
+- Hace `return;` simple — **no** lanza una excepción — para que el `try/catch` del llamador nunca se entere y `gestionarErrorMensaje()` nunca corra. El mensaje queda en `Log Mensajes.estado = EN_PROCESO` (nunca tocado desde `registrarInicioProcesamiento()`) con `etapa = ESCRITURA_COMPLETADA`, con datos 100% reales (manifiesto, tareas `ESCRITA`, filas en hojas de negocio) escritos por el pipeline real — no fabricados a mano.
+- Marcada "INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-12-B", para retirar tras la corrida real, igual que la de Variante A.
+
+### Por qué no hace falta fabricar filas a mano
+El enunciado original de CP-12-B sugiere "dejar el mensaje en `EN_PROCESO`/`ESCRITURA_COMPLETADA` manualmente en la hoja de prueba". Fabricar a mano un manifiesto completo (`Registro Tareas` + filas de hoja de negocio, con `task_id` y `fila_destino` realistas en 3 hojas distintas) es propenso a errores y no representativo. Dejar que el pipeline real escriba los datos —deteniéndolo justo antes de Gmail, sin excepción— logra el mismo estado con datos genuinos, y solo requiere edición manual de **una única celda**: `fecha_inicio` en `Log Mensajes` (para simular que el abandono ya superó `UMBRAL_ABANDONO_MIN`, sin esperar en tiempo real).
+
+### Cambios
+- `codigo/script_refactorizado.gs`: `procesarUnMensaje()` gana el gancho condicional descrito arriba.
+- Ningún otro archivo de `codigo/` ni de `pruebas/` cambia en esta entrada.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante este diseño. No se modificó `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba la Variante B en esta entrada — requiere que el usuario ejecute el procedimiento y reporte el resultado.
+
+---
+
 ## [2026-07-24] — CP-12 (Variante A) Aprobado: corrida real completa, e instrumentación temporal retirada
 
 ### Contexto
