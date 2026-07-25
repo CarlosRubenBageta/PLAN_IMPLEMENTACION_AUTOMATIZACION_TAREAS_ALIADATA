@@ -53,6 +53,9 @@
  *  S. INT-FASE8-07-CUERPO-VACIO (CP-16): rechazo por filtro determinístico
  *     (regla 6, cuerpo vacío tras extraerContenidoNuevo()) ANTES de la IA,
  *     reutilizando efectoFormalSinTareasCorrecto_ sin cambios.
+ *  T. INT-FASE8-08-FECHA-LIMITE-EXPLICITA (CP-17): nueva verificación opcional
+ *     de la columna "Fecha límite" en verificarResultadoFormal_() (camino
+ *     correcto, día equivocado, celda vacía, y la rama fechaLimiteEsperada=null).
  * ============================================================================
  */
 
@@ -803,6 +806,115 @@ function prepararSimuladoCuerpoVacio_(overridesEstado) {
   simularEnvioMensaje_(estado);
   simularYVerificar_(amb);
   return { estado: estado, amb: amb };
+}
+
+// ============================================================================
+// DOBLES ESPECÍFICOS DE INT-FASE8-08-FECHA-LIMITE-EXPLICITA (CP-17)
+// ============================================================================
+//
+// Fábrica dedicada, NO reutiliza efectoFormalUnaTareaFabrica_ (creada para
+// CP-15/CP-14): aunque la forma general (1 observación, 1 tarea) es igual,
+// esta fábrica ejercita una capacidad NUEVA (escribir la columna "Fecha
+// límite") que CP-14/CP-15 nunca necesitaron — se mantiene separada para no
+// arriesgar esa cobertura ya aprobada.
+
+/** Crea el estado base seleccionando el fixture de fecha límite explícita vía AUTO_FASE8_CASO. */
+function crearEstadoFechaLimiteExplicita_(overrides) {
+  var estado = crearEstadoIntegracion_(overrides || {});
+  estado.props.AUTO_FASE8_CASO = 'INT-FASE8-08-FECHA-LIMITE-EXPLICITA';
+  return estado;
+}
+
+/** prepararCaso_() + simularEnvioMensaje_() + simularYVerificar_() para el fixture de fecha límite explícita. */
+function prepararSimuladoFechaLimiteExplicita_(overridesEstado) {
+  var estado = crearEstadoFechaLimiteExplicita_(overridesEstado);
+  var amb = crearAmbFalsoIntegracion_(estado);
+  prepararCaso_(amb);
+  simularEnvioMensaje_(estado);
+  simularYVerificar_(amb);
+  return { estado: estado, amb: amb };
+}
+
+/**
+ * Fábrica del efecto formal para INT-FASE8-08-FECHA-LIMITE-EXPLICITA: aplica,
+ * sobre las hojas falsas, el resultado que el pipeline real escribiría para un
+ * mensaje con 1 observación y 1 tarea (Comercial), incluida la columna "Fecha
+ * límite" de la hoja de negocio. `opciones.fechaLimite` es un objeto Date (o
+ * `undefined` para dejar la celda vacía, camino por defecto); por defecto
+ * reproduce el camino correcto (31/07/2026).
+ */
+function efectoFormalUnaTareaConFechaFabrica_(opciones) {
+  opciones = opciones || {};
+  return function (estado) {
+    var mid = estado.mensaje.id;
+    var t1 = 'taskId1' in opciones ? opciones.taskId1 : mid + '-T1';
+    var tablero1 = opciones.tablero1 || 'Comercial';
+    var estadoEscritura1 = opciones.estadoEscritura1 || ESTADOS_ESCRITURA_TAREA.ESCRITA;
+    var texto1 = 'texto1' in opciones ? opciones.texto1 : 'CANARIO_OBS_TEXTO_ORIGINAL_no_debe_registrarse_en_logs';
+    var idNegocio1 = 'idNegocio1' in opciones ? opciones.idNegocio1 : t1;
+    var fechaLimite1 = 'fechaLimite' in opciones ? opciones.fechaLimite : new Date(2026, 6, 31);
+
+    // --- Log Mensajes: una fila PROCESADO/FINALIZADO ---
+    var log = estado.sheets['Log Mensajes'];
+    var encLog = log._datos()[0];
+    var filaLog = encLog.map(function () { return ''; });
+    function setLog(nombre, val) { var idx = encLog.indexOf(nombre); if (idx !== -1) filaLog[idx] = val; }
+    setLog('message_id', mid);
+    setLog('thread_id', 'TH-1');
+    setLog('estado', opciones.estadoLog || ESTADOS.PROCESADO);
+    setLog('etapa', opciones.etapaLog || ETAPAS.FINALIZADO);
+    setLog('cantidad_observaciones', 'cantidadObservaciones' in opciones ? opciones.cantidadObservaciones : 1);
+    setLog('cantidad_tareas', 'cantidadTareas' in opciones ? opciones.cantidadTareas : 1);
+    setLog('resultado_gmail', opciones.resultadoGmail || 'SOLO_ETIQUETADO');
+    setLog('error', '');
+    log._datos().push(filaLog);
+
+    // --- Registro Tareas: 1 fila ---
+    var registro = estado.sheets['Registro Tareas'];
+    var encRegistro = registro._datos()[0];
+    function filaRegistro(taskId, tablero, estadoEscritura, textoOriginal) {
+      var f = encRegistro.map(function () { return ''; });
+      function setR(nombre, val) { var idx = encRegistro.indexOf(nombre); if (idx !== -1) f[idx] = val; }
+      setR('task_id', taskId);
+      setR('message_id', mid);
+      setR('thread_id', 'TH-1');
+      setR('tablero', tablero);
+      setR('estado_escritura', estadoEscritura);
+      setR('observacion_numero', 1);
+      setR('observacion_texto_original', textoOriginal);
+      return f;
+    }
+    if (!opciones.omitirFilaRegistro1) registro._datos().push(filaRegistro(t1, tablero1, estadoEscritura1, texto1));
+
+    // --- Indice Idempotencia: por defecto, una entrada ---
+    var indice = estado.sheets['Indice Idempotencia'];
+    var idsIndice = opciones.idsIndice || [t1];
+    var estadosIndice = opciones.estadosIndice || [ESTADOS.PROCESADO];
+    idsIndice.forEach(function (taskId, i) {
+      indice._datos().push([mid, taskId, estadosIndice[i] || ESTADOS.PROCESADO, 'FECHA']);
+    });
+
+    // --- Hojas de negocio: una fila nueva, vinculada por "ID", con "Fecha límite" ---
+    var encabezadosNegocioConocidos = encabezadosHojaNegocio_();
+    var idxIdConocido = encabezadosNegocioConocidos.indexOf('ID');
+    var idxFechaLimiteConocido = encabezadosNegocioConocidos.indexOf('Fecha límite');
+    function agregarFilaNegocio(tablero, taskId) {
+      var hoja = estado.sheets[tablero];
+      var f = encabezadosNegocioConocidos.map(function () { return ''; });
+      if (idxIdConocido !== -1) f[idxIdConocido] = taskId;
+      if (idxFechaLimiteConocido !== -1 && fechaLimite1 !== undefined) f[idxFechaLimiteConocido] = fechaLimite1;
+      hoja._datos().push(f);
+    }
+    if (!opciones.omitirFilaNegocio1) agregarFilaNegocio(opciones.tableroFilaNegocio1 || tablero1, idNegocio1);
+
+    // --- Gmail: etiqueta Procesado (salvo que se pida omitirla) ---
+    if (!opciones.omitirEtiquetaProcesado && estado.mensaje.labelIds.indexOf('L_PROC') === -1) {
+      estado.mensaje.labelIds.push('L_PROC');
+    }
+    (opciones.etiquetasExtra || []).forEach(function (labelId) {
+      if (estado.mensaje.labelIds.indexOf(labelId) === -1) estado.mensaje.labelIds.push(labelId);
+    });
+  };
 }
 
 // ============================================================================
@@ -1921,6 +2033,60 @@ function ejecutarPruebasAutomatizadorIntegracionFase8() {
     var r = verificarClasificacionSimulada_({ resultadosSimulados: [{ resultado: { resultado: 'NO_ELEGIBLE', cantidadObservaciones: 0, cantidadTareas: 0, tableros: [] } }] }, fixture);
     assert('S4 — verificarClasificacionSimulada_(): NO_ELEGIBLE con cantidades 0 en vez de null rechaza',
       r.ok === false && tieneError(r, 'SIMULACION_CANTIDAD_OBSERVACIONES:0') && tieneError(r, 'SIMULACION_CANTIDAD_TAREAS:0'), JSON.stringify(r.errores));
+  })();
+
+  // ==========================================================================
+  // T: INT-FASE8-08-FECHA-LIMITE-EXPLICITA (CP-17) — nueva verificación
+  //    OPCIONAL de la columna "Fecha límite" en verificarResultadoFormal_(),
+  //    activada por fixture.esperado.fechaLimiteEsperada. Que construirFechaLocal()
+  //    (codigo/escritura_sheets.gs) realmente evite el corrimiento de un día en
+  //    la zona horaria del proyecto solo puede confirmarse con una corrida
+  //    real — ver auditoria/CHANGELOG.md.
+  // ==========================================================================
+
+  function ejecutarFormalFechaLimiteExplicita_(opciones) {
+    var ctx = prepararSimuladoFechaLimiteExplicita_({ efectoFormal: efectoFormalUnaTareaConFechaFabrica_(opciones) });
+    return { resultado: ejecutarFormalYVerificar_(ctx.amb), estado: ctx.estado };
+  }
+
+  // T1: camino correcto — 1 observación, 1 tarea (Comercial), Fecha límite = 2026-07-31.
+  (function () {
+    var r = ejecutarFormalFechaLimiteExplicita_({});
+    assert('T1 — INT-FASE8-08: camino correcto (1 observación, 1 tarea en Comercial, Fecha límite 2026-07-31) aprueba',
+      r.resultado.ok === true, JSON.stringify(r.resultado.errores));
+  })();
+
+  // T2: día equivocado (corrimiento de un día: 30 en vez de 31) — rechaza.
+  (function () {
+    var r = ejecutarFormalFechaLimiteExplicita_({ fechaLimite: new Date(2026, 6, 30) });
+    assert('T2 — día equivocado (corrimiento de un día, 2026-07-30 en vez de 2026-07-31) rechaza',
+      tieneError(r.resultado, 'HOJA_NEGOCIO_FECHA_LIMITE_NO_COINCIDE:Comercial:2026-07-30'), JSON.stringify(r.resultado.errores));
+  })();
+
+  // T3: celda "Fecha límite" vacía cuando se esperaba una fecha explícita — rechaza.
+  (function () {
+    var r = ejecutarFormalFechaLimiteExplicita_({ fechaLimite: '' });
+    assert('T3 — celda "Fecha límite" vacía cuando se esperaba una fecha explícita rechaza',
+      tieneError(r.resultado, 'HOJA_NEGOCIO_FECHA_LIMITE_NO_COINCIDE:Comercial:VACIO'), JSON.stringify(r.resultado.errores));
+  })();
+
+  // T4/T5: rama fechaLimiteEsperada=null (aún sin un fixture propio — CP-18 lo
+  // usará) — mutación temporal del fixture de CP-17, con restauración en
+  // finally (mismo patrón que las pruebas L32-L33).
+  (function () {
+    var fixture = obtenerFixtureIntegracion_('INT-FASE8-08-FECHA-LIMITE-EXPLICITA');
+    var original = fixture.esperado.fechaLimiteEsperada;
+    fixture.esperado.fechaLimiteEsperada = null;
+    try {
+      var rVacia = ejecutarFormalFechaLimiteExplicita_({ fechaLimite: '' });
+      assert('T4 — fechaLimiteEsperada=null con la celda vacía aprueba', rVacia.resultado.ok === true, JSON.stringify(rVacia.resultado.errores));
+
+      var rConFecha = ejecutarFormalFechaLimiteExplicita_({});
+      assert('T5 — fechaLimiteEsperada=null con una fecha presente en la celda rechaza',
+        tieneError(rConFecha.resultado, 'HOJA_NEGOCIO_FECHA_LIMITE_NO_COINCIDE:Comercial:2026-07-31'), JSON.stringify(rConFecha.resultado.errores));
+    } finally {
+      fixture.esperado.fechaLimiteEsperada = original;
+    }
   })();
 
   Logger.log('--- Resumen ---');

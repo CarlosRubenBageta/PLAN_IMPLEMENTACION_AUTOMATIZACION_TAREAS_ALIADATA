@@ -1,5 +1,27 @@
 # Changelog
 
+## [2026-07-24] — Ampliación incremental del automatizador de integración: fixture INT-FASE8-08-FECHA-LIMITE-EXPLICITA (CP-17)
+
+### Contexto
+Se evaluó primero CP-06 (Promoción de Google) como siguiente caso, pero sus dos equivalentes documentados (FC-04: encabezado `List-Unsubscribe`; FC-09: remitente de dominio `google.com`) requieren algo que no se puede producir componiendo un correo normal desde `sichar@gmail.com` — un encabezado crudo o un remitente spoofeado — a diferencia de todos los fixtures anteriores, que solo necesitaban control sobre asunto/cuerpo/remitente propio. Se decidió, con el usuario, diferir CP-06 (requeriría el servicio avanzado Gmail API y un script auxiliar de envío con MIME crudo, fuera del flujo actual de "componer y enviar manualmente") y continuar con **CP-17** (fecha límite explícita, reutiliza **PE-04**, `pruebas/PRUEBAS_ESCRITURA.md`), que sí es un fixture de correo normal.
+
+### Qué verifica este caso
+`construirFechaLocal()` (`codigo/escritura_sheets.gs`) evita un corrimiento de un día al escribir la columna "Fecha límite" como `Date` real, construyéndola con componentes explícitos (`new Date(año, mes-1, día)`) en vez de parsear el ISO 8601 directamente. Hasta ahora, `verificarResultadoFormal_()` (sección 7) **nunca comprobaba el valor de esta columna** — solo la columna `ID` de las hojas de negocio (para vincular filas al manifiesto). Esta ampliación agrega esa verificación, como una comprobación **opcional** (activada por un nuevo campo `fixture.esperado.fechaLimiteEsperada`), sin afectar ningún fixture existente (los seis anteriores no declaran este campo).
+
+### Diseño del fixture
+El cuerpo declara una acción con una fecha límite **explícita y concreta** ("antes del 31 de julio de 2026"), evitando deliberadamente una referencia relativa de día ("antes del viernes"): el propio prompt (`codigo/prompts_ia.gs`) trae un ejemplo few-shot donde "antes del viernes" se clasifica con `fecha_limite: null` (una referencia relativa no es una fecha explícita en formato calendario) — usar esa misma redacción habría probado el camino `null` (CP-18), no el camino de fecha explícita que busca CP-17. Se eligió el 31/07/2026 (7 días después de la fecha de hoy) para evitar cualquier ambigüedad de "hoy"/mismo día.
+
+### Cambios
+- `pruebas/fixtures_integracion_fase8.gs`: nuevo fixture `INT-FASE8-08-FECHA-LIMITE-EXPLICITA`, con `esperado.tareasEsperadas: [{tablero:'Comercial'}]` y el nuevo campo `esperado.fechaLimiteEsperada: '2026-07-31'`.
+- `pruebas/automatizador_integracion_fase8.gs`: `verificarResultadoFormal_()` gana una verificación opcional de la celda "Fecha límite" de la única fila nueva (cuando `esperado.fechaLimiteEsperada !== undefined` y hay exactamente 1 tarea esperada): compara año/mes/día extraídos localmente de la celda (sin usar `Utilities.formatDate()`, evitando cualquier dependencia de zona horaria en la propia comparación) contra la fecha esperada, o exige celda vacía si `esperado.fechaLimiteEsperada === null`. Nueva categoría cerrada: `HOJA_NEGOCIO_FECHA_LIMITE_NO_COINCIDE:<tablero>:<obtenido>`. Ausente ese campo (los seis fixtures anteriores), comportamiento idéntico al previo.
+- `pruebas/pruebas_automatizador_integracion_fase8.gs`: nueva fábrica de doble dedicada `efectoFormalUnaTareaConFechaFabrica_` (NO reutiliza `efectoFormalUnaTareaFabrica_` de CP-14/CP-15, para no arriesgar esa cobertura ya aprobada), más pruebas de camino correcto, día equivocado (corrimiento de un día) y celda vacía cuando se esperaba una fecha; además, una prueba de la rama `null` (mutación temporal de `esperado.fechaLimiteEsperada` sobre el propio fixture de CP-17, con restauración en `finally`, seguido del mismo patrón ya usado por las pruebas L32-L33).
+- `codigo/*.gs`: **sin cambios.**
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta ampliación. No se modificó `codigo/prompts_ia.gs`, `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-17 en esta entrada — requiere una corrida real (`SIMULACION_OK` + `FORMAL_OK`).
+
+---
+
 ## [2026-07-24] — CP-16 Aprobado: corrida real completa de INT-FASE8-07-CUERPO-VACIO (SIMULACION_OK + FORMAL_OK)
 
 ### Contexto

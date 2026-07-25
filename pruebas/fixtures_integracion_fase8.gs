@@ -355,6 +355,47 @@ var FIXTURES_INTEGRACION_FASE8 = [
       noArchivar: true,
       clavesEtiquetaProhibidas: ['Procesado', 'RevisionErrorProcesamiento', 'RevisionErrorAutomatizacion']
     }
+  },
+  {
+    id: 'INT-FASE8-08-FECHA-LIMITE-EXPLICITA',
+    descripcion: 'Equivalente a CP-17 (reutiliza PE-04, pruebas/PRUEBAS_ESCRITURA.md): una tarea con fecha límite explícita en el cuerpo. Verifica que construirFechaLocal() (codigo/escritura_sheets.gs) escriba la fecha correcta en la columna "Fecha límite" de la hoja de negocio, sin el corrimiento de un día documentado en documentacion/MAPA_ESCRITURA.md, sección 2.',
+    remitentePermitido: 'sichar@gmail.com',
+    asuntoBase: '[PRUEBA-AUTOMATIZACION][INTEGRACION] Confirmación de pedido con fecha límite',
+    // Fecha explícita y concreta (31 de julio de 2026), NO una referencia
+    // relativa de día ("antes del viernes"): el prompt real (codigo/prompts_ia.gs)
+    // trae un ejemplo few-shot donde "antes del viernes" se clasifica con
+    // fecha_limite: null (una referencia relativa no cuenta como fecha
+    // explícita) — usar esa redacción habría probado el camino null (CP-18),
+    // no el de fecha explícita que busca CP-17.
+    cuerpo: 'Necesitamos que el equipo comercial confirme el pedido del cliente antes del 31 de julio de 2026.',
+    versionPromptMinima: 'v4-INC-FASE8-011-informativo-sin-tareas',
+    esperado: {
+      // Log Mensajes (por nombre de encabezado).
+      estado: 'PROCESADO',
+      etapa: 'FINALIZADO',
+      cantidad_observaciones: 1,
+      cantidad_tareas: 1,
+      resultado_gmail: 'SOLO_ETIQUETADO',
+      // Registro Tareas: exactamente 1 fila.
+      filasRegistroTareas: 1,
+      tareasEsperadas: [
+        { tablero: 'Comercial' }
+      ],
+      // Fecha límite esperada en la columna "Fecha límite" de la hoja de
+      // negocio (ISO 8601, año-mes-día) — verificarResultadoFormal_() la
+      // compara por componentes de fecha local (no por fecha completa con
+      // hora), sin usar Utilities.formatDate() en la propia comparación.
+      fechaLimiteEsperada: '2026-07-31',
+      // Indice Idempotencia: una entrada por task_id del manifiesto, todas PROCESADO.
+      entradasIndiceIdempotencia: 1,
+      estadoFinalIndice: 'PROCESADO',
+      // Gmail: recibe Procesado; ninguna etiqueta de revisión/error.
+      claveEtiquetaEsperada: 'Procesado',
+      conservaEtiquetaPrueba: true,
+      conservaInbox: true,
+      noArchivar: true,
+      clavesEtiquetaProhibidas: ['RevisionSinTareas', 'RevisionErrorProcesamiento', 'RevisionErrorAutomatizacion']
+    }
   }
 ];
 

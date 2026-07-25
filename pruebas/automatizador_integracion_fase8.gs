@@ -820,6 +820,25 @@ function ejecutarFormalYVerificar_(amb) {
 }
 
 /**
+ * Extrae año-mes-día LOCALES de un objeto Date, como 'YYYY-MM-DD'. Usa
+ * getFullYear()/getMonth()/getDate() (nunca los equivalentes UTC ni
+ * Utilities.formatDate()) para que la comparación en sí sea neutral respecto
+ * de la zona horaria: tanto en Apps Script real (donde estos getters ya
+ * reflejan la zona horaria configurada del proyecto) como en los dobles
+ * locales de pruebas (donde el valor simulado se construye con los mismos
+ * getters), año/mes/día coinciden exactamente si y solo si representan el
+ * mismo día calendario. Devuelve null si no es un objeto Date real.
+ */
+function formatearFechaLocalISO_(valor) {
+  if (!(valor instanceof Date) || isNaN(valor.getTime())) return null;
+  var mes = String(valor.getMonth() + 1);
+  var dia = String(valor.getDate());
+  if (mes.length < 2) mes = '0' + mes;
+  if (dia.length < 2) dia = '0' + dia;
+  return valor.getFullYear() + '-' + mes + '-' + dia;
+}
+
+/**
  * Verifica el resultado formal contra fixture.esperado, por NOMBRE de
  * encabezado/etiqueta (nunca por número de columna fijo). Aborta
  * explícitamente si falta un encabezado obligatorio (no lo convierte en cero
@@ -834,6 +853,13 @@ function ejecutarFormalYVerificar_(amb) {
  * INT-FASE8-01-INFORMATIVO —, el comportamiento es IDÉNTICO al anterior a
  * esta ampliación: se exigen 0 filas en Registro Tareas y las cinco hojas de
  * negocio idénticas al baseline.
+ *
+ * Ampliado (24/07/2026, CP-17/INT-FASE8-08-FECHA-LIMITE-EXPLICITA) con una
+ * verificación OPCIONAL de la columna "Fecha límite" de la única fila nueva,
+ * activada por `fixture.esperado.fechaLimiteEsperada` (string 'YYYY-MM-DD' o
+ * `null`) cuando hay exactamente 1 tarea esperada para ese tablero. Ausente
+ * ese campo — los siete fixtures anteriores —, comportamiento idéntico al
+ * previo a esta ampliación.
  */
 function verificarResultadoFormal_(amb, cfg, messageId, fixture, idsPorClave, idEtiquetaPrueba, baselinePrevio) {
   var esperado = fixture.esperado;
@@ -1022,6 +1048,20 @@ function verificarResultadoFormal_(amb, cfg, messageId, fixture, idsPorClave, id
       .sort();
 
     if (JSON.stringify(taskIdsNuevasFilas) !== JSON.stringify(taskIdsEsperadosTablero)) errores.push('HOJA_NEGOCIO_TASK_ID_NO_VINCULADO:' + tablero);
+
+    // Fecha límite (opcional, solo si el fixture la declara y hay
+    // exactamente 1 tarea nueva para este tablero — ver docstring de arriba).
+    if (esperado.fechaLimiteEsperada !== undefined && nuevasEsperadas === 1) {
+      var idxFechaLimite = indiceColumnaPorNombre_(base.valores[deteccionEncabezados.indiceFila], 'Fecha límite');
+      var valorFechaLimite = idxFechaLimite === -1 ? undefined : contenido.valores[filasBase][idxFechaLimite];
+      var fechaObtenidaISO = formatearFechaLocalISO_(valorFechaLimite);
+      if (esperado.fechaLimiteEsperada === null) {
+        var estaVacia = valorFechaLimite === '' || valorFechaLimite === undefined || valorFechaLimite === null;
+        if (!estaVacia) errores.push('HOJA_NEGOCIO_FECHA_LIMITE_NO_COINCIDE:' + tablero + ':' + (fechaObtenidaISO || 'NO_ES_FECHA'));
+      } else if (fechaObtenidaISO !== esperado.fechaLimiteEsperada) {
+        errores.push('HOJA_NEGOCIO_FECHA_LIMITE_NO_COINCIDE:' + tablero + ':' + (fechaObtenidaISO || (valorFechaLimite === '' ? 'VACIO' : 'NO_ES_FECHA')));
+      }
+    }
   });
 
   return { ok: errores.length === 0, errores: errores };
