@@ -104,7 +104,7 @@ Reutiliza **FC-04** o **FC-09** (`pruebas/CASOS_CORREOS_NO_OPERATIVOS.md`).
 
 Reutiliza **FC-01** (`pruebas/CASOS_CORREOS_NO_OPERATIVOS.md`).
 **Resultado esperado:** etiqueta `Revisión manual/Error de automatización`, **sin** llamada a OpenAI (verificable porque `Log Mensajes.modelo` queda vacío para este mensaje).
-**Estado:** Pendiente.
+**Estado:** Aprobado — 24/07/2026. Ejecutado mediante el automatizador de integración de Fase 2A (`runId 9a2f73ca-684b-48e0-9fb9-fbd5ffb57382`, `message_id 19f96cb239f5ec62`, fixture `INT-FASE8-10-ERROR-AUTOMATIZACION-APPS-SCRIPT`, disparado por asunto — no por remitente, ya que el remitente exigido por la regla no es una dirección enviable desde `sichar@gmail.com`): `FORMAL_OK` confirmó automáticamente `Log Mensajes` (`estado=SIN_TAREAS`, `resultado_gmail=SOLO_ETIQUETADO`), ninguna fila nueva en `Registro Tareas`, 1 entrada en `Indice Idempotencia` (`task_id` vacío), ninguna hoja de negocio modificada. El log no mostró ninguna línea `consultarIAExtractora()`, confirmando que no hubo llamada real a OpenAI (mismo mecanismo de filtro que CP-16). El tester confirmó visualmente en Gmail la etiqueta `Revisión manual/Error de automatización` — distinta de `Revisión manual/Sin tareas detectadas` (la de CP-16). Aprobó al primer intento, sin necesitar ningún ajuste. Ver detalle completo en `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
 ## CP-08 — JSON inválido de la IA
 

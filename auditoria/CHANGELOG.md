@@ -1,5 +1,36 @@
 # Changelog
 
+## [2026-07-24] — CP-07 Aprobado: corrida real completa de INT-FASE8-10-ERROR-AUTOMATIZACION-APPS-SCRIPT (SIMULACION_OK + FORMAL_OK)
+
+### Contexto
+Con el fixture recién agregado (ver entrada inmediatamente anterior), la primera corrida real completó el flujo de dos invocaciones sin ninguna discrepancia, al primer intento:
+
+```text
+runId: 9a2f73ca-684b-48e0-9fb9-fbd5ffb57382
+messageId: 19f96cb239f5ec62 (nuevo, nunca antes usado)
+formal: FORMAL_OK
+```
+
+`ejecutarFormalYVerificarCasoIntegracionFase8Visible()` informó `[AUTO-FASE8] FORMAL_OK runId=9a2f73ca-684b-48e0-9fb9-fbd5ffb57382 caso=INT-FASE8-10-ERROR-AUTOMATIZACION-APPS-SCRIPT messageId=19f96cb239f5ec62`. El log no muestra ninguna línea `consultarIAExtractora()` — confirma, igual que CP-16, que el filtro determinístico rechazó el mensaje **antes** de invocar a la IA, sin generar ningún costo de OpenAI. No se recibió por separado el texto del log de `SIMULACION_OK`; por construcción, `ejecutarFormalYVerificar_()` exige esa sesión para el mismo `message_id`/nonce/fingerprint antes de autorizar la formal, por lo que este `FORMAL_OK` confirma sin ambigüedad que también aprobó.
+
+### Confirmación visual directa
+El tester revisó manualmente Gmail y confirmó que el mensaje recibió la etiqueta `Revisión manual/Error de automatización` — exactamente la esperada, distinta de `Revisión manual/Sin tareas detectadas` (la que recibió CP-16 por el mismo mecanismo de filtro).
+
+### Qué certifica `FORMAL_OK` (por construcción de `verificarResultadoFormal_()`, sección 7)
+- **`Log Mensajes`:** una fila para este `message_id`, `estado=SIN_TAREAS`, `etapa=FINALIZADO`, `cantidad_observaciones`/`cantidad_tareas` en blanco, `resultado_gmail=SOLO_ETIQUETADO`, `error` no vacío (motivo del filtro, nunca registrado como texto).
+- **`Registro Tareas`:** ninguna fila nueva para el mensaje.
+- **`Indice Idempotencia`:** exactamente 1 entrada, `estado_final=SIN_TAREAS`, `task_id` vacío.
+- **Hojas de negocio:** ninguna modificada.
+- **Gmail:** conserva `Pruebas-Automatizacion` e `INBOX`, recibe `Revisión manual/Error de automatización` (confirmado visualmente), no recibe `Procesado` ni las otras etiquetas de revisión/error, no se archiva.
+
+### Aprobación
+**CP-07 pasa de Pendiente a Aprobado — 24/07/2026**, al primer intento, sin necesitar ningún ajuste. Confirma en producción real que la regla obligatoria de notificaciones de fallos de Apps Script (regla 1 de `evaluarFiltroDeterministico()`) dispara correctamente por asunto (sin necesitar el remitente exigido, que no era enviable), aplica la etiqueta distinta correspondiente, y no genera ninguna llamada real a OpenAI. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### No accedido
+No se modificó ningún archivo de código (`codigo/*.gs` ni `pruebas/*.gs`) en esta entrada — es exclusivamente el registro de una corrida real exitosa y la actualización de los documentos de seguimiento.
+
+---
+
 ## [2026-07-24] — Ampliación incremental del automatizador de integración: fixture INT-FASE8-10-ERROR-AUTOMATIZACION-APPS-SCRIPT (CP-07)
 
 ### Contexto

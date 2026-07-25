@@ -49,7 +49,7 @@ Captura revisada por Claude Cowork. Muestra:
 | CP-04 | Tareas para tres hojas | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: tras un ajuste de redacción del fixture, `SIMULACION_OK` confirmó 1 observación/3 tareas (`Desarrollo IT/Alto`, `Finanzas/Alto`, `Comercial/Medio`), sin escrituras; `FORMAL_OK` confirmó automáticamente `Log Mensajes`, 3 filas en `Registro Tareas` (mismo `texto_original`), 3 entradas en `Indice Idempotencia`, filas nuevas en `Desarrollo IT`/`Finanzas`/`Comercial`, y etiqueta `Procesado` en Gmail. | Registro `[AUTO-FASE8]` de la corrida real — `runId 26c92904-c613-4a07-b34b-01a766da3710`, `message_id 19f95bc29ad0717d` | Aprobado — 24/07/2026 |
 | CP-05 | Correo informativo | 23/07/2026; regresión automatizada 24/07/2026 | Ver detalle completo debajo de la tabla. Resumen del cierre formal: `DRY_RUN=true` confirmó `resultado=SIN_TAREAS`/`observaciones=0`, sin escrituras; ejecución formal (`DRY_RUN=false`) confirmó `cantidad_observaciones=0`, `cantidad_tareas=0`, ninguna fila en `Registro Tareas`, una entrada en `Indice Idempotencia` (`estado_final=SIN_TAREAS`), etiqueta `Revisión manual/Sin tareas detectadas` aplicada, mensaje no archivado. Regresión automatizada posterior: `INT-FASE8-01-INFORMATIVO` obtuvo `SIMULACION_OK` y `FORMAL_OK` con un `message_id` nuevo y comprobó automáticamente el mismo resultado. | Cierre formal verificado manualmente por Carlos Rubén Bageta; piloto automatizado `runId dcd52847-c431-4625-8d0e-d3ca82f0f096`, `message_id 19f920a199a6666b` | Aprobado — 23/07/2026 (cierre de INC-FASE8-011; ratificado automáticamente el 24/07/2026) |
 | CP-06 | Promoción de Google | | | | Pendiente |
-| CP-07 | Notificación de Apps Script | | | | Pendiente |
+| CP-07 | Notificación de Apps Script | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: `FORMAL_OK` confirmó automáticamente `Log Mensajes` (`SIN_TAREAS`), ninguna fila nueva en `Registro Tareas`, 1 entrada en `Indice Idempotencia` (`task_id` vacío), sin llamada a OpenAI (sin línea `consultarIAExtractora()`), y etiqueta `Revisión manual/Error de automatización` confirmada visualmente en Gmail. Disparado por asunto, no por remitente. Aprobó al primer intento. | Registro `[AUTO-FASE8]` de la corrida real — `runId 9a2f73ca-684b-48e0-9fb9-fbd5ffb57382`, `message_id 19f96cb239f5ec62` | Aprobado — 24/07/2026 |
 | CP-08 | JSON inválido | | | | Pendiente |
 | CP-09 | Error HTTP temporal | | | | Pendiente |
 | CP-10 | Hoja inexistente | 21/07/2026, ejecución formal ~21:18 | Hoja `Desarrollo IT` renombrada temporalmente a `Desarrollo IT__CP10_TEMP` (mismo comportamiento de hoja inexistente). Lote de 2 mensajes: uno a la hoja inexistente (`REVISION_MANUAL`/`ERROR_ESCRITURA`), otro a `Finanzas` (`PROCESADO`/`ESCRITA`). Ver detalle completo debajo de la tabla. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
@@ -903,6 +903,30 @@ Versión de prompt: v4-INC-FASE8-011-informativo-sin-tareas
 
 **Estado (veredicto final):** Aprobado — 24/07/2026 (`PASA`).
 
+## Detalle de CP-07 — Notificación de Apps Script (aprobado vía automatizador de integración Fase 2A)
+
+```text
+Fecha de ejecución: 24/07/2026
+Caso automatizado: INT-FASE8-10-ERROR-AUTOMATIZACION-APPS-SCRIPT
+runId: 9a2f73ca-684b-48e0-9fb9-fbd5ffb57382
+message_id: 19f96cb239f5ec62 (nuevo)
+Versión de prompt: v4-INC-FASE8-011-informativo-sin-tareas
+```
+
+**Antecedente:** al igual que CP-03/CP-04/CP-15/CP-14/CP-16/CP-17/CP-18, se ejecutó íntegramente a través del automatizador de integración de Fase 2A. Reutiliza FC-01 (`pruebas/CASOS_CORREOS_NO_OPERATIVOS.md`): un asunto que coincide con la regla obligatoria de notificaciones de fallos de Apps Script (regla 1 de `evaluarFiltroDeterministico()`, `codigo/filtros_correo.gs`) — condición OR entre remitente y asunto; se usó el asunto porque el remitente exigido (`noreply-apps-scripts-notifications@google.com`) no es una dirección que el tester pueda enviar realmente (a diferencia de CP-06, diferido por este mismo motivo). Reutiliza sin cambios en `verificarResultadoFormal_()`/`verificarClasificacionSimulada_()`, ya que `RevisionErrorAutomatizacion` ya era una clave de etiqueta soportada de forma genérica; solo hizo falta una fábrica de efecto formal dedicada (`efectoFormalErrorAutomatizacionCorrecto_`) que aplicara `L_ERRAUTO` en vez de `L_SINTAREAS`.
+
+### Simulación y ejecución formal
+
+- El núcleo informó exactamente 1 mensaje elegible y procesó el `message_id` preparado. El log **no muestra ninguna línea** `consultarIAExtractora()` — confirma, igual que CP-16, que el filtro determinístico rechazó el mensaje antes de llegar a la IA, sin generar ningún costo de OpenAI.
+- No se recibió por separado el texto del log de `SIMULACION_OK` de esta corrida (sí el de la ejecución formal). Esto no impide la aprobación: por construcción, `ejecutarFormalYVerificar_()` exige una sesión en `SIMULACION_OK` para el mismo `message_id`/nonce/fingerprint antes de autorizar la formal — el `FORMAL_OK` recibido confirma, sin ambigüedad, que la simulación también aprobó.
+- Log recibido de la ejecución formal: `procesarCorreosDeTareasConConfiguracion_(): recuperación de abandonados omitida por opciones.omitirRecuperacion.`; `procesarCorreosDeTareas(): 1 mensajes elegibles, procesando 1.`; `[AUTO-FASE8] FORMAL_OK runId=9a2f73ca-684b-48e0-9fb9-fbd5ffb57382 caso=INT-FASE8-10-ERROR-AUTOMATIZACION-APPS-SCRIPT messageId=19f96cb239f5ec62`.
+- Por construcción de `verificarResultadoFormal_()` (sección 7), este `FORMAL_OK` certifica: `Log Mensajes` (`estado=SIN_TAREAS`, `etapa=FINALIZADO`, `cantidad_observaciones`/`cantidad_tareas` en blanco, `resultado_gmail=SOLO_ETIQUETADO`, `error` no vacío); `Registro Tareas` sin ninguna fila nueva; `Indice Idempotencia` con 1 entrada (`estado_final=SIN_TAREAS`, `task_id` vacío); ninguna hoja de negocio modificada; Gmail conservó `Pruebas-Automatizacion` e `INBOX`, sin `Procesado` ni las otras etiquetas de revisión/error, sin archivar.
+- **Confirmación visual directa del tester:** el mensaje recibió la etiqueta `Revisión manual/Error de automatización` en Gmail — exactamente la esperada, distinta de `Revisión manual/Sin tareas detectadas` (la de CP-16).
+
+**Conclusión:** CP-07 PASA. Confirma, en producción real, que la regla obligatoria de notificaciones de fallos de Apps Script dispara correctamente por asunto, aplica la etiqueta distinta correspondiente, y no genera ninguna llamada real a OpenAI.
+
+**Estado (veredicto final):** Aprobado — 24/07/2026 (`PASA`).
+
 ## Detalle de CP-18 — Fecha no explícita (aprobado vía automatizador de integración Fase 2A)
 
 ```text
@@ -1085,7 +1109,7 @@ Total de casos que condicionan la aprobación de esta fase: 36 (CP-01 a CP-29, C
 Diferido a Fase 10 (no condiciona esta fase): 1 (CP-30, DEC-004)
 Bloqueado que todavía condiciona la Fase 8: 1 (CP-35 — ver nota de auditoría abajo)
 Bloqueados pendientes de Lotes 2/3 (no condicionan esta fase): 2 (CP-38, CP-39)
-Aprobados: 23 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-10, CP-11, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-27, CP-28, CP-31, CP-36, CP-37)
+Aprobados: 24 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-07, CP-10, CP-11, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-27, CP-28, CP-31, CP-36, CP-37)
 Rechazados: 0
   CP-19 pasó de Rechazado (21/07/2026, INC-FASE8-008) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución fallida original se conserva íntegro en el detalle de CP-19.
   CP-23 pasó de Rechazado (22/07/2026, INC-FASE8-009) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución vulnerable original se conserva íntegro en el detalle de CP-23.
@@ -1098,7 +1122,8 @@ Rechazados: 0
   CP-16 pasó de Pendiente a Aprobado (24/07/2026, ejecución vía el automatizador de integración de Fase 2A con message_id 19f9677c994bf546, en el segundo intento — el primero expuso un defecto del verificador (`verificarClasificacionSimulada_()` no contemplaba `NO_ELEGIBLE`), nunca un defecto del pipeline productivo, que ya rechazaba correctamente el mensaje). Confirma además, en producción real, que el filtro determinístico rechaza un cuerpo vacío antes de la IA, sin generar ninguna llamada a OpenAI — primer caso de este automatizador con esa característica.
   CP-17 pasó de Pendiente a Aprobado (24/07/2026, ejecución vía el automatizador de integración de Fase 2A con message_id 19f9699bac4232c8, al primer intento, sin necesitar ningún ajuste de redacción). Confirma además, en producción real, que `construirFechaLocal()` no produce el corrimiento de un día en la columna "Fecha límite" — el tester confirmó visualmente `31/07/2026` en la hoja `Comercial`.
   CP-18 pasó de Pendiente a Aprobado (24/07/2026, ejecución vía el automatizador de integración de Fase 2A con message_id 19f96b3f0b156c2a, al primer intento, sin necesitar ningún ajuste de redacción). Complemento exacto de CP-17: confirma que, sin fecha en el cuerpo, la columna "Fecha límite" queda vacía en vez de que la IA invente una fecha.
-Pendientes (ejecutables con estado Pendiente, no corridos aún): 12
+  CP-07 pasó de Pendiente a Aprobado (24/07/2026, ejecución vía el automatizador de integración de Fase 2A con message_id 19f96cb239f5ec62, al primer intento, sin necesitar ningún ajuste). Confirma además, en producción real, que la regla obligatoria de notificaciones de fallos de Apps Script dispara correctamente por asunto (sin necesitar el remitente exigido, no enviable) y aplica la etiqueta `Revisión manual/Error de automatización`, distinta de la de CP-16 — sin generar ninguna llamada real a OpenAI.
+Pendientes (ejecutables con estado Pendiente, no corridos aún): 11
   [Corregido 22/07/2026: esta lista omitía a CP-27, ya aprobado desde el 20/07/2026 (CP-27 — Modo prueba con ID productivo); no cambia el alcance ni el estado de ningún caso.]
   [Corregido 23/07/2026 (semántica): CP-35 estaba contabilizado dentro de "Pendientes"; su estado individual es Bloqueado (ver nota de auditoría abajo), no Pendiente. Se lo separa como bloqueado que todavía condiciona la Fase 8. Pendientes pasa de 20 a 19; no cambia el estado individual de ningún caso.]
   [Corregido 24/07/2026: CP-03 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 19 a 18.]
@@ -1108,7 +1133,8 @@ Pendientes (ejecutables con estado Pendiente, no corridos aún): 12
   [Corregido 24/07/2026: CP-16 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 15 a 14.]
   [Corregido 24/07/2026: CP-17 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 14 a 13.]
   [Corregido 24/07/2026: CP-18 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 13 a 12.]
-  CP-01, CP-02, CP-03, CP-04, CP-05, CP-10, CP-11, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-27, CP-28, CP-31, CP-36 y CP-37 aprobados
+  [Corregido 24/07/2026: CP-07 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 12 a 11.]
+  CP-01, CP-02, CP-03, CP-04, CP-05, CP-07, CP-10, CP-11, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-27, CP-28, CP-31, CP-36 y CP-37 aprobados
   CP-21 ya no está bloqueado por INC-FASE8-008 (CP-19 Aprobado) y fue ejecutado y aprobado el 22/07/2026
   CP-05 ya no está bloqueado por INC-FASE8-011 (cerrada) y fue ejecutado y aprobado el 23/07/2026
   CP-03 fue ejecutado y aprobado el 24/07/2026
@@ -1118,8 +1144,9 @@ Pendientes (ejecutables con estado Pendiente, no corridos aún): 12
   CP-16 fue ejecutado y aprobado el 24/07/2026
   CP-17 fue ejecutado y aprobado el 24/07/2026
   CP-18 fue ejecutado y aprobado el 24/07/2026
-Casos sin aprobación que todavía condicionan la Fase 8: 13 (12 Pendientes + CP-35 Bloqueado)
-Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 16
+  CP-07 fue ejecutado y aprobado el 24/07/2026
+Casos sin aprobación que todavía condicionan la Fase 8: 12 (11 Pendientes + CP-35 Bloqueado)
+Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 15
 
 Nota (auditoría 20/07/2026): CP-35 pasó a "bloqueado" — no puede considerarse
 una verificación válida del criterio "no existen duplicados" hasta que
