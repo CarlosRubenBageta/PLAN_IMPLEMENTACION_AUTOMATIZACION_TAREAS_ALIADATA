@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026-07-24] — Ampliación incremental del automatizador de integración: fixture INT-FASE8-10-ERROR-AUTOMATIZACION-APPS-SCRIPT (CP-07)
+
+### Contexto
+Se agrega un décimo fixture, equivalente a CP-07 (reutiliza **FC-01**, `pruebas/CASOS_CORREOS_NO_OPERATIVOS.md`): un correo cuyo asunto coincide con la regla obligatoria de notificaciones de fallos de Apps Script (regla 1 de `evaluarFiltroDeterministico()`, `codigo/filtros_correo.gs`). A diferencia de CP-16 (mismo mecanismo — filtro determinístico, sin llegar a la IA), este caso debe recibir la etiqueta `RevisionErrorAutomatizacion`, **distinta** de `RevisionSinTareas`.
+
+### Por qué el asunto y no el remitente
+La regla 1 dispara con `remitente === noreply-apps-scripts-notifications@google.com` **O** `asunto` contiene `"Summary of failures for Google Apps Script"` — es una condición OR. El remitente exigido no es una dirección que el tester pueda enviar realmente (a diferencia de CP-06, que sí quedó bloqueado por esto — ver entradas anteriores). Este fixture usa el asunto como disparador, permitiendo una corrida real completa desde `sichar@gmail.com`, sin ningún spoofing de remitente ni tooling adicional.
+
+### Por qué hizo falta una fábrica de efecto formal nueva (y no cambios en el verificador)
+`finalizarMensajeSinTareas()` (`codigo/script_refactorizado.gs`) usa el mismo `estadoFinal=SIN_TAREAS` tanto para `RevisionSinTareas` como para `RevisionErrorAutomatizacion` — la única diferencia real es la etiqueta de Gmail aplicada. `RevisionErrorAutomatizacion` ya es una clave de etiqueta soportada de forma genérica por `verificarResultadoFormal_()`/`verificarEtiquetas_()` (mismo mecanismo que `RevisionSinTareas`/`RevisionErrorProcesamiento`/`Procesado`), así que **no hizo falta ningún cambio en el automatizador ni en el núcleo**. Lo único que hacía falta era un doble de efecto formal que aplicara la etiqueta `L_ERRAUTO` en vez de `L_SINTAREAS` — `efectoFormalSinTareasCorrecto_` (el valor por defecto, usado por CP-16/INT-FASE8-01, ya aprobados) tiene esa etiqueta fija por diseño, así que se creó una fábrica dedicada nueva en vez de generalizarla, para no arriesgar esa cobertura ya aprobada.
+
+### Cambios
+- `pruebas/fixtures_integracion_fase8.gs`: nuevo fixture `INT-FASE8-10-ERROR-AUTOMATIZACION-APPS-SCRIPT` (`claveEtiquetaEsperada: 'RevisionErrorAutomatizacion'`, `resultadoSimulado: 'NO_ELEGIBLE'`).
+- `pruebas/pruebas_automatizador_integracion_fase8.gs`: nueva `efectoFormalErrorAutomatizacionCorrecto_` (dedicada, aplica `L_ERRAUTO`), `crearEstadoErrorAutomatizacion_`/`prepararSimuladoErrorAutomatizacion_`. Pruebas de camino correcto.
+- `pruebas/automatizador_integracion_fase8.gs` / `codigo/*.gs`: **sin cambios.**
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta ampliación. No se modificó `codigo/prompts_ia.gs`, `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-07 en esta entrada — requiere una corrida real (`SIMULACION_OK` + `FORMAL_OK`).
+
+---
+
 ## [2026-07-24] — CP-18 Aprobado: corrida real completa de INT-FASE8-09-FECHA-LIMITE-NO-EXPLICITA (SIMULACION_OK + FORMAL_OK)
 
 ### Contexto

@@ -431,6 +431,54 @@ var FIXTURES_INTEGRACION_FASE8 = [
       noArchivar: true,
       clavesEtiquetaProhibidas: ['RevisionSinTareas', 'RevisionErrorProcesamiento', 'RevisionErrorAutomatizacion']
     }
+  },
+  {
+    id: 'INT-FASE8-10-ERROR-AUTOMATIZACION-APPS-SCRIPT',
+    descripcion: 'Equivalente a CP-07 (reutiliza FC-01, pruebas/CASOS_CORREOS_NO_OPERATIVOS.md): un correo cuyo asunto coincide con la regla obligatoria de notificaciones de fallos de Apps Script (regla 1 de evaluarFiltroDeterministico(), codigo/filtros_correo.gs). A diferencia de CP-16 (mismo mecanismo de filtro, pero claveEtiqueta=RevisionSinTareas), este caso debe recibir RevisionErrorAutomatizacion — una etiqueta DISTINTA — y tampoco debe hacer ninguna llamada real a OpenAI.',
+    remitentePermitido: 'sichar@gmail.com',
+    asuntoBase: '[PRUEBA-AUTOMATIZACION][INTEGRACION] Summary of failures for Google Apps Script',
+    // El asunto (no el remitente) dispara la regla 1 de evaluarFiltroDeterministico()
+    // (codigo/filtros_correo.gs): coincidencia de subcadena con
+    // ASUNTO_FALLOS_APPS_SCRIPT = 'Summary of failures for Google Apps Script'.
+    // Se elige el asunto en vez del remitente porque el remitente exigido por
+    // la regla (noreply-apps-scripts-notifications@google.com) no es una
+    // dirección que el tester pueda enviar realmente — el asunto sí permite
+    // probar esta regla con un correo normal desde sichar@gmail.com (a
+    // diferencia de CP-06, diferido por este mismo motivo).
+    cuerpo: 'Your script "procesarCorreosDeTareas" has failed 3 times in the last 24 hours. Execution failed: Exception: Servicio de Gmail no disponible temporalmente.',
+    versionPromptMinima: 'v4-INC-FASE8-011-informativo-sin-tareas',
+    esperado: {
+      // Log Mensajes (por nombre de encabezado). Misma forma que
+      // INT-FASE8-07-CUERPO-VACIO (0 tareas, sin tareasEsperadas): ambos
+      // llegan por el filtro determinístico, no por decisión de la IA —
+      // solo cambia la etiqueta de Gmail resultante.
+      estado: 'SIN_TAREAS',
+      etapa: 'FINALIZADO',
+      cantidad_observaciones: 0,
+      cantidad_tareas: 0,
+      // Clasificación simulada (DRY_RUN) real: igual que INT-FASE8-07, el
+      // filtro determinístico rechaza el mensaje antes de la IA, por lo que
+      // procesarUnMensajeSimulado() devuelve resultado='NO_ELEGIBLE' con
+      // cantidades en null (ver verificarClasificacionSimulada_()).
+      resultadoSimulado: 'NO_ELEGIBLE',
+      resultado_gmail: 'SOLO_ETIQUETADO',
+      // La columna "error" contiene el motivo del filtro determinístico; el
+      // automatizador solo comprueba que NO esté vacía, sin registrar su texto.
+      errorNoVacio: true,
+      // Registro Tareas: ninguna fila para el message_id.
+      filasRegistroTareas: 0,
+      // Indice Idempotencia: exactamente una entrada, task_id vacío.
+      entradasIndiceIdempotencia: 1,
+      taskIdIndiceVacio: true,
+      estadoFinalIndice: 'SIN_TAREAS',
+      // Gmail: a diferencia de INT-FASE8-07 (RevisionSinTareas), este caso
+      // recibe la etiqueta de error de automatización.
+      claveEtiquetaEsperada: 'RevisionErrorAutomatizacion',
+      conservaEtiquetaPrueba: true,
+      conservaInbox: true,
+      noArchivar: true,
+      clavesEtiquetaProhibidas: ['Procesado', 'RevisionSinTareas', 'RevisionErrorProcesamiento']
+    }
   }
 ];
 

@@ -58,6 +58,9 @@
  *     correcto, día equivocado, celda vacía, y la rama fechaLimiteEsperada=null).
  *  U. INT-FASE8-09-FECHA-LIMITE-NO-EXPLICITA (CP-18): complemento exacto de
  *     CP-17, reutilizando sin cambios efectoFormalUnaTareaConFechaFabrica_.
+ *  V. INT-FASE8-10-ERROR-AUTOMATIZACION-APPS-SCRIPT (CP-07): mismo mecanismo
+ *     de filtro que CP-16, con una etiqueta de Gmail distinta
+ *     (RevisionErrorAutomatizacion), vía efectoFormalErrorAutomatizacionCorrecto_.
  * ============================================================================
  */
 
@@ -940,6 +943,58 @@ function crearEstadoFechaLimiteNoExplicita_(overrides) {
 /** prepararCaso_() + simularEnvioMensaje_() + simularYVerificar_() para el fixture de fecha límite no explícita. */
 function prepararSimuladoFechaLimiteNoExplicita_(overridesEstado) {
   var estado = crearEstadoFechaLimiteNoExplicita_(overridesEstado);
+  var amb = crearAmbFalsoIntegracion_(estado);
+  prepararCaso_(amb);
+  simularEnvioMensaje_(estado);
+  simularYVerificar_(amb);
+  return { estado: estado, amb: amb };
+}
+
+// ============================================================================
+// DOBLES ESPECÍFICOS DE INT-FASE8-10-ERROR-AUTOMATIZACION-APPS-SCRIPT (CP-07)
+// ============================================================================
+//
+// Requiere una fábrica de efecto formal NUEVA (no reutiliza
+// efectoFormalSinTareasCorrecto_, el valor por defecto ya aprobado por
+// INT-FASE8-01/CP-16): la forma de Log Mensajes/Indice Idempotencia es
+// idéntica (estado_final=SIN_TAREAS en ambos casos, ver
+// codigo/script_refactorizado.gs finalizarMensajeSinTareas()), pero la
+// etiqueta de Gmail resultante es distinta (L_ERRAUTO en vez de
+// L_SINTAREAS) — efectoFormalSinTareasCorrecto_ tiene esa etiqueta fija por
+// diseño, así que se crea una fábrica dedicada en vez de generalizarla.
+
+/** Efecto formal RevisionErrorAutomatizacion correcto: no toca hojas de negocio, etiqueta L_ERRAUTO (no L_SINTAREAS). */
+function efectoFormalErrorAutomatizacionCorrecto_(estado) {
+  var log = estado.sheets['Log Mensajes'];
+  var enc = log._datos()[0];
+  var fila = [];
+  for (var i = 0; i < enc.length; i++) fila.push('');
+  function set(nombre, val) { var idx = enc.indexOf(nombre); if (idx !== -1) fila[idx] = val; }
+  set('message_id', estado.mensaje.id);
+  set('thread_id', 'TH-1');
+  set('estado', 'SIN_TAREAS');
+  set('etapa', 'FINALIZADO');
+  set('cantidad_observaciones', 0);
+  set('cantidad_tareas', 0);
+  set('resultado_gmail', 'SOLO_ETIQUETADO');
+  set('error', 'CANARIO_MOTIVO_ERROR_AUTOMATIZACION_no_debe_registrarse');
+  log._datos().push(fila);
+  estado.sheets['Indice Idempotencia']._datos().push([estado.mensaje.id, '', 'SIN_TAREAS', 'FECHA']);
+  if (estado.mensaje.labelIds.indexOf('L_ERRAUTO') === -1) estado.mensaje.labelIds.push('L_ERRAUTO');
+}
+
+/** Crea el estado base seleccionando el fixture de error de automatización vía AUTO_FASE8_CASO. */
+function crearEstadoErrorAutomatizacion_(overrides) {
+  overrides = overrides || {};
+  if (!('efectoFormal' in overrides)) overrides.efectoFormal = efectoFormalErrorAutomatizacionCorrecto_;
+  var estado = crearEstadoIntegracion_(overrides);
+  estado.props.AUTO_FASE8_CASO = 'INT-FASE8-10-ERROR-AUTOMATIZACION-APPS-SCRIPT';
+  return estado;
+}
+
+/** prepararCaso_() + simularEnvioMensaje_() + simularYVerificar_() para el fixture de error de automatización. */
+function prepararSimuladoErrorAutomatizacion_(overridesEstado) {
+  var estado = crearEstadoErrorAutomatizacion_(overridesEstado);
   var amb = crearAmbFalsoIntegracion_(estado);
   prepararCaso_(amb);
   simularEnvioMensaje_(estado);
@@ -2143,6 +2198,32 @@ function ejecutarPruebasAutomatizadorIntegracionFase8() {
     var r = ejecutarFormalFechaLimiteNoExplicita_({});
     assert('U1 — INT-FASE8-09: camino correcto (1 observación, 1 tarea en Desarrollo IT, Fecha límite vacía) aprueba',
       r.resultado.ok === true, JSON.stringify(r.resultado.errores));
+  })();
+
+  // ==========================================================================
+  // V: INT-FASE8-10-ERROR-AUTOMATIZACION-APPS-SCRIPT (CP-07) — mismo mecanismo
+  //    de filtro determinístico que INT-FASE8-07-CUERPO-VACIO (CP-16), pero
+  //    con una etiqueta de Gmail DISTINTA (RevisionErrorAutomatizacion en vez
+  //    de RevisionSinTareas). Que evaluarFiltroDeterministico() realmente
+  //    dispare la regla 1 con este asunto (en vez de llegar a la IA) solo
+  //    puede confirmarse con una corrida real — ver auditoria/CHANGELOG.md.
+  // ==========================================================================
+
+  // V1: camino correcto — filtro determinístico rechaza con RevisionErrorAutomatizacion, sin llamar a la IA.
+  (function () {
+    var ctx = prepararSimuladoErrorAutomatizacion_({});
+    var r = ejecutarFormalYVerificar_(ctx.amb);
+    assert('V1 — INT-FASE8-10: camino correcto (RevisionErrorAutomatizacion, 0 observaciones/0 tareas) aprueba (SIMULACION_OK + FORMAL_OK)',
+      r.ok === true, JSON.stringify(r.errores));
+  })();
+
+  // V2: si por error se aplicara la etiqueta RevisionSinTareas en vez de RevisionErrorAutomatizacion, rechaza.
+  (function () {
+    var ctx = prepararSimuladoErrorAutomatizacion_({ efectoFormal: efectoFormalSinTareasCorrecto_ });
+    var r = ejecutarFormalYVerificar_(ctx.amb);
+    assert('V2 — si se aplicara RevisionSinTareas en vez de RevisionErrorAutomatizacion, rechaza',
+      r.ok === false && (tieneError(r, 'GMAIL_SIN_ETIQUETA_RESULTADO') || tieneError(r, 'GMAIL_ETIQUETA_PROHIBIDA:RevisionSinTareas')),
+      JSON.stringify(r.errores));
   })();
 
   Logger.log('--- Resumen ---');
