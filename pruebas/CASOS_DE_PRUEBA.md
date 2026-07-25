@@ -199,7 +199,7 @@ Reutiliza **PE-04** (`pruebas/PRUEBAS_ESCRITURA.md`).
 ## CP-18 — Fecha no explícita
 
 Reutiliza **PE-05** (`pruebas/PRUEBAS_ESCRITURA.md`).
-**Estado:** Pendiente.
+**Estado:** Aprobado — 24/07/2026. Ejecutado mediante el automatizador de integración de Fase 2A (`runId 34ca060d-42b0-4175-95e7-fc7808532a2f`, `message_id 19f96b3f0b156c2a`, fixture `INT-FASE8-09-FECHA-LIMITE-NO-EXPLICITA`): `FORMAL_OK` confirmó automáticamente `Log Mensajes` (`cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`), 1 fila en `Registro Tareas`, 1 entrada en `Indice Idempotencia`, una fila nueva en `Desarrollo IT` con la columna "Fecha límite" **vacía** (la IA no inventó ninguna fecha), y la etiqueta `Procesado` aplicada en Gmail. Complemento exacto de CP-17: juntos confirman ambos lados de la verificación de la columna "Fecha límite" (sección 7.3 de `documentacion/AUTOMATIZACION_INTEGRACION_FASE8.md`). Aprobó al primer intento, sin necesitar ningún ajuste de redacción. Ver detalle completo en `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
 ## CP-19 — Respuesta nueva en hilo ya procesado
 

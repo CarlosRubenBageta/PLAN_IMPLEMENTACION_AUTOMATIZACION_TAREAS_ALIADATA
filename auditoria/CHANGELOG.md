@@ -1,5 +1,33 @@
 # Changelog
 
+## [2026-07-24] — CP-18 Aprobado: corrida real completa de INT-FASE8-09-FECHA-LIMITE-NO-EXPLICITA (SIMULACION_OK + FORMAL_OK)
+
+### Contexto
+Con el fixture recién agregado (ver entrada inmediatamente anterior), la primera corrida real completó el flujo de dos invocaciones sin ninguna discrepancia, al primer intento:
+
+```text
+runId: 34ca060d-42b0-4175-95e7-fc7808532a2f
+messageId: 19f96b3f0b156c2a (nuevo, nunca antes usado)
+formal: FORMAL_OK
+```
+
+`consultarIAExtractora(): usando prompt versión v4-INC-FASE8-011-informativo-sin-tareas` confirmó que este fixture llegó a la IA; `ejecutarFormalYVerificarCasoIntegracionFase8Visible()` informó `[AUTO-FASE8] FORMAL_OK runId=34ca060d-42b0-4175-95e7-fc7808532a2f caso=INT-FASE8-09-FECHA-LIMITE-NO-EXPLICITA messageId=19f96b3f0b156c2a`. No se recibió por separado el texto del log de `SIMULACION_OK`; por construcción, `ejecutarFormalYVerificar_()` exige esa sesión para el mismo `message_id`/nonce/fingerprint antes de autorizar la formal, por lo que este `FORMAL_OK` confirma sin ambigüedad que también aprobó.
+
+### Qué certifica `FORMAL_OK` (por construcción de `verificarResultadoFormal_()`, secciones 7 y 7.3)
+- **`Log Mensajes`:** una fila para este `message_id`, `estado=PROCESADO`, `etapa=FINALIZADO`, `cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`.
+- **`Registro Tareas`:** exactamente 1 fila; `task_id` no vacío; `estado_escritura=ESCRITA`; `tablero=Desarrollo IT`; `observacion_texto_original` no vacío.
+- **`Indice Idempotencia`:** exactamente 1 entrada, `estado_final=PROCESADO`.
+- **Hoja de negocio `Desarrollo IT`:** una fila nueva, vinculada por la columna `ID` a ese `task_id`, con la columna "Fecha límite" **vacía** — la IA no inventó ninguna fecha para un cuerpo que no la menciona.
+- **Gmail:** conserva `Pruebas-Automatizacion` e `INBOX`, recibe `Procesado`, no recibe ninguna etiqueta de revisión/error, no se archiva.
+
+### Aprobación
+**CP-18 pasa de Pendiente a Aprobado — 24/07/2026**, al primer intento, sin necesitar ningún ajuste de redacción. Confirma en producción real, junto con CP-17 (aprobado en la entrada anterior), ambos lados de la verificación de la columna "Fecha límite" (sección 7.3): con fecha explícita se escribe la fecha correcta; sin fecha, la celda queda vacía. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### No accedido
+No se modificó ningún archivo de código (`codigo/*.gs` ni `pruebas/*.gs`) en esta entrada — es exclusivamente el registro de una corrida real exitosa y la actualización de los documentos de seguimiento.
+
+---
+
 ## [2026-07-24] — Ampliación incremental del automatizador de integración: fixture INT-FASE8-09-FECHA-LIMITE-NO-EXPLICITA (CP-18)
 
 ### Contexto
