@@ -1,5 +1,39 @@
 # Changelog
 
+## [2026-07-24] — Instrumentación temporal de prueba para CP-12 (Variante A): caída después de escritura parcial
+
+### Contexto
+De los 11 casos `Pendiente` restantes (más CP-06, diferido), el usuario pidió empezar por el más complejo. Análisis comparativo:
+
+- **CP-08/CP-09/CP-26/CP-29**: un único punto de fault injection cada uno, una sola corrida.
+- **CP-13**: sin instrumentación de código (dispara `procesarCorreosDeTareas()` dos veces casi simultáneas), pero con un desafío de *logística de ejecución* (lograr concurrencia real desde un solo tester), no de diseño.
+- **CP-25/CP-32/CP-33/CP-34**: forman una cadena que reutiliza el estado resultante de CP-12/CP-26 (CP-32 reutiliza el estado de CP-25; CP-33 reutiliza el de CP-26; CP-34 repite CP-25 con una segunda falla).
+- **CP-12**: el único caso con **dos variantes obligatorias** (A: excepción capturada dentro de la misma ejecución, el camino nuevo y más común desde INC-FASE8-005; B: runtime realmente interrumpido, el camino original) que deben converger al mismo resultado final. La variante B además requiere fabricar manualmente un estado intermedio directamente en las hojas (bypaseando el pipeline) y, para disparar la recuperación, esperar `UMBRAL_ABANDONO_MIN` o forzar `recuperarProcesamientosAbandonados()`. Es, por lejos, el caso con más pasos distintos de diseño e instrumentación.
+
+Se confirma **CP-12** como el caso más complejo y se comienza por su **Variante A** (la más común y la que además informa directamente el diseño de CP-25, que reutiliza la misma técnica de instrumentación). La Variante B queda para una ronda posterior, dado que introduce una técnica de preparación de estado completamente distinta (edición manual de hojas en vez de fault injection en código).
+
+### Por qué esto es distinto de todo el trabajo de Fase 2A anterior
+CP-12 es un caso **clásico** de Fase 8 (como CP-01/02/05/10/11/19-24/27/28/31/36/37): se ejecuta invocando `procesarCorreosDeTareas()` directamente desde el editor de Apps Script, **no** a través del automatizador de integración de Fase 2A (`pruebas/fixtures_integracion_fase8.gs`/`pruebas/automatizador_integracion_fase8.gs`) — no hace falta `AUTO_FASE8_CASO` ni las funciones visibles de tres invocaciones. Por eso esta ampliación no toca ningún archivo de `pruebas/fixtures_integracion_fase8.gs` ni `pruebas/automatizador_integracion_fase8.gs`.
+
+### Instrumentación temporal (requiere tocar `codigo/script_refactorizado.gs`)
+A diferencia de CP-10 (que solo renombró temporalmente una hoja real, sin tocar código), no existe ninguna palanca de configuración externa para forzar que `Gmail.Users.Messages.modify()` falle bajo demanda sin arriesgar la cuenta real. Se agrega un gancho condicional en `aplicarResultadoGmail()`, justo después de la salida por `DRY_RUN` y antes de cualquier llamada real a Gmail:
+
+- Se activa **solo** si `cfg.modoPrueba === true` **Y** la property `CP12_FORZAR_FALLO_GMAIL === 'true'` — nunca puede dispararse en la cuenta productiva (`MODO_PRUEBA` siempre es `false` ahí), y nunca se activa por accidente en ninguna prueba existente (ninguna prueba local ni fixture ya aprobado fija esa property).
+- Lanza una excepción sintética, exactamente en el punto que CP-12/CP-25 necesitan: **después** de que `escribirFilasPorLote()` ya escribió las filas (`ESCRITA` en `Registro Tareas`), **antes** de que `Gmail.Users.Messages.modify()` se invoque — reproduce fielmente una falla real de Gmail posterior a la escritura, tal como ya la trata `gestionarErrorMensaje()` (INC-FASE8-005).
+- **Marcada explícitamente como temporal** en el comentario del propio código, para retirarla en una entrada posterior una vez que el usuario confirme el resultado de la corrida real (mismo criterio de "revertir la instrumentación" ya establecido para CP-08/CP-29).
+
+### Diseño del correo sintético
+Un correo nuevo (nunca antes enviado), con la misma estructura que probó CP-03 (1 observación → 2 tareas concretas en 2 tableros distintos, mencionando explícitamente "equipo comercial" para desambiguar), pero con redacción propia para no mezclar evidencia con la de CP-03 (ya aprobado): "Hay que revisar el error técnico que generó una factura duplicada, y el equipo comercial debe avisarle al cliente que ya estamos trabajando en la solución."
+
+### Cambios
+- `codigo/script_refactorizado.gs`: `aplicarResultadoGmail()` gana el gancho condicional descrito arriba, delimitado con comentarios "INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-12" para poder ubicarlo y retirarlo sin ambigüedad.
+- Ningún otro archivo de `codigo/` ni de `pruebas/` cambia en esta entrada.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante este diseño. No se modificó `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-12 en esta entrada — requiere que el usuario ejecute el procedimiento de dos corridas y reporte el resultado.
+
+---
+
 ## [2026-07-24] — CP-07 Aprobado: corrida real completa de INT-FASE8-10-ERROR-AUTOMATIZACION-APPS-SCRIPT (SIMULACION_OK + FORMAL_OK)
 
 ### Contexto

@@ -1052,6 +1052,19 @@ function aplicarResultadoGmail(mensajeDescriptor, claveResultado, cfg) {
     return;
   }
 
+  // INICIO INSTRUMENTACIÓN TEMPORAL CP-12 (auditoria/CHANGELOG.md, 24/07/2026) — RETIRAR TRAS LA CORRIDA REAL.
+  // Simula una falla de Gmail justo después de escribirFilasPorLote() (tareas
+  // ya ESCRITA) y antes de la llamada real a Gmail — el punto exacto que
+  // CP-12/CP-25 necesitan para probar la recuperación de INC-FASE8-005 sin
+  // depender de una falla real de la API. Gateada por cfg.modoPrueba (nunca
+  // puede dispararse en la cuenta productiva, donde MODO_PRUEBA es false) y
+  // por una property exclusiva de esta prueba, que ningún otro punto del
+  // pipeline lee.
+  if (cfg.modoPrueba && PropertiesService.getScriptProperties().getProperty('CP12_FORZAR_FALLO_GMAIL') === 'true') {
+    throw new Error('CP-12: falla de Gmail simulada por instrumentación temporal de prueba (retirar tras la corrida).');
+  }
+  // FIN INSTRUMENTACIÓN TEMPORAL CP-12
+
   if (!cfg.permitirEtiquetado && !cfg.permitirArchivado) {
     actualizarLogMensajes(mensajeDescriptor, {
       resultado_gmail: 'OMITIDO_POR_CONFIGURACION',
