@@ -54,7 +54,7 @@ Captura revisada por Claude Cowork. Muestra:
 | CP-09 | Error HTTP temporal | | | | Pendiente |
 | CP-10 | Hoja inexistente | 21/07/2026, ejecución formal ~21:18 | Hoja `Desarrollo IT` renombrada temporalmente a `Desarrollo IT__CP10_TEMP` (mismo comportamiento de hoja inexistente). Lote de 2 mensajes: uno a la hoja inexistente (`REVISION_MANUAL`/`ERROR_ESCRITURA`), otro a `Finanzas` (`PROCESADO`/`ESCRITA`). Ver detalle completo debajo de la tabla. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
 | CP-11 | Mismo mensaje dos veces | 21/07/2026, ~21:43 | `procesarCorreosDeTareas()` informó `0 mensajes elegibles, procesando 0` reutilizando los dos mensajes ya cerrados de CP-10. Ver detalle completo debajo de la tabla. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
-| CP-12 | Caída después de escritura parcial | | Criterio revisado por auditoría de INC-FASE8-005: el caso tal como estaba redactado asumía recuperación vía `UMBRAL_ABANDONO_MIN`, sin contemplar el cierre inmediato de `gestionarErrorMensaje()`. Ejecutar recién después de aplicar la corrección de INC-FASE8-005. | | Pendiente (bloqueado por INC-FASE8-005) |
+| CP-12 | Caída después de escritura parcial | 24/07/2026 (Variante A, flujo clásico con instrumentación temporal) | Ver detalle completo debajo de la tabla. Resumen: `Log Mensajes` quedó en `ERROR_TEMPORAL`/`ESCRITURA_COMPLETADA` tras la falla simulada; la corrida de recuperación reanudó vía `reanudarDesdeManifiesto()` sin volver a consultar la IA, `Indice Idempotencia` cerrado sin duplicados. Validado además sobre 5 mensajes viejos arrastrados por la query amplia (hallazgo no planeado, sin impacto en aprobaciones vigentes). **Variante B (runtime interrumpido) permanece Pendiente.** | Registro de ejecución de la corrida real — `message_id 19f96ec29b3c8486` | Aprobado (Variante A) — 24/07/2026 |
 | CP-13 | Dos ejecuciones simultáneas | | | | Pendiente |
 | CP-14 | Firma extensa | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: `SIMULACION_OK` confirmó 1 observación/1 tarea (`Gestión General/Alto`), sin escrituras; `FORMAL_OK` confirmó automáticamente `Log Mensajes`, 1 fila en `Registro Tareas`, 1 entrada en `Indice Idempotencia`, fila nueva en `Gestión General`, y etiqueta `Procesado` en Gmail. Aprobó al primer intento, pese a ser el primer cuerpo multi-párrafo del automatizador. | Registro `[AUTO-FASE8]` de la corrida real — `runId b8ed62db-4f41-418e-9acd-276d1bcdd4ee`, `message_id 19f9640b73453584` | Aprobado — 24/07/2026 |
 | CP-15 | Observaciones duplicadas | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: `SIMULACION_OK` confirmó 1 observación/1 tarea (`Finanzas/Alto`), sin escrituras; `FORMAL_OK` confirmó automáticamente `Log Mensajes`, 1 fila en `Registro Tareas`, 1 entrada en `Indice Idempotencia`, fila nueva en `Finanzas`, y etiqueta `Procesado` en Gmail. Aprobó al primer intento. | Registro `[AUTO-FASE8]` de la corrida real — `runId 01fbd80c-a874-4eed-82a6-c21a14b8070f`, `message_id 19f9621b19597350` | Aprobado — 24/07/2026 |
@@ -903,6 +903,44 @@ Versión de prompt: v4-INC-FASE8-011-informativo-sin-tareas
 
 **Estado (veredicto final):** Aprobado — 24/07/2026 (`PASA`).
 
+## Detalle de CP-12 (Variante A) — Caída después de escritura parcial (flujo clásico, instrumentación temporal)
+
+```text
+Fecha de ejecución: 24/07/2026
+message_id (caso principal): 19f96ec29b3c8486 (nuevo)
+Instrumentación: gancho gateado por cfg.modoPrueba + property CP12_FORZAR_FALLO_GMAIL
+en aplicarResultadoGmail() (codigo/script_refactorizado.gs) — ya retirado del código.
+```
+
+**Antecedente:** a diferencia de CP-03/CP-04/CP-14-18/CP-07, este es un caso **clásico** de Fase 8 (ejecutado con `procesarCorreosDeTareas()` directamente, no vía el automatizador de integración de Fase 2A). Corrige el criterio original de este caso (INC-FASE8-005): la recuperación real ocurre en la **entrada** de `procesarUnMensaje()` (comprobación de manifiesto persistido), no solo vía `recuperarProcesamientosAbandonados()`/`UMBRAL_ABANDONO_MIN`.
+
+### Primera corrida (falla simulada activa)
+
+- Correo sintético nuevo: "Hay que revisar el error técnico que generó una factura duplicada, y el equipo comercial debe avisarle al cliente que ya estamos trabajando en la solución." (`message_id 19f96ec29b3c8486`).
+- La IA clasificó 2 observaciones / 2 tareas (no 1/2 como se había diseñado, pero no afecta la validez de la prueba).
+- `escribirFilasPorLote()` escribió las 2 tareas (`ESCRITA` en `Registro Tareas`, con `fila_destino` real).
+- `aplicarResultadoGmail()` lanzó la excepción sintética; `gestionarErrorMensaje()` encontró el manifiesto ya persistido y dejó `Log Mensajes.estado = ERROR_TEMPORAL`, con `etapa = ESCRITURA_COMPLETADA` preservada (no reseteada) — **sin** fila nueva en `Indice Idempotencia`.
+
+### Hallazgo no planeado: 7 mensajes viejos arrastrados por la query amplia
+
+`GMAIL_QUERY_PRUEBA` no aísla por marcador único (a diferencia del automatizador de Fase 2A): la primera corrida real informó "8 mensajes elegibles, procesando 8", no 1. Los otros 7 eran mensajes de rondas anteriores de este proyecto, nunca cerrados en `Indice Idempotencia` porque solo habían pasado por simulaciones del automatizador de Fase 2A (que nunca persisten) — entre ellos, el primer intento fallido de CP-04 (`19f95a4113a1fb97`), el del segundo hallazgo real de tableros equivocados (`19f94b94245ce658`), y el primer intento retirado de CP-16 (`19f9661d038ea8de`).
+
+- **5 de los 7** tenían manifiesto propio (2-3 tareas cada uno) y quedaron en el mismo `ERROR_TEMPORAL`/`ESCRITURA_COMPLETADA`, con sus tareas escritas por primera vez en las hojas de negocio.
+- **2 de los 7** (incluido `19f9661d038ea8de`, el primer intento retirado de CP-16) no tenían manifiesto (`SIN_TAREAS`/filtro determinístico); `gestionarErrorMensaje()` los clasificó `ERROR_DEFINITIVO` (mi error sintético no coincide con el patrón `timeout|rate limit|50x`) y los cerró de forma permanente, con 0 tareas. **No afecta la aprobación de CP-16**, que se basa en un `message_id` distinto ya cerrado con éxito.
+
+### Segunda corrida (instrumentación desactivada, con consentimiento del usuario para incluir los 6 mensajes en `ERROR_TEMPORAL`)
+
+Log recibido: para cada uno de los 6 mensajes en `ERROR_TEMPORAL` (incluido `19f96ec29b3c8486`), `"procesarUnMensaje(): existe manifiesto para <id>; se reanuda sin volver a consultar la IA."` seguido de `"reanudarDesdeManifiesto(): todas las tareas de <id> ya estaban ESCRITA; se repite únicamente la actualización de Gmail."` — **sin** ninguna línea `consultarIAExtractora()` y **sin** ningún error, para ninguno de los 6.
+
+- `Log Mensajes`: las mismas 6 filas pasaron a `estado = PROCESADO` (ninguna fila nueva).
+- `Indice Idempotencia`: 15 entradas nuevas en total (3+3+2+2+3+2, según la cantidad de tareas de cada mensaje) — para `19f96ec29b3c8486` específicamente, 2 entradas (`ALI-401AEE58B20AFA0C-001/002`).
+- Ninguna hoja de negocio recibió filas adicionales a las ya escritas en la primera corrida.
+- Los 2 mensajes `ERROR_DEFINITIVO` no reaparecieron como elegibles (correctamente excluidos para siempre).
+
+**Conclusión:** CP-12 (Variante A) PASA. Confirma, en producción real, que una excepción capturada después de `escribirFilasPorLote()` no duplica tareas ni vuelve a consultar la IA en el reintento — y lo hace sobre 6 mensajes reales distintos, no solo uno, gracias al hallazgo no planeado.
+
+**Estado (veredicto final):** Aprobado (Variante A) — 24/07/2026 (`PASA`). **Variante B pendiente** (requiere fabricar manualmente un estado intermedio en las hojas, técnica distinta de fault injection).
+
 ## Detalle de CP-07 — Notificación de Apps Script (aprobado vía automatizador de integración Fase 2A)
 
 ```text
@@ -1134,6 +1172,7 @@ Pendientes (ejecutables con estado Pendiente, no corridos aún): 11
   [Corregido 24/07/2026: CP-17 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 14 a 13.]
   [Corregido 24/07/2026: CP-18 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 13 a 12.]
   [Corregido 24/07/2026: CP-07 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 12 a 11.]
+  [Nota 24/07/2026: CP-12 tiene su Variante A Aprobada (ejecución real, ver `pruebas/CASOS_DE_PRUEBA.md` y el detalle de este documento) — no se mueve a "Aprobados" ni se resta de "Pendientes" porque el caso completo exige que ambas variantes converjan al mismo resultado (igual criterio que CP-31, contado como Aprobado recién con las 4 combinaciones). La Variante B permanece pendiente.]
   CP-01, CP-02, CP-03, CP-04, CP-05, CP-07, CP-10, CP-11, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-27, CP-28, CP-31, CP-36 y CP-37 aprobados
   CP-21 ya no está bloqueado por INC-FASE8-008 (CP-19 Aprobado) y fue ejecutado y aprobado el 22/07/2026
   CP-05 ya no está bloqueado por INC-FASE8-011 (cerrada) y fue ejecutado y aprobado el 23/07/2026

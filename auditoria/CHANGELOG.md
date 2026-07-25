@@ -1,5 +1,46 @@
 # Changelog
 
+## [2026-07-24] — CP-12 (Variante A) Aprobado: corrida real completa, e instrumentación temporal retirada
+
+### Contexto
+Con la instrumentación agregada en la entrada anterior, la corrida real confirmó exactamente el comportamiento esperado — con un hallazgo adicional no planeado (ver más abajo).
+
+```text
+Primera corrida (CP12_FORZAR_FALLO_GMAIL=true):
+message_id: 19f96ec29b3c8486 (nuevo)
+Log Mensajes: estado=ERROR_TEMPORAL, etapa=ESCRITURA_COMPLETADA, cantidad_observaciones=2, cantidad_tareas=2
+Registro Tareas: 2 filas ESCRITA
+Indice Idempotencia: sin entrada
+
+Segunda corrida (CP12_FORZAR_FALLO_GMAIL=false):
+"procesarUnMensaje(): existe manifiesto para 19f96ec29b3c8486; se reanuda sin volver a consultar la IA."
+"reanudarDesdeManifiesto(): todas las tareas de 19f96ec29b3c8486 ya estaban ESCRITA; se repite únicamente la actualización de Gmail."
+Log Mensajes: estado=PROCESADO
+Indice Idempotencia: 2 entradas nuevas (ALI-401AEE58B20AFA0C-001/002)
+```
+
+### Hallazgo no planeado: la query amplia del flujo clásico arrastró 7 mensajes viejos
+`GMAIL_QUERY_PRUEBA` (usada por el flujo clásico `procesarCorreosDeTareas()`, a diferencia de la selección por marcador único del automatizador de integración de Fase 2A) no distingue mensajes: la primera corrida real informó "8 mensajes elegibles, procesando 8", no 1. Los otros 7 eran mensajes de rondas anteriores de este proyecto — intentos de simulación fallidos o retirados del automatizador de Fase 2A (por ejemplo, el primer intento de CP-04 `19f95a4113a1fb97`, el del segundo hallazgo real de tableros equivocados `19f94b94245ce658`, y el primer intento retirado de CP-16 `19f9661d038ea8de`) — que **nunca habían sido tocados por el pipeline clásico**: la simulación del automatizador nunca persiste (`procesarUnMensajeSimulado()`), así que estos `message_id` seguían "elegibles" indefinidamente para `Indice Idempotencia`, aunque ya estuvieran documentados como intentos fallidos.
+
+Como consecuencia, la instrumentación de CP-12 se disparó para los 8:
+- **5 mensajes con tareas** (manifiesto creado antes de la falla) quedaron en el mismo estado `ERROR_TEMPORAL`/`ESCRITURA_COMPLETADA` que el de CP-12, con sus tareas escritas por primera vez en las hojas de negocio correspondientes.
+- **2 mensajes sin tareas** (`19f91f222eb9d62d`, `19f9661d038ea8de` — este último el primer intento retirado de CP-16) no tenían manifiesto; `gestionarErrorMensaje()` los clasificó como `ERROR_DEFINITIVO` (mi error sintético no contiene "timeout"/"rate limit"/50x) y los cerró de forma permanente en `Indice Idempotencia`, con 0 tareas. **No afecta la aprobación de CP-16** (aprobado con un `message_id` distinto y ya cerrado con éxito); son mensajes que de todos modos nunca iban a reutilizarse.
+
+Con el consentimiento del usuario, la segunda corrida (recuperación) se dejó actuar sobre los 6 mensajes en `ERROR_TEMPORAL` (no solo el de CP-12), porque sus tareas ya estaban escritas en las hojas de negocio — dejarlos así habría sido peor (filas huérfanas sin cierre) que completarles el ciclo. Resultado: los 6 pasaron a `PROCESADO`, con 15 entradas nuevas en total en `Indice Idempotencia` (3+3+2+2+3+2, según la cantidad de tareas de cada uno), **ninguno** con una llamada nueva a la IA ni una fila duplicada — validando el mismo mecanismo de recuperación sobre 6 casos reales distintos en vez de uno solo.
+
+**Lección para futuras rondas de fault injection con el flujo clásico:** a diferencia del automatizador de Fase 2A (aislado por marcador único), cualquier instrumentación de `procesarCorreosDeTareas()` puede alcanzar a mensajes viejos no cerrados en `Indice Idempotencia`. Conviene revisar `Log Mensajes`/`Indice Idempotencia` por mensajes "elegibles" residuales antes de instrumentar, o acotar `GMAIL_QUERY_PRUEBA` temporalmente por asunto.
+
+### Aprobación
+**CP-12 (Variante A) pasa de Pendiente a Aprobado — 24/07/2026.** Confirma en producción real que una excepción capturada después de `escribirFilasPorLote()` deja el mensaje en `ERROR_TEMPORAL` sin cerrarlo (preservando `etapa=ESCRITURA_COMPLETADA`), y que la entrada de `procesarUnMensaje()` reanuda desde el manifiesto persistido en la siguiente ejecución, sin duplicar tareas ni volver a consultar la IA. **La Variante B (runtime realmente interrumpido) permanece Pendiente** — requiere una técnica de preparación de estado distinta (edición manual de hojas), para una ronda posterior. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### Retiro de la instrumentación temporal
+Con la Variante A aprobada, se retira de `codigo/script_refactorizado.gs` el gancho `INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-12` agregado en la entrada anterior (`aplicarResultadoGmail()` vuelve exactamente a su forma previa a esa entrada). La property `CP12_FORZAR_FALLO_GMAIL` queda sin efecto en el código; el usuario puede eliminarla de `ScriptProperties` cuando quiera, sin urgencia (ya no la lee ningún punto del pipeline).
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada — es exclusivamente el registro de la corrida real, la aprobación, y el retiro de la instrumentación.
+
+---
+
 ## [2026-07-24] — Instrumentación temporal de prueba para CP-12 (Variante A): caída después de escritura parcial
 
 ### Contexto
