@@ -1,5 +1,45 @@
 # Changelog
 
+## [2026-07-26] — CP-25 Aprobado: corrida real completa, instrumentación temporal retirada
+
+### Contexto
+Con la instrumentación agregada en la entrada anterior, ambas corridas reales confirmaron exactamente el comportamiento esperado, en el primer intento.
+
+```text
+Correo sintético: "[PRUEBA-AUTOMATIZACION] Reportes internos sin actualizar" (message_id 19fa0743dc9d5b94, nuevo)
+2 observaciones / 2 tareas: Desarrollo IT ("Revisar el servidor de reportes internos"),
+Comercial ("Avisar a los clientes sobre la demora en el envío de reportes mensuales")
+
+Primera corrida (CP25_FORZAR_FALLO_GMAIL=true):
+"1 mensajes elegibles, procesando 1." → consultarIAExtractora() →
+"Error procesando mensaje 19fa0743dc9d5b94: CP-25: falla de Gmail simulada por instrumentación temporal de prueba (retirar tras la corrida)."
+Log Mensajes: estado=ERROR_TEMPORAL, etapa=ESCRITURA_COMPLETADA, cantidad_observaciones=2, cantidad_tareas=2.
+Sin entrada en Indice Idempotencia. Registro Tareas: 2 filas ESCRITA (Desarrollo IT, Comercial).
+
+Segunda corrida (CP25_FORZAR_FALLO_GMAIL=false, ejecutada de inmediato, sin esperar ningún umbral):
+"1 mensajes elegibles, procesando 1."
+"procesarUnMensaje(): existe manifiesto para 19fa0743dc9d5b94; se reanuda sin volver a consultar la IA."
+"reanudarDesdeManifiesto(): todas las tareas de 19fa0743dc9d5b94 ya estaban ESCRITA; se repite únicamente la actualización de Gmail."
+Log Mensajes: estado=PROCESADO (misma fila).
+```
+
+### Diferencia confirmada respecto de CP-12
+A diferencia de CP-12 (Variante A: `ERROR_TEMPORAL` recuperado en la siguiente ejecución sin restricción de tiempo, igual mecanismo; Variante B: `EN_PROCESO` recuperado vía `UMBRAL_ABANDONO_MIN`), CP-25 confirma el camino **más directo**: la segunda corrida se ejecutó inmediatamente, sin esperar nada, y el mensaje siguió siendo "elegible" para el bucle normal (no requirió `recuperarProcesamientosAbandonados()`, ya que `ERROR_TEMPORAL` no es `EN_PROCESO`) — la recuperación ocurrió enteramente en la comprobación de manifiesto a la **entrada** de `procesarUnMensaje()`, exactamente el punto que INC-FASE8-005 corrigió.
+
+### Verificación de no duplicación
+Confirmado tras la segunda corrida: `Desarrollo IT` y `Comercial` mantienen exactamente **1 fila cada una** para este mensaje — las mismas escritas en la primera corrida, sin duplicar.
+
+### Aprobación
+**CP-25 pasa de Pendiente a Aprobado — 26/07/2026.** Confirma en producción real que una excepción capturada en `aplicarResultadoGmail()` después de `escribirFilasPorLote()` deja el mensaje en `ERROR_TEMPORAL` sin cerrarlo, y que la siguiente ejecución de `procesarCorreosDeTareas()` — sin necesidad de esperar ningún umbral de tiempo — reanuda vía `reanudarDesdeManifiesto()` sin volver a consultar la IA ni reescribir las tareas ya `ESCRITA`, cerrando el mensaje como `PROCESADO`. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### Retiro de la instrumentación temporal
+Con CP-25 aprobado, se retira de `codigo/script_refactorizado.gs` el gancho `INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-25` agregado en la entrada anterior (`aplicarResultadoGmail()` vuelve exactamente a su forma previa a esa entrada). La property `CP25_FORZAR_FALLO_GMAIL` queda sin efecto en el código. Verificado antes y después del retiro: `node --check` sobre el archivo y las 5 suites locales (166/60/46/19/17 verificaciones), sin regresiones.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada — es exclusivamente el registro de la corrida real, la aprobación, y el retiro de la instrumentación.
+
+---
+
 ## [2026-07-26] — Instrumentación temporal de prueba para CP-25: falla de Gmail después de escribir filas
 
 ### Contexto
