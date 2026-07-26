@@ -1,5 +1,37 @@
 # Changelog
 
+## [2026-07-26] — Instrumentación temporal de prueba para CP-25: falla de Gmail después de escribir filas
+
+### Contexto
+CP-25 usa exactamente el mismo mecanismo que **CP-12 (Variante A)** — ambos ejercitan la corrección de INC-FASE8-005: una excepción capturada en `aplicarResultadoGmail()` después de que `escribirFilasPorLote()` ya escribió las filas. La diferencia es el foco: CP-25 es, en la práctica, el caso que reproduce **la incidencia real original** reportada por Carlos Rubén Bageta el 20/07/2026 (mensajes `19f81f96fcd09cae`, `19f819a446a30718`, ambos cerrados hoy como `ERROR_DEFINITIVO` en el proyecto de prueba, sin relación con esta instrumentación), y su resultado esperado pone el énfasis explícito en confirmar que la recuperación **no** vuelve a llamar a `consultarIAExtractora()` ni a `escribirFilasPorLote()` para las tareas ya `ESCRITA`. Además, CP-25 deja el estado (`Registro Tareas` con tareas `ESCRITA`) que **CP-32** reutiliza a continuación.
+
+Sigue la misma disciplina que CP-12: nunca se aprueba un caso con la evidencia de otro, aunque el mecanismo de código sea idéntico — CP-25 necesita su propia corrida real, con su propio `message_id` nuevo.
+
+### Instrumentación temporal (`codigo/script_refactorizado.gs`)
+Se reutiliza el mismo punto de `aplicarResultadoGmail()` ya usado por CP-12 (Variante A) — justo después de la salida por `DRY_RUN` y antes de cualquier llamada real a Gmail —, pero con una property **exclusiva de CP-25** (`CP25_FORZAR_FALLO_GMAIL`) para mantener el rastro de auditoría inequívoco entre casos, aunque el código de la excepción sea idéntico:
+
+- Se activa **solo** si `cfg.modoPrueba === true` **y** `CP25_FORZAR_FALLO_GMAIL === 'true'` — mismo criterio de seguridad que CP-12 (nunca en la cuenta productiva).
+- Marcada "INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-25", para retirar tras la corrida real.
+
+### Diseño del correo sintético
+Nuevo (nunca antes enviado), con 2 tareas en 2 tableros distintos (mismo patrón que CP-12, necesario para que `escribirFilasPorLote()` tenga algo real que escribir antes del corte), con redacción propia para no mezclar evidencia con CP-12/CP-03: "El servidor de reportes internos dejó de actualizarse desde ayer a la tarde, hay que revisarlo. Mientras tanto, el equipo comercial tiene que avisarle a los clientes que el envío de reportes mensuales va a demorar unos días."
+
+### Procedimiento (dos corridas, sin espera de tiempo — a diferencia de CP-12-B)
+1. `CP25_FORZAR_FALLO_GMAIL=true` en Script Properties.
+2. Enviar el correo sintético.
+3. Ejecutar `procesarCorreosDeTareas()` — se espera `Log Mensajes.estado=ERROR_TEMPORAL`, `etapa=ESCRITURA_COMPLETADA`, 2 tareas `ESCRITA`, sin entrada en `Indice Idempotencia`.
+4. `CP25_FORZAR_FALLO_GMAIL=false`.
+5. Ejecutar `procesarCorreosDeTareas()` de nuevo (inmediatamente, sin esperar — la recuperación aquí ocurre en la **entrada** de `procesarUnMensaje()`, no vía `UMBRAL_ABANDONO_MIN`) — se espera que reanude vía `reanudarDesdeManifiesto()` **sin** ninguna línea `consultarIAExtractora()` en el log, `Log Mensajes` pasando a `PROCESADO`, y sin filas nuevas en `Desarrollo IT`/`Comercial` (las mismas 2 de la primera corrida, no duplicadas).
+
+### Cambios
+- `codigo/script_refactorizado.gs`: `aplicarResultadoGmail()` gana el gancho condicional descrito arriba.
+- Ningún otro archivo de `codigo/` ni de `pruebas/` cambia en esta entrada.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante este diseño. No se modificó `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-25 en esta entrada — requiere que el usuario ejecute el procedimiento de dos corridas y reporte el resultado.
+
+---
+
 ## [2026-07-25] — CP-12 (Variante B) Aprobado: corrida real completa, instrumentación temporal retirada — CP-12 completo
 
 ### Contexto
