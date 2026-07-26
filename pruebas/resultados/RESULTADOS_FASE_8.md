@@ -68,7 +68,7 @@ Captura revisada por Claude Cowork. Muestra:
 | CP-23 | Texto que comienza como fórmula | 22/07/2026 (ejecución vulnerable) y 22/07/2026 (regresión aprobada) | Ejecución original: `Log Mensajes` F20 mostró `#ERROR!` con `=CONCAT("CP23-20260722-02","-FORMULA")` en la barra de fórmulas (`message_id 19f8ab1e4b126f56`) — inyección de fórmulas confirmada (INC-FASE8-009). Corrección aplicada en `registrarInicioProcesamiento()`, `actualizarLogMensajes()` y `persistirManifiestoTareas()`. Regresión (`message_id 19f8afd5236e6cf7`, asunto `=CONCAT("CP23-20260722-03","-FORMULA")`): `Log Mensajes` (fila 21) y `Comercial` (fila 11) almacenaron el asunto literalmente, sin `#ERROR!`. `Registro Tareas` (fila 20, `fila_destino=11`) confirmó la creación correcta del manifiesto — esa hoja no tiene columna de asunto; la protección de sus campos de texto libre está cubierta por las 17/17 pruebas deterministas. Ver detalle completo (ambas ejecuciones) debajo de la tabla. | Ejecución vulnerable: `Log Mensajes` fila 20 (`#ERROR!`, no modificada), Registro Tareas fila 19 (`ALI-7576DEA84BEA5CDE-001`; `fila_destino=10`), Comercial fila 10 — evidencia real, conservada. Regresión: `Log Mensajes` fila 21, `Registro Tareas` fila 20 (`ALI-6FE9C44A57429639-001`), `Comercial` fila 11 — verificación manual de Carlos Rubén Bageta, sin captura archivada | Aprobado — 22/07/2026 (regresión real, tras corrección de INC-FASE8-009) |
 | CP-24 | Varias cuentas Google abiertas | 22/07/2026 | Ventana de incógnito con dos cuentas Google (personal primero, `carlosrubenbageta@alia-data.com` después, en posición `/u/1/`). Enlace "Link al correo" (`?authuser=carlosrubenbageta@alia-data.com#search/rfc822msgid:...`) resolvió automáticamente `/mail/u/1/`; búsqueda `rfc822msgid` devolvió exactamente un resultado; correo abierto en la cuenta operativa correcta, sin selección manual. Ver detalle completo debajo de la tabla. | Verificación manual de Carlos Rubén Bageta (sin captura archivada para esta fila) | Aprobado |
 | CP-25 | Falla Gmail después de escribir filas | 26/07/2026 (flujo clásico con instrumentación temporal) | Ver detalle completo debajo de la tabla. Resumen: mismo mecanismo que CP-12 (excepción capturada en `aplicarResultadoGmail()` tras `escribirFilasPorLote()`), pero recuperado en la ejecución inmediatamente siguiente sin esperar ningún umbral de tiempo — `reanudarDesdeManifiesto()` sin volver a consultar la IA ni reescribir tareas, `Log Mensajes` a `PROCESADO`, sin duplicados. Aprobó al primer intento. | Registro de ejecución de ambas corridas reales — `message_id 19fa0743dc9d5b94` | Aprobado — 26/07/2026 |
-| CP-26 | Caída después de reservar tareas | | | | Pendiente |
+| CP-26 | Caída después de reservar tareas | 26/07/2026 (flujo clásico con instrumentación temporal) | Ver detalle completo debajo de la tabla. Resumen: excepción capturada entre `persistirManifiestoTareas()` y `escribirFilasPorLote()` (tareas `RESERVADA`, no `ESCRITA`); la ejecución inmediatamente siguiente reanudó vía `reanudarDesdeManifiesto()`, escribió las tareas pendientes usando los mismos `task_id` ya reservados, sin volver a consultar la IA. Un primer intento con otro correo se descartó por property no creada (sin relación con el pipeline). | Registro de ejecución de ambas corridas reales — `message_id 19fa0a67abbf10f3` | Aprobado — 26/07/2026 |
 | CP-27 | Modo prueba con ID productivo | 20/07/2026 19:04:22 | Configuración rechazada correctamente: `validarConfiguracion()` detectó `SPREADSHEET_ID_PRUEBA = SPREADSHEET_ID` y abortó; `procesarCorreosDeTareas()` finalizó sin tocar Gmail/Sheets/OpenAI. Configuración restaurada y revalidada como válida después (ver detalle debajo de la tabla). | `pruebas/evidencias/CP-27/01_configuracion_rechazada.png`, `02_funcion_principal_abortada.png`, `04_configuracion_restaurada.png` | Aprobado |
 | CP-28 | Mensajes distintos dentro de un hilo | 21/07/2026: `DRY_RUN=true` ~22:00 y ejecución formal `DRY_RUN=false` ~22:05 | `procesarCorreosDeTareas()` informó `2 mensajes elegibles, procesando 2` en ambas modalidades. `message_id 19f875267239b349` (`Gestión General`) y `19f87541d8034391` (`Comercial`) procesados de forma independiente; el mensaje puente enviado no generó fila. Ver detalle completo debajo de la tabla. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
 | CP-29 | Dato sensible en el cuerpo | | | | Pendiente |
@@ -1026,6 +1026,48 @@ reanudarDesdeManifiesto(): todas las tareas de 19fa0743dc9d5b94 ya estaban ESCRI
 
 **Estado (veredicto final):** Aprobado — 26/07/2026 (`PASA`).
 
+## Detalle de CP-26 — Caída después de reservar tareas (flujo clásico, instrumentación temporal)
+
+```text
+Fecha de ejecución: 26/07/2026
+message_id: 19fa0a67abbf10f3 (nuevo; un primer intento con message_id 19fa09b2d765e4bc se descartó, ver nota abajo)
+Instrumentación: gancho gateado por cfg.modoPrueba + property CP26_FORZAR_FALLO_ESCRITURA
+en procesarUnMensaje() (codigo/script_refactorizado.gs), justo después de persistirManifiestoTareas()
+y actualizarLogMensajes(..., { etapa: ETAPAS.TAREAS_RESERVADAS }) — ya retirado del código.
+```
+
+**Diferencia con CP-12/CP-25:** ambos interrumpen después de `escribirFilasPorLote()` (tareas ya `ESCRITA`). CP-26 interrumpe **antes**, dejando las tareas `RESERVADA` (`task_id` asignado, sin fila en la hoja de negocio). Esto ejercita una rama distinta de `reanudarDesdeManifiesto()` (`codigo/recuperacion.gs`, líneas 129-148: `pendientes.length > 0`) que sí escribe durante la recuperación, en vez de la rama "todas ya `ESCRITA`" (que solo repite Gmail).
+
+### Intento descartado (sin usarse como evidencia)
+
+La primera corrida real, con el correo "Encuesta de satisfacción pendiente" (`message_id 19fa09b2d765e4bc`), terminó "Se ha completado la ejecución" sin ningún error: la property `CP26_FORZAR_FALLO_ESCRITURA` nunca se había llegado a crear en Script Properties (ausente, no en `false`), por lo que el gancho nunca se activó. El mensaje se procesó de punta a punta normalmente (`PROCESADO`/`FINALIZADO`, 2 tareas `ESCRITA` en `Desarrollo IT`/`Comercial`) y quedó cerrado en `Indice Idempotencia` — no representa el escenario de CP-26 y no se reutilizó; se repitió el envío con un correo nuevo tras crear la property correctamente.
+
+### Primera corrida (falla simulada activa, con la property ya creada)
+
+- Correo sintético nuevo: "El certificado de seguridad del sitio web vence la próxima semana, hay que renovarlo antes de esa fecha. Avisale también al equipo comercial para que informen a los clientes que el sitio seguirá funcionando sin interrupciones." (`message_id 19fa0a67abbf10f3`).
+- Log: "1 mensajes elegibles, procesando 1" → `consultarIAExtractora()` → "Error procesando mensaje 19fa0a67abbf10f3: CP-26: falla simulada por instrumentación temporal de prueba, justo después de reservar tareas y antes de escribir filas (retirar tras la corrida). messageId=19fa0a67abbf10f3".
+- La IA clasificó 2 observaciones / 2 tareas (`Desarrollo IT`: "Renovar el certificado de seguridad del sitio web"; `Comercial`: "Informar al equipo comercial sobre la renovación del certificado").
+- `persistirManifiestoTareas()` asignó `task_id` (`ALI-A40A5B99A249A690-001/002`) y los reservó antes de la excepción simulada; `escribirFilasPorLote()` nunca llegó a correr.
+- `Log Mensajes`: `estado=ERROR_TEMPORAL`, **`etapa=TAREAS_RESERVADAS`**, `cantidad_observaciones=2`, `cantidad_tareas=2` — sin fila nueva en `Indice Idempotencia`.
+- `Registro Tareas`: 2 filas nuevas, `estado_escritura=RESERVADA`, `fecha_reserva` completada, `fila_destino`/`fecha_escritura` vacías.
+- Confirmado visualmente: **ninguna** fila nueva en `Desarrollo IT` ni `Comercial`.
+
+### Segunda corrida (instrumentación desactivada, ejecutada de inmediato)
+
+Log recibido:
+```text
+procesarCorreosDeTareas(): 1 mensajes elegibles, procesando 1.
+procesarUnMensaje(): existe manifiesto para 19fa0a67abbf10f3; se reanuda sin volver a consultar la IA.
+```
+
+- Sin ninguna línea `consultarIAExtractora()`. A diferencia de la rama "todas ya `ESCRITA`" (CP-12/CP-25), esta rama de `reanudarDesdeManifiesto()` no tiene un log de confirmación propio — la ejecución tardó ~8 segundos (vs. ~1 segundo de una repetición de solo Gmail), consistente con una escritura real ocurriendo durante la recuperación.
+- `Log Mensajes`: pasó a `estado=PROCESADO`.
+- Confirmado visualmente: 1 fila nueva en `Desarrollo IT` y 1 en `Comercial`, con los **mismos `task_id`** ya reservados en la primera corrida (`ALI-A40A5B99A249A690-001/002`) — sin generar un manifiesto nuevo.
+
+**Conclusión:** CP-26 PASA. Confirma, en producción real, que una excepción capturada entre `persistirManifiestoTareas()` y `escribirFilasPorLote()` deja las tareas `RESERVADA` sin escribir, y que la recuperación posterior las escribe usando el manifiesto ya persistido (mismos `task_id`), sin volver a consultar la IA ni duplicar el manifiesto.
+
+**Estado (veredicto final):** Aprobado — 26/07/2026 (`PASA`).
+
 ## Detalle de CP-07 — Notificación de Apps Script (aprobado vía automatizador de integración Fase 2A)
 
 ```text
@@ -1232,7 +1274,7 @@ Total de casos que condicionan la aprobación de esta fase: 36 (CP-01 a CP-29, C
 Diferido a Fase 10 (no condiciona esta fase): 1 (CP-30, DEC-004)
 Bloqueado que todavía condiciona la Fase 8: 1 (CP-35 — ver nota de auditoría abajo)
 Bloqueados pendientes de Lotes 2/3 (no condicionan esta fase): 2 (CP-38, CP-39)
-Aprobados: 26 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-07, CP-10, CP-11, CP-12, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-25, CP-27, CP-28, CP-31, CP-36, CP-37)
+Aprobados: 27 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-07, CP-10, CP-11, CP-12, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-25, CP-26, CP-27, CP-28, CP-31, CP-36, CP-37)
 Rechazados: 0
   CP-19 pasó de Rechazado (21/07/2026, INC-FASE8-008) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución fallida original se conserva íntegro en el detalle de CP-19.
   CP-23 pasó de Rechazado (22/07/2026, INC-FASE8-009) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución vulnerable original se conserva íntegro en el detalle de CP-23.
@@ -1248,7 +1290,8 @@ Rechazados: 0
   CP-07 pasó de Pendiente a Aprobado (24/07/2026, ejecución vía el automatizador de integración de Fase 2A con message_id 19f96cb239f5ec62, al primer intento, sin necesitar ningún ajuste). Confirma además, en producción real, que la regla obligatoria de notificaciones de fallos de Apps Script dispara correctamente por asunto (sin necesitar el remitente exigido, no enviable) y aplica la etiqueta `Revisión manual/Error de automatización`, distinta de la de CP-16 — sin generar ninguna llamada real a OpenAI.
   CP-12 pasó de Pendiente a Aprobado (25/07/2026, ambas variantes ejecutadas en el flujo clásico con instrumentación temporal — Variante A: message_id 19f96ec29b3c8486, excepción capturada, ERROR_TEMPORAL recuperado vía manifiesto; Variante B: message_id 19f9734c63bb0299, runtime interrumpido sin excepción, EN_PROCESO recuperado vía recuperarProcesamientosAbandonados()/UMBRAL_ABANDONO_MIN. Ambas convergieron al mismo resultado final, sin duplicar tareas ni volver a consultar la IA). El registro de ambas corridas se conserva íntegro en el detalle de CP-12.
   CP-25 pasó de Pendiente a Aprobado (26/07/2026, flujo clásico con instrumentación temporal, message_id 19fa0743dc9d5b94 -- mismo mecanismo que CP-12 Variante A, pero recuperado en la ejecucion inmediatamente siguiente sin esperar ningun umbral de tiempo, ya que ERROR_TEMPORAL sigue "elegible" para el bucle normal. reanudarDesdeManifiesto() confirmo sin volver a consultar la IA ni reescribir tareas, sin duplicados en Desarrollo IT/Comercial. Aprobo al primer intento). El registro de ambas corridas se conserva integro en el detalle de CP-25.
-Pendientes (ejecutables con estado Pendiente, no corridos aún): 9
+  CP-26 pasó de Pendiente a Aprobado (26/07/2026, flujo clásico con instrumentación temporal, message_id 19fa0a67abbf10f3 -- interrumpe en un punto anterior a CP-12/CP-25: entre persistirManifiestoTareas() y escribirFilasPorLote(), dejando las tareas RESERVADA en vez de ESCRITA. reanudarDesdeManifiesto() escribio las tareas pendientes usando los mismos task_id ya reservados, sin volver a consultar la IA ni generar un manifiesto nuevo. Un primer intento con otro correo se descarto por una property no creada, sin relacion con el pipeline). El registro de ambas corridas se conserva integro en el detalle de CP-26.
+Pendientes (ejecutables con estado Pendiente, no corridos aún): 8
   [Corregido 22/07/2026: esta lista omitía a CP-27, ya aprobado desde el 20/07/2026 (CP-27 — Modo prueba con ID productivo); no cambia el alcance ni el estado de ningún caso.]
   [Corregido 23/07/2026 (semántica): CP-35 estaba contabilizado dentro de "Pendientes"; su estado individual es Bloqueado (ver nota de auditoría abajo), no Pendiente. Se lo separa como bloqueado que todavía condiciona la Fase 8. Pendientes pasa de 20 a 19; no cambia el estado individual de ningún caso.]
   [Corregido 24/07/2026: CP-03 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 19 a 18.]
@@ -1274,8 +1317,9 @@ Pendientes (ejecutables con estado Pendiente, no corridos aún): 9
   CP-07 fue ejecutado y aprobado el 24/07/2026
   CP-12 completó ambas variantes y fue aprobado el 25/07/2026
   CP-25 fue ejecutado y aprobado el 26/07/2026
-Casos sin aprobación que todavía condicionan la Fase 8: 10 (9 Pendientes + CP-35 Bloqueado)
-Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 13
+  CP-26 fue ejecutado y aprobado el 26/07/2026
+Casos sin aprobación que todavía condicionan la Fase 8: 9 (8 Pendientes + CP-35 Bloqueado)
+Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 12
 
 Nota (auditoría 20/07/2026): CP-35 pasó a "bloqueado" — no puede considerarse
 una verificación válida del criterio "no existen duplicados" hasta que

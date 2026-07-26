@@ -1,5 +1,57 @@
 # Changelog
 
+## [2026-07-26] — CP-26 Aprobado: corrida real completa, instrumentación temporal retirada
+
+### Contexto
+Con la instrumentación agregada en la entrada anterior, ambas corridas reales confirmaron exactamente el comportamiento esperado — con un intento previo descartado por un problema de configuración, no de código.
+
+```text
+Intento descartado: la primera corrida real terminó "Se ha completado la ejecución" sin
+ningún error — la property CP26_FORZAR_FALLO_ESCRITURA nunca se había llegado a crear en
+Script Properties. El mensaje (correo "Encuesta de satisfacción pendiente", message_id
+19fa09b2d765e4bc) se procesó de punta a punta normalmente (PROCESADO/FINALIZADO, 2 tareas
+ESCRITA) y quedó cerrado — no cuenta como intento de CP-26 y no se reutiliza.
+
+Correo sintético (segundo intento, con la property ya creada): "[PRUEBA-AUTOMATIZACION]
+Certificado de seguridad por vencer" (message_id 19fa0a67abbf10f3, nuevo)
+2 observaciones / 2 tareas: Desarrollo IT ("Renovar el certificado de seguridad del sitio web"),
+Comercial ("Informar al equipo comercial sobre la renovación del certificado")
+
+Primera corrida (CP26_FORZAR_FALLO_ESCRITURA=true):
+"1 mensajes elegibles, procesando 1." → consultarIAExtractora() →
+"Error procesando mensaje 19fa0a67abbf10f3: CP-26: falla simulada por instrumentación temporal
+de prueba, justo después de reservar tareas y antes de escribir filas (retirar tras la corrida)."
+Log Mensajes: estado=ERROR_TEMPORAL, etapa=TAREAS_RESERVADAS, cantidad_observaciones=2, cantidad_tareas=2.
+Registro Tareas: 2 filas nuevas (ALI-A40A5B99A249A690-001/002), estado_escritura=RESERVADA,
+fecha_reserva completada, fila_destino y fecha_escritura vacías.
+Desarrollo IT / Comercial: sin ninguna fila nueva.
+
+Segunda corrida (CP26_FORZAR_FALLO_ESCRITURA=false, ejecutada de inmediato):
+"1 mensajes elegibles, procesando 1."
+"procesarUnMensaje(): existe manifiesto para 19fa0a67abbf10f3; se reanuda sin volver a consultar la IA."
+(sin línea consultarIAExtractora(); ~8 segundos de ejecución, consistente con escritura real)
+Log Mensajes: estado=PROCESADO.
+Desarrollo IT / Comercial: 1 fila nueva cada una, con los MISMOS task_id ya reservados
+(ALI-A40A5B99A249A690-001/002) — no se generó un manifiesto nuevo.
+```
+
+### Nota sobre el intento descartado
+A diferencia del olvido de la etiqueta Gmail en CP-25 (que no llegó a tocar ningún dato real), este primer intento sí procesó el mensaje de punta a punta con éxito, porque la ausencia de la property es indistinguible de tenerla en `false`. No afecta la validez de la prueba: simplemente ese `message_id` no representa el escenario de CP-26 y se descartó sin reutilizarlo, repitiendo el envío con un correo nuevo.
+
+### Diferencia confirmada respecto de CP-12/CP-25
+CP-26 interrumpe en un punto **anterior** del flujo (después de `persistirManifiestoTareas()`, antes de `escribirFilasPorLote()`), dejando las tareas `RESERVADA` en vez de `ESCRITA`. Por eso `reanudarDesdeManifiesto()` toma la rama `pendientes.length > 0` de `codigo/recuperacion.gs` (líneas 135-148) en vez de la rama "todas ya ESCRITA" — esa rama no tiene un log de confirmación propio (a diferencia de la otra), por lo que la evidencia es el estado final: los mismos `task_id` ya reservados aparecen ahora con fila real en las hojas de negocio, sin haberse regenerado.
+
+### Aprobación
+**CP-26 pasa de Pendiente a Aprobado — 26/07/2026.** Confirma en producción real que una excepción capturada entre `persistirManifiestoTareas()` y `escribirFilasPorLote()` deja las tareas en `RESERVADA` (con `task_id` ya asignado) sin escribir, y que la siguiente ejecución de `procesarCorreosDeTareas()` — sin esperar ningún umbral de tiempo — reanuda vía `reanudarDesdeManifiesto()`, detecta las tareas pendientes y las escribe usando los mismos `task_id`, sin volver a consultar la IA ni generar un manifiesto nuevo. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### Retiro de la instrumentación temporal
+Con CP-26 aprobado, se retira de `codigo/script_refactorizado.gs` el gancho `INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-26` agregado en la entrada anterior (`procesarUnMensaje()` vuelve exactamente a su forma previa a esa entrada). La property `CP26_FORZAR_FALLO_ESCRITURA` queda sin efecto en el código. Verificado antes y después del retiro: `node --check` sobre el archivo y las 5 suites locales (166/60/46/19/17 verificaciones), sin regresiones.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada — es exclusivamente el registro de la corrida real, la aprobación, y el retiro de la instrumentación.
+
+---
+
 ## [2026-07-26] — Instrumentación temporal de prueba para CP-26: caída después de reservar tareas
 
 ### Contexto
