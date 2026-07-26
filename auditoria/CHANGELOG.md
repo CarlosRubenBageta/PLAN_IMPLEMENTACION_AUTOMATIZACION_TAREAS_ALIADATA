@@ -1,5 +1,35 @@
 # Changelog
 
+## [2026-07-26] — Instrumentación temporal de prueba para CP-32: recuperación con tareas ya ESCRITA
+
+### Contexto
+El enunciado de CP-32 (`pruebas/CASOS_DE_PRUEBA.md`) describe el escenario como "un manifiesto persistido cuyas tareas ya están todas `ESCRITA`... (por ejemplo, tras CP-25)" — es, en la práctica, exactamente el mecanismo y el resultado esperado ya probado y aprobado por CP-25 (excepción capturada en `aplicarResultadoGmail()` tras `escribirFilasPorLote()`, recuperación inmediata vía `reanudarDesdeManifiesto()` sin volver a consultar la IA). A diferencia de CP-33 (cuyo título cita explícitamente "/ CP-26"), el título de CP-32 no cita a CP-25 — pero la superposición es real y se deja constancia de ella aquí. Siguiendo la misma disciplina que ya se aplicó para CP-25 respecto de CP-12 (nunca aprobar un caso con la evidencia de otro, aunque el mecanismo sea idéntico), CP-32 se ejecuta con su propia instrumentación, su propio correo y su propio `message_id`.
+
+### Instrumentación temporal (`codigo/script_refactorizado.gs`)
+Mismo punto que CP-12/CP-25 en `aplicarResultadoGmail()` (justo después de la salida por `DRY_RUN`, antes de cualquier llamada real a Gmail), con property exclusiva `CP32_FORZAR_FALLO_GMAIL`.
+
+- Se activa **solo** si `cfg.modoPrueba === true` **y** `CP32_FORZAR_FALLO_GMAIL === 'true'`.
+- Marcada "INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-32", para retirar tras la corrida real.
+
+### Diseño del correo sintético
+Nuevo, con 2 tareas en 2 tableros distintos, redacción propia: "Hay que actualizar la lista de precios en el sistema interno antes de fin de mes, y el equipo comercial tiene que avisarle a los clientes actuales sobre el nuevo esquema de precios."
+
+### Procedimiento (dos corridas, sin espera de tiempo)
+1. `CP32_FORZAR_FALLO_GMAIL=true` en Script Properties.
+2. Enviar el correo sintético.
+3. Ejecutar `procesarCorreosDeTareas()` — se espera `Log Mensajes.estado=ERROR_TEMPORAL`, `etapa=ESCRITURA_COMPLETADA`, 2 tareas `ESCRITA`, sin entrada en `Indice Idempotencia`.
+4. `CP32_FORZAR_FALLO_GMAIL=false`.
+5. Ejecutar `procesarCorreosDeTareas()` de nuevo (de inmediato) — se espera `"reanudarDesdeManifiesto(): todas las tareas... ya estaban ESCRITA; se repite únicamente la actualización de Gmail."`, sin ninguna línea `consultarIAExtractora()`, `Log Mensajes` a `PROCESADO`, sin filas duplicadas en las hojas de negocio.
+
+### Cambios
+- `codigo/script_refactorizado.gs`: `aplicarResultadoGmail()` gana el gancho condicional descrito arriba.
+- Ningún otro archivo de `codigo/` ni de `pruebas/` cambia en esta entrada.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante este diseño. No se modificó `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-32 en esta entrada — requiere que el usuario ejecute el procedimiento de dos corridas y reporte el resultado.
+
+---
+
 ## [2026-07-26] — CP-26 Aprobado: corrida real completa, instrumentación temporal retirada
 
 ### Contexto
