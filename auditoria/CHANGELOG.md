@@ -1,5 +1,38 @@
 # Changelog
 
+## [2026-07-26] — Instrumentación temporal de prueba para CP-26: caída después de reservar tareas
+
+### Contexto
+CP-26 ejercita un punto de falla distinto al de CP-12/CP-25: en vez de interrumpir después de `escribirFilasPorLote()` (tareas ya `ESCRITA`), interrumpe **después de `persistirManifiestoTareas()`** (tareas ya `RESERVADA` — `task_id` asignado, sin fila aún en la hoja de negocio) **y antes de** `escribirFilasPorLote()`. El resultado esperado es específico de este punto: `reanudarDesdeManifiesto()` debe detectar las tareas `RESERVADA` como `pendientes` (`estadoEscritura !== ESCRITA`, `codigo/recuperacion.gs` líneas 129-131) y ejecutar la escritura recién en la recuperación, usando los **mismos `task_id`** ya reservados — sin generar un manifiesto nuevo ni volver a consultar la IA. Además, CP-26 deja el estado que **CP-33** reutiliza a continuación.
+
+Mismo criterio que CP-25: técnica de fault injection ya validada (excepción gateada, capturada por `gestionarErrorMensaje()` → `ERROR_TEMPORAL`), pero en un punto nuevo del flujo, con su propio `message_id` y su propia property.
+
+### Instrumentación temporal (`codigo/script_refactorizado.gs`)
+Gancho nuevo en `procesarUnMensaje()`, justo después de `tareas = tareasConId;` (tras persistir el manifiesto y marcar `etapa: ETAPAS.TAREAS_RESERVADAS`) y antes del comentario "Paso 6-7: escribir tareas por lote":
+
+- Se activa **solo** si `cfg.modoPrueba === true` **y** `CP26_FORZAR_FALLO_ESCRITURA === 'true'` — mismo criterio de seguridad que CP-12/CP-25.
+- Marcada "INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-26", para retirar tras la corrida real.
+- **Advertencia de seguridad ya prevista en `pruebas/CASOS_DE_PRUEBA.md`:** el mensaje de la excepción no incluye `cfg` ni `options`, solo el `messageId`.
+
+### Diseño del correo sintético
+Nuevo (nunca antes enviado), con 2 tareas en 2 tableros distintos, redacción propia para no mezclar evidencia con CP-12/CP-25: "Hay que enviar la encuesta de satisfacción a los clientes que compraron el mes pasado, y el equipo de desarrollo tiene que agregar el nuevo formulario a la web."
+
+### Procedimiento (dos corridas, sin espera de tiempo)
+1. `CP26_FORZAR_FALLO_ESCRITURA=true` en Script Properties.
+2. Enviar el correo sintético.
+3. Ejecutar `procesarCorreosDeTareas()` — se espera `Log Mensajes.estado=ERROR_TEMPORAL`, `etapa=TAREAS_RESERVADAS` (no `ESCRITURA_COMPLETADA`, a diferencia de CP-12/CP-25), 2 filas nuevas en `Registro Tareas` con `estado_escritura=RESERVADA` y **sin** `fila_destino`; **cero** filas nuevas en `Desarrollo IT`/`Comercial` (a diferencia de CP-12/CP-25, acá `escribirFilasPorLote()` nunca llegó a correr); sin entrada en `Indice Idempotencia`.
+4. `CP26_FORZAR_FALLO_ESCRITURA=false`.
+5. Ejecutar `procesarCorreosDeTareas()` de nuevo (inmediatamente, sin esperar) — se espera "procesarUnMensaje(): existe manifiesto...; se reanuda sin volver a consultar la IA", **sin** ninguna línea `consultarIAExtractora()`; `reanudarDesdeManifiesto()` detecta las tareas `RESERVADA` como pendientes y llama a `escribirFilasPorLote()` recién ahora, usando los mismos `task_id` ya reservados (a diferencia de la rama "todas ya ESCRITA" de CP-12/CP-25, esta rama no tiene un log dedicado propio — la confirmación es por estado final, no por una línea de texto adicional); `Log Mensajes` pasa a `PROCESADO`; ahora sí aparecen 1 fila nueva en `Desarrollo IT` y 1 en `Comercial`, con el mismo `task_id` visto en el paso 3.
+
+### Cambios
+- `codigo/script_refactorizado.gs`: `procesarUnMensaje()` gana el gancho condicional descrito arriba.
+- Ningún otro archivo de `codigo/` ni de `pruebas/` cambia en esta entrada.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante este diseño. No se modificó `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-26 en esta entrada — requiere que el usuario ejecute el procedimiento de dos corridas y reporte el resultado.
+
+---
+
 ## [2026-07-26] — CP-25 Aprobado: corrida real completa, instrumentación temporal retirada
 
 ### Contexto
