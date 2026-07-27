@@ -1052,17 +1052,6 @@ function aplicarResultadoGmail(mensajeDescriptor, claveResultado, cfg) {
     return;
   }
 
-  // INICIO INSTRUMENTACIÓN TEMPORAL CP-32 (auditoria/CHANGELOG.md, 26/07/2026) — RETIRAR TRAS LA CORRIDA REAL.
-  // Mismo punto y mecanismo que la instrumentación ya usada y retirada para
-  // CP-12 (Variante A) y CP-25: simula una falla de Gmail justo después de
-  // escribirFilasPorLote() (tareas ya ESCRITA) y antes de la llamada real a
-  // Gmail. Property exclusiva de esta prueba para mantener el rastro de
-  // auditoría inequívoco entre casos.
-  if (cfg.modoPrueba && PropertiesService.getScriptProperties().getProperty('CP32_FORZAR_FALLO_GMAIL') === 'true') {
-    throw new Error('CP-32: falla de Gmail simulada por instrumentación temporal de prueba (retirar tras la corrida).');
-  }
-  // FIN INSTRUMENTACIÓN TEMPORAL CP-32
-
   if (!cfg.permitirEtiquetado && !cfg.permitirArchivado) {
     actualizarLogMensajes(mensajeDescriptor, {
       resultado_gmail: 'OMITIDO_POR_CONFIGURACION',

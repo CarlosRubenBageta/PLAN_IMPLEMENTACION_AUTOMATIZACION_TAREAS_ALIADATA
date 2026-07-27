@@ -74,7 +74,7 @@ Captura revisada por Claude Cowork. Muestra:
 | CP-29 | Dato sensible en el cuerpo | | | | Pendiente |
 | CP-30 | Log detallado purgado | | | | Diferido a Fase 10 (DEC-004, no condiciona la aprobación de esta fase) |
 | CP-31 | Cuatro combinaciones PERMITIR_ETIQUETADO/PERMITIR_ARCHIVADO | 21/07/2026 | Matriz operativa completa (4/4 combinaciones) verificada, más 6 escenarios de configuración inválida (`PERMITIR_ETIQUETADO`/`PERMITIR_ARCHIVADO` ausentes o inválidos, `ID_ETIQUETA_*` ausente con etiquetado habilitado, `ID_ETIQUETA_*` ausentes con etiquetado deshabilitado). Ver detalle completo debajo de la tabla. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
-| CP-32 | Recuperación con tareas ya ESCRITA | | Nuevo caso (INC-FASE8-005, 20/07/2026). Ídem. | | Pendiente |
+| CP-32 | Recuperación con tareas ya ESCRITA | 26/07/2026 (flujo clásico con instrumentación temporal) | Ver detalle completo debajo de la tabla. Resumen: mismo mecanismo que CP-25 (excepción capturada en `aplicarResultadoGmail()` tras `escribirFilasPorLote()`); la ejecución inmediatamente siguiente reanudó vía `reanudarDesdeManifiesto()` sin volver a consultar la IA, sin duplicar tareas. Un primer intento con otro correo se descartó por property no creada (mismo problema de CP-26, sin impacto en el pipeline). | Registro de ejecución de ambas corridas reales — `message_id 19fa0d6ae4f8f334` | Aprobado — 26/07/2026 |
 | CP-33 | Recuperación con tareas en RESERVADA | | Nuevo caso (INC-FASE8-005, 20/07/2026). Ídem. | | Pendiente |
 | CP-34 | Nueva falla de Gmail durante la recuperación (sin recursión) | | Nuevo caso (INC-FASE8-005, 20/07/2026). Ídem. | | Pendiente |
 | CP-35 | Sin filas duplicadas en Indice Idempotencia tras recuperaciones sucesivas | | Auditoría 20/07/2026 (H-05/H-06): deja de ser prueba obligatoria de aprobación hasta que `finalizarMensaje()` implemente upsert (`documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 9). Sin esa corrección, este caso solo confirmaría "no ocurrió esta vez", no que esté estructuralmente prevenido. | | Bloqueado — requiere corrección de idempotencia |
@@ -1068,6 +1068,46 @@ procesarUnMensaje(): existe manifiesto para 19fa0a67abbf10f3; se reanuda sin vol
 
 **Estado (veredicto final):** Aprobado — 26/07/2026 (`PASA`).
 
+## Detalle de CP-32 — Recuperación con tareas ya ESCRITA (flujo clásico, instrumentación temporal)
+
+```text
+Fecha de ejecución: 26/07/2026
+message_id: 19fa0d6ae4f8f334 (nuevo; un primer intento con message_id 19fa0d04df5d38e3 se descartó, ver nota abajo)
+Instrumentación: gancho gateado por cfg.modoPrueba + property CP32_FORZAR_FALLO_GMAIL
+en aplicarResultadoGmail() (codigo/script_refactorizado.gs) — mismo punto y mecanismo
+que CP-12 (Variante A) y CP-25 — ya retirado del código.
+```
+
+**Relación con CP-25:** el enunciado de CP-32 (`pruebas/CASOS_DE_PRUEBA.md`) describe el escenario como "un manifiesto persistido cuyas tareas ya están todas `ESCRITA`... (por ejemplo, tras CP-25)" — mecánicamente es el mismo mecanismo y resultado esperado que CP-25 ya probó y aprobó. Siguiendo la misma disciplina aplicada a CP-25 respecto de CP-12, se ejecutó con su propia instrumentación, su propio correo y su propio `message_id`.
+
+### Intento descartado (sin usarse como evidencia)
+
+La primera corrida real, con el correo "Actualización de precios pendiente" (`message_id 19fa0d04df5d38e3`), terminó "Se ha completado la ejecución" sin ningún error — mismo problema visto en el primer intento de CP-26: la property `CP32_FORZAR_FALLO_GMAIL` no se había llegado a crear en Script Properties. El mensaje se procesó de punta a punta normalmente (`PROCESADO`/`FINALIZADO`) y quedó cerrado — no representa el escenario de CP-32 y no se reutilizó.
+
+### Primera corrida (falla simulada activa, con la property ya creada)
+
+- Correo sintético nuevo: "El dominio del sitio web vence en dos semanas, hay que renovarlo antes de esa fecha. El equipo comercial debe confirmarle al cliente que el sitio no tendrá interrupciones durante la renovación." (`message_id 19fa0d6ae4f8f334`).
+- Log: "1 mensajes elegibles, procesando 1" → `consultarIAExtractora()` → "Error procesando mensaje 19fa0d6ae4f8f334: CP-32: falla de Gmail simulada por instrumentación temporal de prueba (retirar tras la corrida)."
+- `escribirFilasPorLote()` escribió las 2 tareas (`ESCRITA` en `Registro Tareas`) antes de la excepción simulada.
+- `Log Mensajes`: `estado=ERROR_TEMPORAL`, `etapa=ESCRITURA_COMPLETADA`, `cantidad_tareas=2` — sin fila nueva en `Indice Idempotencia`.
+
+### Segunda corrida (instrumentación desactivada, ejecutada de inmediato)
+
+Log recibido:
+```text
+procesarCorreosDeTareas(): 1 mensajes elegibles, procesando 1.
+procesarUnMensaje(): existe manifiesto para 19fa0d6ae4f8f334; se reanuda sin volver a consultar la IA.
+reanudarDesdeManifiesto(): todas las tareas de 19fa0d6ae4f8f334 ya estaban ESCRITA; se repite únicamente la actualización de Gmail.
+```
+
+- Sin ninguna línea `consultarIAExtractora()`.
+- `Log Mensajes`: pasó a `estado=PROCESADO`.
+- Confirmado: sin filas duplicadas en `Desarrollo IT`/`Comercial` para este mensaje.
+
+**Conclusión:** CP-32 PASA. Confirma, con evidencia real propia, el mismo resultado ya validado por CP-25: una excepción capturada después de `escribirFilasPorLote()` deja el mensaje en `ERROR_TEMPORAL` sin cerrarlo, y la ejecución inmediatamente siguiente lo recupera vía `reanudarDesdeManifiesto()` sin duplicar tareas ni volver a consultar la IA.
+
+**Estado (veredicto final):** Aprobado — 26/07/2026 (`PASA`).
+
 ## Detalle de CP-07 — Notificación de Apps Script (aprobado vía automatizador de integración Fase 2A)
 
 ```text
@@ -1274,7 +1314,7 @@ Total de casos que condicionan la aprobación de esta fase: 36 (CP-01 a CP-29, C
 Diferido a Fase 10 (no condiciona esta fase): 1 (CP-30, DEC-004)
 Bloqueado que todavía condiciona la Fase 8: 1 (CP-35 — ver nota de auditoría abajo)
 Bloqueados pendientes de Lotes 2/3 (no condicionan esta fase): 2 (CP-38, CP-39)
-Aprobados: 27 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-07, CP-10, CP-11, CP-12, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-25, CP-26, CP-27, CP-28, CP-31, CP-36, CP-37)
+Aprobados: 28 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-07, CP-10, CP-11, CP-12, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-25, CP-26, CP-27, CP-28, CP-31, CP-32, CP-36, CP-37)
 Rechazados: 0
   CP-19 pasó de Rechazado (21/07/2026, INC-FASE8-008) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución fallida original se conserva íntegro en el detalle de CP-19.
   CP-23 pasó de Rechazado (22/07/2026, INC-FASE8-009) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución vulnerable original se conserva íntegro en el detalle de CP-23.
@@ -1291,7 +1331,8 @@ Rechazados: 0
   CP-12 pasó de Pendiente a Aprobado (25/07/2026, ambas variantes ejecutadas en el flujo clásico con instrumentación temporal — Variante A: message_id 19f96ec29b3c8486, excepción capturada, ERROR_TEMPORAL recuperado vía manifiesto; Variante B: message_id 19f9734c63bb0299, runtime interrumpido sin excepción, EN_PROCESO recuperado vía recuperarProcesamientosAbandonados()/UMBRAL_ABANDONO_MIN. Ambas convergieron al mismo resultado final, sin duplicar tareas ni volver a consultar la IA). El registro de ambas corridas se conserva íntegro en el detalle de CP-12.
   CP-25 pasó de Pendiente a Aprobado (26/07/2026, flujo clásico con instrumentación temporal, message_id 19fa0743dc9d5b94 -- mismo mecanismo que CP-12 Variante A, pero recuperado en la ejecucion inmediatamente siguiente sin esperar ningun umbral de tiempo, ya que ERROR_TEMPORAL sigue "elegible" para el bucle normal. reanudarDesdeManifiesto() confirmo sin volver a consultar la IA ni reescribir tareas, sin duplicados en Desarrollo IT/Comercial. Aprobo al primer intento). El registro de ambas corridas se conserva integro en el detalle de CP-25.
   CP-26 pasó de Pendiente a Aprobado (26/07/2026, flujo clásico con instrumentación temporal, message_id 19fa0a67abbf10f3 -- interrumpe en un punto anterior a CP-12/CP-25: entre persistirManifiestoTareas() y escribirFilasPorLote(), dejando las tareas RESERVADA en vez de ESCRITA. reanudarDesdeManifiesto() escribio las tareas pendientes usando los mismos task_id ya reservados, sin volver a consultar la IA ni generar un manifiesto nuevo. Un primer intento con otro correo se descarto por una property no creada, sin relacion con el pipeline). El registro de ambas corridas se conserva integro en el detalle de CP-26.
-Pendientes (ejecutables con estado Pendiente, no corridos aún): 8
+  CP-32 pasó de Pendiente a Aprobado (26/07/2026, flujo clásico con instrumentación temporal, message_id 19fa0d6ae4f8f334 -- mismo mecanismo ya probado por CP-25, ejecutado con su propia evidencia siguiendo la misma disciplina aplicada a CP-25 respecto de CP-12. reanudarDesdeManifiesto() confirmo sin volver a consultar la IA ni reescribir tareas, sin duplicados. Un primer intento con otro correo se descarto por una property no creada, mismo problema visto en CP-26). El registro de ambas corridas se conserva integro en el detalle de CP-32.
+Pendientes (ejecutables con estado Pendiente, no corridos aún): 7
   [Corregido 22/07/2026: esta lista omitía a CP-27, ya aprobado desde el 20/07/2026 (CP-27 — Modo prueba con ID productivo); no cambia el alcance ni el estado de ningún caso.]
   [Corregido 23/07/2026 (semántica): CP-35 estaba contabilizado dentro de "Pendientes"; su estado individual es Bloqueado (ver nota de auditoría abajo), no Pendiente. Se lo separa como bloqueado que todavía condiciona la Fase 8. Pendientes pasa de 20 a 19; no cambia el estado individual de ningún caso.]
   [Corregido 24/07/2026: CP-03 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 19 a 18.]
@@ -1318,8 +1359,9 @@ Pendientes (ejecutables con estado Pendiente, no corridos aún): 8
   CP-12 completó ambas variantes y fue aprobado el 25/07/2026
   CP-25 fue ejecutado y aprobado el 26/07/2026
   CP-26 fue ejecutado y aprobado el 26/07/2026
-Casos sin aprobación que todavía condicionan la Fase 8: 9 (8 Pendientes + CP-35 Bloqueado)
-Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 12
+  CP-32 fue ejecutado y aprobado el 26/07/2026
+Casos sin aprobación que todavía condicionan la Fase 8: 8 (7 Pendientes + CP-35 Bloqueado)
+Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 11
 
 Nota (auditoría 20/07/2026): CP-35 pasó a "bloqueado" — no puede considerarse
 una verificación válida del criterio "no existen duplicados" hasta que

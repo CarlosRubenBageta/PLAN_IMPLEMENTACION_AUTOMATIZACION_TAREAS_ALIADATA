@@ -1,5 +1,47 @@
 # Changelog
 
+## [2026-07-26] — CP-32 Aprobado: corrida real completa, instrumentación temporal retirada
+
+### Contexto
+Con la instrumentación agregada en la entrada anterior, ambas corridas reales confirmaron exactamente el comportamiento esperado — con un intento previo descartado por el mismo problema de configuración ya visto en CP-26 (property no creada), sin relación con el pipeline.
+
+```text
+Intento descartado: primera corrida real (correo "Actualización de precios pendiente",
+message_id 19fa0d04df5d38e3) terminó "Se ha completado la ejecución" sin ningún error —
+CP32_FORZAR_FALLO_GMAIL no se había creado en Script Properties. Procesado de punta a
+punta normalmente (PROCESADO/FINALIZADO), quedó cerrado y no se reutilizó.
+
+Correo sintético (segundo intento, con la property ya creada): "[PRUEBA-AUTOMATIZACION]
+Renovación de dominio por vencer" (message_id 19fa0d6ae4f8f334, nuevo)
+2 observaciones / 2 tareas: Desarrollo IT ("Renovar el dominio del sitio web antes de que venza"),
+Comercial ("Confirmarle al cliente que el sitio no tendrá interrupciones durante la renovación")
+
+Primera corrida (CP32_FORZAR_FALLO_GMAIL=true):
+"1 mensajes elegibles, procesando 1." → consultarIAExtractora() →
+"Error procesando mensaje 19fa0d6ae4f8f334: CP-32: falla de Gmail simulada por instrumentación
+temporal de prueba (retirar tras la corrida)."
+Log Mensajes: estado=ERROR_TEMPORAL, etapa=ESCRITURA_COMPLETADA, cantidad_tareas=2,
+sin entrada en Indice Idempotencia.
+
+Segunda corrida (CP32_FORZAR_FALLO_GMAIL=false, ejecutada de inmediato):
+"1 mensajes elegibles, procesando 1."
+"procesarUnMensaje(): existe manifiesto para 19fa0d6ae4f8f334; se reanuda sin volver a consultar la IA."
+"reanudarDesdeManifiesto(): todas las tareas de 19fa0d6ae4f8f334 ya estaban ESCRITA; se repite
+únicamente la actualización de Gmail."
+Log Mensajes: estado=PROCESADO. Sin filas duplicadas en Desarrollo IT/Comercial.
+```
+
+### Aprobación
+**CP-32 pasa de Pendiente a Aprobado — 26/07/2026.** Confirma, con su propia evidencia real (`message_id 19fa0d6ae4f8f334`), el mismo resultado ya probado por CP-25: una excepción capturada después de `escribirFilasPorLote()` deja el mensaje en `ERROR_TEMPORAL` sin cerrarlo, y la ejecución inmediatamente siguiente lo recupera vía `reanudarDesdeManifiesto()` sin duplicar tareas ni volver a consultar la IA. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### Retiro de la instrumentación temporal
+Con CP-32 aprobado, se retira de `codigo/script_refactorizado.gs` el gancho `INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-32` agregado en la entrada anterior (`aplicarResultadoGmail()` vuelve exactamente a su forma previa a esa entrada). La property `CP32_FORZAR_FALLO_GMAIL` queda sin efecto en el código. Verificado antes y después del retiro: `node --check` sobre el archivo y las 5 suites locales (166/60/46/19/17 verificaciones), sin regresiones.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada — es exclusivamente el registro de la corrida real, la aprobación, y el retiro de la instrumentación.
+
+---
+
 ## [2026-07-26] — Instrumentación temporal de prueba para CP-32: recuperación con tareas ya ESCRITA
 
 ### Contexto

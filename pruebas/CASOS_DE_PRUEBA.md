@@ -279,7 +279,7 @@ Igual que **CP-12** (variante A, el camino inmediato corregido por INC-FASE8-005
 
 **Procedimiento:** con un manifiesto persistido cuyas tareas ya están todas `ESCRITA` en `Registro Tareas` (por ejemplo, tras CP-25), ejecutar `procesarCorreosDeTareas()` de nuevo.
 **Resultado esperado:** `procesarUnMensaje()` detecta el manifiesto en la entrada, llama a `reanudarDesdeManifiesto()`, que no encuentra tareas `pendientes` (todas ya `ESCRITA`) y por lo tanto **no** llama a `escribirFilasPorLote()`; solo repite `aplicarResultadoGmail()` y cierra el mensaje.
-**Estado:** Pendiente.
+**Estado:** Aprobado — 26/07/2026. Mismo mecanismo ya probado por CP-25 (excepción gateada en `aplicarResultadoGmail()` tras `escribirFilasPorLote()`, property exclusiva `CP32_FORZAR_FALLO_GMAIL`), ejecutado con su propia evidencia: correo sintético "Renovación de dominio por vencer" (`message_id 19fa0d6ae4f8f334`, 2 tareas). Primera corrida: `Log Mensajes` en `estado=ERROR_TEMPORAL`, `etapa=ESCRITURA_COMPLETADA`, sin entrada en `Indice Idempotencia`. Segunda corrida (inmediata, sin espera): `"reanudarDesdeManifiesto(): todas las tareas... ya estaban ESCRITA; se repite únicamente la actualización de Gmail"`, sin ninguna línea `consultarIAExtractora()`; `Log Mensajes` a `PROCESADO`, sin filas duplicadas. Un primer intento con otro correo se descartó por una property no creada (mismo problema visto en CP-26), sin relación con el pipeline. Instrumentación ya retirada del código. Ver detalle completo en `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
 ## CP-33 — Recuperación con tareas en RESERVADA (INC-FASE8-005 / CP-26)
 
