@@ -1,5 +1,43 @@
 # Changelog
 
+## [2026-07-26] — CP-33 Aprobado: corrida real completa, instrumentación temporal retirada
+
+### Contexto
+Con la instrumentación agregada en la entrada anterior, ambas corridas reales confirmaron exactamente el comportamiento esperado — al primer intento, sin ningún problema de configuración esta vez.
+
+```text
+Correo sintético: "[PRUEBA-AUTOMATIZACION] Migración de servidor programada" (message_id 19fa0f11793dc340, nuevo)
+2 observaciones / 2 tareas: Desarrollo IT ("Programar la migración del servidor de archivos"),
+Comercial ("Avisar a los clientes sobre una posible interrupción breve del servicio")
+
+Primera corrida (CP33_FORZAR_FALLO_ESCRITURA=true):
+"1 mensajes elegibles, procesando 1." → consultarIAExtractora() →
+"Error procesando mensaje 19fa0f11793dc340: CP-33: falla simulada por instrumentación temporal
+de prueba, justo después de reservar tareas y antes de escribir filas (retirar tras la corrida)."
+Log Mensajes: estado=ERROR_TEMPORAL, etapa=TAREAS_RESERVADAS, cantidad_tareas=2.
+Registro Tareas: 2 filas nuevas, estado_escritura=RESERVADA, sin fila_destino.
+Desarrollo IT / Comercial: sin ninguna fila nueva.
+
+Segunda corrida (CP33_FORZAR_FALLO_ESCRITURA=false, ejecutada de inmediato):
+"1 mensajes elegibles, procesando 1."
+"procesarUnMensaje(): existe manifiesto para 19fa0f11793dc340; se reanuda sin volver a consultar la IA."
+(sin línea consultarIAExtractora(); ~5 segundos de ejecución, consistente con escritura real)
+Log Mensajes: estado=PROCESADO.
+Desarrollo IT / Comercial: 1 fila nueva cada una, con los MISMOS task_id ya reservados —
+no se generó un manifiesto nuevo.
+```
+
+### Aprobación
+**CP-33 pasa de Pendiente a Aprobado — 26/07/2026.** Confirma, con su propia evidencia real (`message_id 19fa0f11793dc340`), el mismo resultado ya validado por CP-26: una excepción capturada entre `persistirManifiestoTareas()` y `escribirFilasPorLote()` deja las tareas en `RESERVADA` sin escribir, y la ejecución inmediatamente siguiente las escribe usando los mismos `task_id`, sin volver a consultar la IA ni generar un manifiesto nuevo. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### Retiro de la instrumentación temporal
+Con CP-33 aprobado, se retira de `codigo/script_refactorizado.gs` el gancho `INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-33` agregado en la entrada anterior (`procesarUnMensaje()` vuelve exactamente a su forma previa a esa entrada). La property `CP33_FORZAR_FALLO_ESCRITURA` queda sin efecto en el código. Verificado antes y después del retiro: `node --check` sobre el archivo y las 5 suites locales (166/60/46/19/17 verificaciones), sin regresiones.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada — es exclusivamente el registro de la corrida real, la aprobación, y el retiro de la instrumentación.
+
+---
+
 ## [2026-07-26] — Instrumentación temporal de prueba para CP-33: recuperación con tareas en RESERVADA
 
 ### Contexto

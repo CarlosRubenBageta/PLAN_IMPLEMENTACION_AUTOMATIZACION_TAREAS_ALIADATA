@@ -669,17 +669,6 @@ function procesarUnMensaje(mensajeDescriptor, cfg) {
   actualizarLogMensajes(mensajeDescriptor, { etapa: ETAPAS.TAREAS_RESERVADAS }, cfg);
   tareas = tareasConId;
 
-  // INICIO INSTRUMENTACIÓN TEMPORAL CP-33 (auditoria/CHANGELOG.md, 26/07/2026) — RETIRAR TRAS LA CORRIDA REAL.
-  // Mismo punto y mecanismo que la instrumentación ya usada y retirada para
-  // CP-26: simula una interrupción justo después de persistirManifiestoTareas()
-  // (tareas ya RESERVADA, con task_id asignado, pero ninguna ESCRITA todavía)
-  // y antes de escribirFilasPorLote(). Property exclusiva de esta prueba; el
-  // mensaje de error no incluye cfg ni options, solo el messageId.
-  if (cfg.modoPrueba && PropertiesService.getScriptProperties().getProperty('CP33_FORZAR_FALLO_ESCRITURA') === 'true') {
-    throw new Error('CP-33: falla simulada por instrumentación temporal de prueba, justo después de reservar tareas y antes de escribir filas (retirar tras la corrida). messageId=' + mensajeDescriptor.messageId);
-  }
-  // FIN INSTRUMENTACIÓN TEMPORAL CP-33
-
   // Paso 6-7: escribir tareas por lote y marcarlas ESCRITAS.
   actualizarLogMensajes(mensajeDescriptor, { etapa: ETAPAS.ESCRITURA_INICIADA }, cfg);
   var filasPorHoja = agruparFilasPorHoja(tareas);

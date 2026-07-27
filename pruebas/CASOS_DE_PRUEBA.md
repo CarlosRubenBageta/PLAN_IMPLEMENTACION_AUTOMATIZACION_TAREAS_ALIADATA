@@ -285,7 +285,7 @@ Igual que **CP-12** (variante A, el camino inmediato corregido por INC-FASE8-005
 
 **Procedimiento:** con un manifiesto persistido cuyas tareas están todas en `RESERVADA` (falla simulada entre `persistirManifiestoTareas()` y `escribirFilasPorLote()`), ejecutar `procesarCorreosDeTareas()` de nuevo.
 **Resultado esperado:** `procesarUnMensaje()` detecta el manifiesto, llama a `reanudarDesdeManifiesto()`, que identifica las tareas `RESERVADA` como `pendientes` y ejecuta la escritura solo para esas — sin volver a consultar la IA ni generar un manifiesto nuevo (mismos `task_id` que ya existían).
-**Estado:** Pendiente.
+**Estado:** Aprobado — 26/07/2026. Mismo mecanismo ya probado por CP-26 (excepción gateada en `procesarUnMensaje()` entre `persistirManifiestoTareas()` y `escribirFilasPorLote()`, property exclusiva `CP33_FORZAR_FALLO_ESCRITURA`), ejecutado con su propia evidencia: correo sintético "Migración de servidor programada" (`message_id 19fa0f11793dc340`, 2 tareas), al primer intento. Primera corrida: `Log Mensajes` en `estado=ERROR_TEMPORAL`, `etapa=TAREAS_RESERVADAS`, 2 tareas `RESERVADA` en `Registro Tareas` sin `fila_destino`; sin filas en las hojas de negocio. Segunda corrida (inmediata, sin espera): `"procesarUnMensaje(): existe manifiesto... se reanuda sin volver a consultar la IA"`, sin ninguna línea `consultarIAExtractora()`; `Log Mensajes` a `PROCESADO`; confirmado que aparecen las filas nuevas en `Desarrollo IT`/`Comercial` con los mismos `task_id` ya reservados. Instrumentación ya retirada del código. Ver detalle completo en `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
 ## CP-34 — Nueva falla de Gmail durante la recuperación (sin recursión)
 
