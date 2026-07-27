@@ -1,5 +1,36 @@
 # Changelog
 
+## [2026-07-26] — Instrumentación temporal de prueba para CP-33: recuperación con tareas en RESERVADA
+
+### Contexto
+Mismo patrón de superposición que CP-32/CP-25: el título de CP-33 (`pruebas/CASOS_DE_PRUEBA.md`) cita explícitamente "/ CP-26", y su procedimiento/resultado esperado es mecánicamente el mismo que CP-26 ya probó y aprobó (excepción capturada entre `persistirManifiestoTareas()` y `escribirFilasPorLote()`, tareas `RESERVADA`, recuperación escribe usando los mismos `task_id`, sin volver a consultar la IA). Misma disciplina ya aplicada dos veces (CP-25→CP-12, CP-32→CP-25): se ejecuta con su propia instrumentación, su propio correo y su propio `message_id`.
+
+### Instrumentación temporal (`codigo/script_refactorizado.gs`)
+Mismo punto que CP-26 en `procesarUnMensaje()` (justo después de `tareas = tareasConId;`, tras `ETAPA.TAREAS_RESERVADAS`, antes de `escribirFilasPorLote()`), con property exclusiva `CP33_FORZAR_FALLO_ESCRITURA`.
+
+- Se activa **solo** si `cfg.modoPrueba === true` **y** `CP33_FORZAR_FALLO_ESCRITURA === 'true'`.
+- Marcada "INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-33", para retirar tras la corrida real.
+- El mensaje de la excepción solo incluye el `messageId` (mismo criterio de seguridad que CP-26).
+
+### Diseño del correo sintético
+Nuevo, con 2 tareas en 2 tableros distintos, redacción propia: "Hay que programar la migración del servidor de archivos para el próximo fin de semana, y el equipo comercial debe avisarle a los clientes sobre una posible interrupción breve del servicio."
+
+### Procedimiento (dos corridas, sin espera de tiempo)
+1. `CP33_FORZAR_FALLO_ESCRITURA=true` en Script Properties.
+2. Enviar el correo sintético.
+3. Ejecutar `procesarCorreosDeTareas()` — se espera `Log Mensajes.estado=ERROR_TEMPORAL`, `etapa=TAREAS_RESERVADAS`, 2 filas nuevas en `Registro Tareas` con `estado_escritura=RESERVADA` y sin `fila_destino`; cero filas nuevas en las hojas de negocio.
+4. `CP33_FORZAR_FALLO_ESCRITURA=false`.
+5. Ejecutar `procesarCorreosDeTareas()` de nuevo (de inmediato) — se espera `"procesarUnMensaje(): existe manifiesto...; se reanuda sin volver a consultar la IA"`, sin ninguna línea `consultarIAExtractora()` (esta rama de `reanudarDesdeManifiesto()` no tiene un log de confirmación propio, igual que en CP-26); `Log Mensajes` a `PROCESADO`; recién ahora aparecen las filas en las hojas de negocio, con los mismos `task_id` ya reservados.
+
+### Cambios
+- `codigo/script_refactorizado.gs`: `procesarUnMensaje()` gana el gancho condicional descrito arriba.
+- Ningún otro archivo de `codigo/` ni de `pruebas/` cambia en esta entrada.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante este diseño. No se modificó `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-33 en esta entrada — requiere que el usuario ejecute el procedimiento de dos corridas y reporte el resultado.
+
+---
+
 ## [2026-07-26] — CP-32 Aprobado: corrida real completa, instrumentación temporal retirada
 
 ### Contexto
