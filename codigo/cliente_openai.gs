@@ -93,13 +93,62 @@ function consultarIAExtractora(datosCorreo, cfg) {
 
     var inicio = Date.now();
     var response;
-    try {
-      response = UrlFetchApp.fetch('https://api.openai.com/v1/chat/completions', options);
-    } catch (errorRed) {
-      // Error de red (timeout, DNS, etc.): tratado como temporal.
-      ultimoResultado = construirResultadoFallido(null, (Date.now() - inicio) / 1000, 'Error de red: ' + errorRed.message, intento);
-      continue;
+    // INICIO INSTRUMENTACIÓN TEMPORAL CP-09 (auditoria/CHANGELOG.md, 26/07/2026) — RETIRAR TRAS LA CORRIDA REAL.
+    // Simula un HTTP 503 (temporal) en el primer intento y un HTTP 200 con
+    // contenido válido en el segundo, sin llamar a la API real de OpenAI —
+    // el resto del bucle real (parseo, esErrorTemporalHttp(), continue,
+    // construcción del resultado final) se ejecuta sin modificar. Gateada
+    // por cfg.modoPrueba y por una property exclusiva de esta prueba.
+    if (cfg.modoPrueba && PropertiesService.getScriptProperties().getProperty('CP09_FORZAR_HTTP_TEMPORAL') === 'true') {
+      Logger.log('CP-09: simulando HTTP ' + (intento === 1 ? '503' : '200') + ' en el intento ' + intento + ' (instrumentación temporal de prueba, sin llamar a la API real de OpenAI).');
+      if (intento === 1) {
+        response = {
+          getResponseCode: function () { return 503; },
+          getContentText: function () { return JSON.stringify({ error: { message: 'CP-09: 503 simulado por instrumentación temporal de prueba.' } }); },
+          getHeaders: function () { return {}; }
+        };
+      } else {
+        response = {
+          getResponseCode: function () { return 200; },
+          getContentText: function () {
+            return JSON.stringify({
+              choices: [{
+                message: {
+                  content: JSON.stringify({
+                    correo_relevante: true,
+                    requiere_revision: false,
+                    motivo_revision: null,
+                    observaciones: [{
+                      texto_original: 'Correo de prueba CP-09.',
+                      tareas: [{
+                        resumen: 'Tarea de prueba CP-09 (segundo intento exitoso).',
+                        tablero: 'Desarrollo IT',
+                        prioridad: 'Medio',
+                        grupo_origen: 'Desarrollo IT',
+                        responsable_sugerido: 'Responsable Técnico',
+                        fecha_limite: null
+                      }]
+                    }]
+                  })
+                },
+                finish_reason: 'stop'
+              }],
+              usage: { prompt_tokens: 100, completion_tokens: 50 }
+            });
+          },
+          getHeaders: function () { return { 'x-request-id': 'cp09-instrumentacion-temporal' }; }
+        };
+      }
+    } else {
+      try {
+        response = UrlFetchApp.fetch('https://api.openai.com/v1/chat/completions', options);
+      } catch (errorRed) {
+        // Error de red (timeout, DNS, etc.): tratado como temporal.
+        ultimoResultado = construirResultadoFallido(null, (Date.now() - inicio) / 1000, 'Error de red: ' + errorRed.message, intento);
+        continue;
+      }
     }
+    // FIN INSTRUMENTACIÓN TEMPORAL CP-09
 
     var duracionSegundos = (Date.now() - inicio) / 1000;
     var codigoHttp = response.getResponseCode();

@@ -1,5 +1,40 @@
 # Changelog
 
+## [2026-07-26] — Instrumentación temporal de prueba para CP-09: error HTTP temporal
+
+### Contexto
+El enunciado de CP-09 ofrece dos opciones. La opción (a) (forzar `OPENAI_API_KEY` inválida → HTTP 401) el propio caso la descarta explícitamente: "verifica el camino de error definitivo, no exactamente temporal" — un 401 no es reintentable (`esErrorTemporalHttp()` solo considera 429 y 5xx). Se implementa la opción (b): simular HTTP 503 en el primer intento interno y HTTP 200 en el segundo.
+
+**Detalle importante:** a diferencia de toda la familia CP-12/25/26/32/33/34 (que necesitaba múltiples ejecuciones de `procesarCorreosDeTareas()`), el bucle de reintentos de CP-09 es **interno** a una sola invocación de `consultarIAExtractora()` (`for (var intento = 1; intento <= MAX_INTENTOS_IA; intento++)`, `codigo/cliente_openai.gs`). Por lo tanto, CP-09 se valida con una **única** ejecución de `procesarCorreosDeTareas()`.
+
+### Instrumentación temporal (`codigo/cliente_openai.gs`)
+A diferencia de CP-08 (que reemplazaba toda la función), aquí se conserva intacto el bucle de reintentos real — solo se reemplaza el objeto `response` de `UrlFetchApp.fetch()` cuando la property está activa, dejando que todo el resto del código real (parseo, `esErrorTemporalHttp()`, decisión de `continue`, construcción del resultado final con `intentos: intento`) se ejecute sin modificar:
+
+- Intento 1: `response` simulado con `getResponseCode()=503`, `getContentText()` con un cuerpo de error JSON válido.
+- Intento 2: `response` simulado con `getResponseCode()=200` y un `contenidoCrudo` válido (1 observación, 1 tarea de prueba).
+- Se activa **solo** si `cfg.modoPrueba === true` **y** `CP09_FORZAR_HTTP_TEMPORAL === 'true'`.
+- El `Utilities.sleep(2000)` entre intentos **no** se salta — corre real, para no alterar el comportamiento de temporización del reintento.
+- Marcada "INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-09", para retirar tras la corrida real.
+
+### Verificación local antes de la corrida real
+Dado que esta instrumentación fabrica objetos JSON más complejos que los casos anteriores, se ejecutó un chequeo local ad-hoc (invocando `consultarIAExtractora()` con la property activa y encadenando `validarRespuestaIA()`/`generarTareasNormalizadas()`) antes de pedirle al usuario que corriera esto real. Ese chequeo encontró un error real en el primer diseño: la tarea sintética no incluía `grupo_origen`, un campo obligatorio de catálogo (`GRUPOS_ORIGEN_VALIDOS`) que `validarRespuestaIA()` exige — sin él, la respuesta simulada habría sido rechazada como inválida, arruinando la corrida real. Corregido (`grupo_origen: 'Desarrollo IT'`) y reverificado end-to-end localmente antes de continuar.
+
+### Procedimiento (una sola corrida)
+1. Copiar `codigo/cliente_openai.gs` actualizado al proyecto de prueba.
+2. `CP09_FORZAR_HTTP_TEMPORAL=true` en Script Properties.
+3. Enviar un correo sintético nuevo cualquiera.
+4. Ejecutar `procesarCorreosDeTareas()` — se espera ver en el log ambos intentos simulados ("simulando HTTP 503... intento 1" y "simulando HTTP 200... intento 2"), `Log Mensajes.intentos=2`, y la tarea generada normalmente (1 fila en `Registro Tareas`, 1 en la hoja de negocio correspondiente, etiqueta `Procesado`).
+5. `CP09_FORZAR_HTTP_TEMPORAL=false`.
+
+### Cambios
+- `codigo/cliente_openai.gs`: `consultarIAExtractora()` gana el gancho condicional descrito arriba, alrededor de la llamada a `UrlFetchApp.fetch()`.
+- Ningún otro archivo de `codigo/` ni de `pruebas/` cambia en esta entrada.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante este diseño. No se modificó `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-09 en esta entrada — requiere que el usuario ejecute el procedimiento y reporte el resultado.
+
+---
+
 ## [2026-07-26] — CP-08 Aprobado: corrida real completa, instrumentación temporal retirada
 
 ### Contexto
