@@ -1,5 +1,37 @@
 # Changelog
 
+## [2026-07-26] — Instrumentación temporal de prueba para CP-13: dos ejecuciones simultáneas
+
+### Contexto
+CP-13 es cualitativamente distinto de todos los casos anteriores: no requiere fault injection sobre la lógica de negocio, sino disparar dos ejecuciones de `procesarCorreosDeTareas()` con muy poca diferencia de tiempo, para verificar el control de concurrencia real (`codigo/script_refactorizado.gs`, líneas 327-351): `LockService.getScriptLock().tryLock(5000)` — si no se obtiene el lock en 5 segundos, se registra `"procesarCorreosDeTareas(): no se pudo obtener el lock; ejecución en curso. Se omite esta corrida."` y se retorna de inmediato, sin llegar a `validarConfiguracion()` ni a ningún acceso real a Gmail/Sheets.
+
+### Por qué se agrega una instrumentación mínima de todos modos
+El desafío de este caso es de **temporización manual**, no de lógica: si la primera ejecución termina su procesamiento real en menos de 5 segundos (posible si hay 0 mensajes elegibles, o si la API responde muy rápido), la segunda ejecución podría alcanzar a obtener el lock dentro de su propia espera de `tryLock(5000)`, sin llegar a demostrar el camino de rechazo. Para no depender de la suerte del timing real de la API ni de la precisión de dos clics manuales, se agrega una única línea de espera artificial, **gateada por `MODO_PRUEBA` (property cruda, ya que `cfg` todavía no existe en este punto de la función) y una property exclusiva `CP13_EXTENDER_LOCK`**, justo después de obtener el lock y antes de `validarConfiguracion()`: mantiene el lock 15 segundos adicionales, dando una ventana amplia para disparar la segunda ejecución manualmente sin depender de la precisión del clic.
+
+### Instrumentación temporal (`codigo/script_refactorizado.gs`)
+- Se activa **solo** si `MODO_PRUEBA === 'true'` **y** `CP13_EXTENDER_LOCK === 'true'` — mismo criterio de seguridad que toda instrumentación anterior (nunca en la cuenta productiva).
+- No requiere ningún correo sintético: el resultado esperado (rechazo por lock, sin tocar Gmail/Sheets) se demuestra igual con 0 mensajes elegibles.
+- Marcada "INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-13", para retirar tras la corrida real.
+
+### Procedimiento
+1. Copiar `codigo/script_refactorizado.gs` actualizado al proyecto de prueba.
+2. `CP13_EXTENDER_LOCK=true` en Script Properties.
+3. Abrir el editor de Apps Script en **dos pestañas del navegador**, ambas sobre el mismo proyecto.
+4. En la pestaña 1, seleccionar `procesarCorreosDeTareas` y ejecutar.
+5. Dentro de 1-2 segundos, en la pestaña 2, seleccionar `procesarCorreosDeTareas` y ejecutar también.
+6. Esperar a que ambas terminen (la que obtuvo el lock tardará ~15+ segundos por la espera artificial; la otra debería terminar en ~5 segundos o menos).
+7. Verificar en el registro de cada pestaña: una debe mostrar el flujo normal completo; la otra debe mostrar únicamente el mensaje de "no se pudo obtener el lock" y terminar sin ninguna otra línea.
+8. `CP13_EXTENDER_LOCK=false`.
+
+### Cambios
+- `codigo/script_refactorizado.gs`: `procesarCorreosDeTareas()` gana el gancho condicional descrito arriba, entre la obtención del lock y `validarConfiguracion()`.
+- Ningún otro archivo de `codigo/` ni de `pruebas/` cambia en esta entrada.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante este diseño. No se modificó `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-13 en esta entrada — requiere que el usuario ejecute el procedimiento y reporte el resultado.
+
+---
+
 ## [2026-07-26] — CP-09 Aprobado: corrida real completa, instrumentación temporal retirada
 
 ### Contexto
