@@ -48,7 +48,7 @@ Captura revisada por Claude Cowork. Muestra:
 | CP-03 | Una observación, dos tareas | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: tras tres iteraciones de ajuste del fixture/automatizador, `SIMULACION_OK` confirmó 1 observación/2 tareas (`Desarrollo IT/Alto`, `Comercial/Medio`), sin escrituras; `FORMAL_OK` confirmó automáticamente `Log Mensajes`, 2 filas en `Registro Tareas` (mismo `texto_original`), 2 entradas en `Indice Idempotencia`, filas nuevas en `Desarrollo IT` y `Comercial`, y etiqueta `Procesado` en Gmail. | Registro `[AUTO-FASE8]` de la corrida real — `runId cceca797-90ec-4493-bfbc-f3a79ad3e782`, `message_id 19f953e0047d2478` | Aprobado — 24/07/2026 |
 | CP-04 | Tareas para tres hojas | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: tras un ajuste de redacción del fixture, `SIMULACION_OK` confirmó 1 observación/3 tareas (`Desarrollo IT/Alto`, `Finanzas/Alto`, `Comercial/Medio`), sin escrituras; `FORMAL_OK` confirmó automáticamente `Log Mensajes`, 3 filas en `Registro Tareas` (mismo `texto_original`), 3 entradas en `Indice Idempotencia`, filas nuevas en `Desarrollo IT`/`Finanzas`/`Comercial`, y etiqueta `Procesado` en Gmail. | Registro `[AUTO-FASE8]` de la corrida real — `runId 26c92904-c613-4a07-b34b-01a766da3710`, `message_id 19f95bc29ad0717d` | Aprobado — 24/07/2026 |
 | CP-05 | Correo informativo | 23/07/2026; regresión automatizada 24/07/2026 | Ver detalle completo debajo de la tabla. Resumen del cierre formal: `DRY_RUN=true` confirmó `resultado=SIN_TAREAS`/`observaciones=0`, sin escrituras; ejecución formal (`DRY_RUN=false`) confirmó `cantidad_observaciones=0`, `cantidad_tareas=0`, ninguna fila en `Registro Tareas`, una entrada en `Indice Idempotencia` (`estado_final=SIN_TAREAS`), etiqueta `Revisión manual/Sin tareas detectadas` aplicada, mensaje no archivado. Regresión automatizada posterior: `INT-FASE8-01-INFORMATIVO` obtuvo `SIMULACION_OK` y `FORMAL_OK` con un `message_id` nuevo y comprobó automáticamente el mismo resultado. | Cierre formal verificado manualmente por Carlos Rubén Bageta; piloto automatizado `runId dcd52847-c431-4625-8d0e-d3ca82f0f096`, `message_id 19f920a199a6666b` | Aprobado — 23/07/2026 (cierre de INC-FASE8-011; ratificado automáticamente el 24/07/2026) |
-| CP-06 | Promoción de Google | | | | Pendiente |
+| CP-06 | Promoción de Google | 27/07/2026 | Ver detalle completo debajo de la tabla. Resumen: correo sintético autoenviado con encabezado `List-Unsubscribe` (vía script temporal usando el servicio avanzado de Gmail, ya que la ventana de redactar normal no permite fijar ese encabezado). El filtro determinístico lo descartó correctamente (`SIN_TAREAS`/`FINALIZADO`, `SOLO_ETIQUETADO`, sin `modelo`), sin generar fila en `Registro Tareas`, con una entrada en `Indice Idempotencia` y la etiqueta `Revisión manual/Sin tareas detectadas` en Gmail. Aprobó al primer intento real. | Capturas de `Log Mensajes`, `Registro Tareas`, `Indice Idempotencia` y Gmail | Aprobado — 27/07/2026 |
 | CP-07 | Notificación de Apps Script | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: `FORMAL_OK` confirmó automáticamente `Log Mensajes` (`SIN_TAREAS`), ninguna fila nueva en `Registro Tareas`, 1 entrada en `Indice Idempotencia` (`task_id` vacío), sin llamada a OpenAI (sin línea `consultarIAExtractora()`), y etiqueta `Revisión manual/Error de automatización` confirmada visualmente en Gmail. Disparado por asunto, no por remitente. Aprobó al primer intento. | Registro `[AUTO-FASE8]` de la corrida real — `runId 9a2f73ca-684b-48e0-9fb9-fbd5ffb57382`, `message_id 19f96cb239f5ec62` | Aprobado — 24/07/2026 |
 | CP-08 | JSON inválido | 26/07/2026 (instrumentación temporal en `codigo/cliente_openai.gs`) | Ver detalle completo debajo de la tabla. Resumen: `consultarIAExtractora()` devolvió `contenidoCrudo` inválido sin llamar a la API real; `validarRespuestaIA()` lo detectó y el mensaje se cerró `REVISION_MANUAL`/`FINALIZADO`, sin fila en `Registro Tareas`, con etiqueta `Revisión manual/Error de procesamiento`. Aprobó al primer intento. | Registro de ejecución de la corrida real | Aprobado — 26/07/2026 |
 | CP-09 | Error HTTP temporal | 26/07/2026 (instrumentación temporal en `codigo/cliente_openai.gs`) | Ver detalle completo debajo de la tabla. Resumen: HTTP 503 simulado en el intento 1, HTTP 200 con contenido válido en el intento 2 (solo se reemplazó el objeto `response`, el bucle real de reintentos corrió sin modificar); `Log Mensajes.intentos=2`, tarea generada normalmente en el segundo intento. Dos intentos previos se descartaron por una copia desactualizada del archivo (sin `grupo_origen`). | Registro de ejecución de la corrida real | Aprobado — 26/07/2026 |
@@ -71,13 +71,13 @@ Captura revisada por Claude Cowork. Muestra:
 | CP-26 | Caída después de reservar tareas | 26/07/2026 (flujo clásico con instrumentación temporal) | Ver detalle completo debajo de la tabla. Resumen: excepción capturada entre `persistirManifiestoTareas()` y `escribirFilasPorLote()` (tareas `RESERVADA`, no `ESCRITA`); la ejecución inmediatamente siguiente reanudó vía `reanudarDesdeManifiesto()`, escribió las tareas pendientes usando los mismos `task_id` ya reservados, sin volver a consultar la IA. Un primer intento con otro correo se descartó por property no creada (sin relación con el pipeline). | Registro de ejecución de ambas corridas reales — `message_id 19fa0a67abbf10f3` | Aprobado — 26/07/2026 |
 | CP-27 | Modo prueba con ID productivo | 20/07/2026 19:04:22 | Configuración rechazada correctamente: `validarConfiguracion()` detectó `SPREADSHEET_ID_PRUEBA = SPREADSHEET_ID` y abortó; `procesarCorreosDeTareas()` finalizó sin tocar Gmail/Sheets/OpenAI. Configuración restaurada y revalidada como válida después (ver detalle debajo de la tabla). | `pruebas/evidencias/CP-27/01_configuracion_rechazada.png`, `02_funcion_principal_abortada.png`, `04_configuracion_restaurada.png` | Aprobado |
 | CP-28 | Mensajes distintos dentro de un hilo | 21/07/2026: `DRY_RUN=true` ~22:00 y ejecución formal `DRY_RUN=false` ~22:05 | `procesarCorreosDeTareas()` informó `2 mensajes elegibles, procesando 2` en ambas modalidades. `message_id 19f875267239b349` (`Gestión General`) y `19f87541d8034391` (`Comercial`) procesados de forma independiente; el mensaje puente enviado no generó fila. Ver detalle completo debajo de la tabla. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
-| CP-29 | Dato sensible en el cuerpo | | | | Pendiente |
+| CP-29 | Dato sensible en el cuerpo | 27/07/2026 (primera corrida, fallida; segunda corrida, aprobada) | Ver detalle completo debajo de la tabla. Resumen: la primera corrida mostró el DNI enmascarado correctamente pero la tarjeta "4551 8712 3456 7890" completa, sin enmascarar, por un separador NBSP que el patrón no reconocía (INC-FASE8-012). Tras la corrección en `codigo/prompts_ia.gs`, la segunda corrida (mensaje nuevo) confirmó ambos valores enmascarados (`[TARJETA_ENMASCARADA]`, `[DNI_ENMASCARADO]`) antes de llegar a la IA, con el procesamiento continuando con normalidad. Endurecimiento adicional de DNI/CBU aplicado después, por decisión de Carlos Rubén Bageta (ver `auditoria/CHANGELOG.md`). | Registro de ejecución de ambas corridas reales | Aprobado — 27/07/2026 |
 | CP-30 | Log detallado purgado | | | | Diferido a Fase 10 (DEC-004, no condiciona la aprobación de esta fase) |
 | CP-31 | Cuatro combinaciones PERMITIR_ETIQUETADO/PERMITIR_ARCHIVADO | 21/07/2026 | Matriz operativa completa (4/4 combinaciones) verificada, más 6 escenarios de configuración inválida (`PERMITIR_ETIQUETADO`/`PERMITIR_ARCHIVADO` ausentes o inválidos, `ID_ETIQUETA_*` ausente con etiquetado habilitado, `ID_ETIQUETA_*` ausentes con etiquetado deshabilitado). Ver detalle completo debajo de la tabla. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
 | CP-32 | Recuperación con tareas ya ESCRITA | 26/07/2026 (flujo clásico con instrumentación temporal) | Ver detalle completo debajo de la tabla. Resumen: mismo mecanismo que CP-25 (excepción capturada en `aplicarResultadoGmail()` tras `escribirFilasPorLote()`); la ejecución inmediatamente siguiente reanudó vía `reanudarDesdeManifiesto()` sin volver a consultar la IA, sin duplicar tareas. Un primer intento con otro correo se descartó por property no creada (mismo problema de CP-26, sin impacto en el pipeline). | Registro de ejecución de ambas corridas reales — `message_id 19fa0d6ae4f8f334` | Aprobado — 26/07/2026 |
 | CP-33 | Recuperación con tareas en RESERVADA | 26/07/2026 (flujo clásico con instrumentación temporal) | Ver detalle completo debajo de la tabla. Resumen: mismo mecanismo que CP-26 (excepción capturada entre `persistirManifiestoTareas()` y `escribirFilasPorLote()`, tareas `RESERVADA`); la ejecución inmediatamente siguiente escribió las tareas pendientes usando los mismos `task_id` ya reservados, sin volver a consultar la IA. Aprobó al primer intento. | Registro de ejecución de ambas corridas reales — `message_id 19fa0f11793dc340` | Aprobado — 26/07/2026 |
 | CP-34 | Nueva falla de Gmail durante la recuperación (sin recursión) | 26/07/2026 (flujo clásico con instrumentación temporal, 3 corridas) | Ver detalle completo debajo de la tabla. Resumen: mismo gancho de CP-12/CP-25/CP-32, mantenido activo durante dos corridas consecutivas; la segunda falla se capturó por el mismo camino que la primera, con una sola línea de error (sin cadena de reintentos), y una tercera corrida recuperó el mensaje limpiamente. Aprobó al primer intento. Cierra la familia CP-12/25/26/32/33/34. | Registro de ejecución de las tres corridas reales — `message_id 19fa107c79d673bb` | Aprobado — 26/07/2026 |
-| CP-35 | Sin filas duplicadas en Indice Idempotencia tras recuperaciones sucesivas | | Auditoría 20/07/2026 (H-05/H-06): deja de ser prueba obligatoria de aprobación hasta que `finalizarMensaje()` implemente upsert (`documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 9). Sin esa corrección, este caso solo confirmaría "no ocurrió esta vez", no que esté estructuralmente prevenido. | | Bloqueado — requiere corrección de idempotencia |
+| CP-35 | Sin filas duplicadas en Indice Idempotencia tras recuperaciones sucesivas | 27/07/2026 | Ver detalle completo debajo de la tabla. Resumen: corrección H-05/H-06 aplicada (`upsertIndiceIdempotencia()` + reordenamiento en `finalizarMensaje()`), verificada localmente (20 casos) y luego con una corrida real forzando dos invocaciones de `finalizarMensaje()` para el mismo mensaje — una sola fila final por `task_id`, genuinamente actualizada (`estado_final=CP35_SEGUNDA_LLAMADA`), sin duplicados. Aprobó al primer intento real. | Registro de ejecución y capturas de `Indice Idempotencia`/`Log Mensajes` | Aprobado — 27/07/2026 |
 | CP-36 | Aislamiento de mensajes por hilo | 21/07/2026: `DRY_RUN=true` (repetido accidentalmente una vez, mismo resultado) y ejecución formal `DRY_RUN=false` | Ver detalle completo debajo de la tabla. Resumen: `procesarCorreosDeTareas()` informó `1 mensajes elegibles, procesando 1` en ambas modalidades; solo `message_id 19f8698d446c577a` (Mensaje A) fue procesado; el Mensaje B (mismo hilo, sin etiqueta) no generó fila alguna. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
 | CP-37 | Validación estricta de MODO_PRUEBA/DRY_RUN/GMAIL_QUERY_PRUEBA | 21/07/2026 | 7 escenarios verificados: `MODO_PRUEBA=TRUE` rechazado (case-sensitive); `MODO_PRUEBA` ausente rechazado (barrera INC-FASE8-007); `DRY_RUN=TRUE` rechazado; `GMAIL_QUERY_PRUEBA` ausente rechazado; consulta sin `label:Pruebas-Automatizacion` rechazada; `ETIQUETA_PRUEBA` ausente rechazada; restauración final con planilla de prueba y `DRY_RUN=true` válida. | `pruebas/evidencias/CP-27/05.png` a `10.png` (6 capturas) | Aprobado |
 | CP-38 | Recuperación tras archivado previo, sin depender de la búsqueda de Gmail | | Nuevo caso (auditoría 20/07/2026, H-07). Requiere `recuperarMensajesConManifiestoPendiente()`. | | Bloqueado — requiere corrección |
@@ -1482,6 +1482,113 @@ Versión de prompt: v4-INC-FASE8-011-informativo-sin-tareas
 
 **Estado:** CP-05 permanece Aprobado; INC-FASE8-011 permanece cerrada.
 
+## Detalle de CP-29 — Dato sensible en el cuerpo (primera corrida real, bug encontrado — INC-FASE8-012)
+
+```text
+Fecha de ejecución: 27/07/2026
+message_id: no registrado por el usuario en esta corrida; el mensaje ya quedó cerrado/
+procesado y no se reutiliza para la segunda corrida.
+Instrumentación: gancho gateado por cfg.modoPrueba + property CP29_LOGUEAR_CUERPO_ENMASCARADO
+en extraerDatosCorreo() (codigo/script_refactorizado.gs) — registra únicamente el cuerpo ya
+enmascarado; sigue activa, pendiente de la segunda corrida.
+```
+
+### Primera corrida (falla real — dato sensible sin enmascarar)
+
+- Correo sintético exacto de `pruebas/CASOS_DE_PRUEBA.md`: "Por favor actualicen el medio de pago del cliente. Nueva tarjeta: 4551 8712 3456 7890. DNI del titular: 30.123.456."
+- Log: `"CP-29: cuerpo ya enmascarado (instrumentación temporal de prueba): Por favor actualicen el medio de pago del cliente. Nueva tarjeta: 4551 8712 3456 7890. DNI del titular: [DNI_ENMASCARADO]."`
+- El DNI se reemplazó correctamente. **La tarjeta quedó completa, sin enmascarar** — el procesamiento continuó con normalidad a partir de ahí (`consultarIAExtractora()` corrió a continuación en el mismo log, versión de prompt `v4-INC-FASE8-011-informativo-sin-tareas`).
+- Diagnóstico completo en `pruebas/resultados/INCIDENCIAS_FASE_8.md`, INC-FASE8-012: se descartó una versión desactualizada de `prompts_ia.gs` (el usuario confirmó contenido idéntico, carácter por carácter, al del repo — precedente de CP-09 descartado con evidencia directa esta vez). La causa real: `mensaje.getPlainBody()` puede devolver un espacio no separable (NBSP, U+00A0) entre grupos de dígitos cuando el correo pasó por contenido HTML — carácter visualmente indistinguible de un espacio normal — que el patrón de tarjeta vigente (`[ -]?`, solo espacio ASCII o guion) no reconocía como separador. Reproducido localmente de forma exacta insertando un NBSP real en el mismo texto del caso.
+
+### Corrección aplicada (antes de la segunda corrida)
+
+`codigo/prompts_ia.gs`, `enmascararDatosSensibles()`: patrón de tarjeta cambiado de `/\b(?:\d[ -]?){13,16}\b/g` a `/\b(?:\d[\s-]?){13,16}\b/g` (`\s` cubre cualquier separador Unicode de espacio en blanco, incluido NBSP). Verificado localmente con 7 casos a través de la cadena real completa (`extraerContenidoNuevo` → `normalizarCuerpo` → `enmascararDatosSensibles`): el texto exacto de CP-29 con espacio ASCII, el mismo con NBSP reproduciendo el bug original, los tres separadores en NBSP, guiones, sin separador, un control negativo (teléfono de 6 dígitos, no debe enmascararse) y un control de que el patrón de CBU no cambió — los 7 pasan.
+
+**Conclusión:** CP-29 **no pasa** en esta primera corrida — dato sensible expuesto. La causa ya está corregida en el repo; falta una segunda corrida real (mensaje nuevo, `message_id` distinto) para confirmar antes de aprobar.
+
+**Estado (veredicto parcial):** Pendiente — corrección aplicada, segunda corrida real pendiente (ver INC-FASE8-012).
+
+### Segunda corrida (con la corrección de INC-FASE8-012 aplicada)
+
+Mismo correo sintético, mensaje nuevo (el primer intento ya había quedado cerrado/procesado). Log recibido:
+
+```text
+procesarCorreosDeTareas(): 1 mensajes elegibles, procesando 1.
+CP-29: cuerpo ya enmascarado (instrumentación temporal de prueba): Por favor actualicen el medio de pago del cliente. Nueva tarjeta: [TARJETA_ENMASCARADA]. DNI del titular: [DNI_ENMASCARADO].
+consultarIAExtractora(): usando prompt versión v4-INC-FASE8-011-informativo-sin-tareas
+```
+
+- Ambos valores quedaron enmascarados correctamente antes de llegar a la IA extractora.
+- El procesamiento continuó con normalidad hasta completar la ejecución, sin errores.
+
+**Conclusión:** CP-29 PASA. Confirma, en producción real, que la corrección de INC-FASE8-012 (tolerancia a NBSP en el patrón de tarjeta) resuelve el caso original sin reintroducir el problema. Instrumentación temporal retirada de `codigo/script_refactorizado.gs` (`extraerDatosCorreo()`).
+
+### Endurecimiento adicional de DNI/CBU (decisión post-aprobación, 27/07/2026)
+
+Por decisión de Carlos Rubén Bageta, se aprovechó el hallazgo de INC-FASE8-012 para endurecer también los patrones de DNI y CBU (la misma clase de fragilidad frente a separadores no anticipados), en vez de dejarlo solo como riesgo residual documentado. La verificación local previa al cambio encontró un bug de interacción real: el patrón de tarjeta, al ser un rango greedy (13-16 dígitos), le ganaba un prefijo a cualquier CBU de 22 dígitos agrupado con espacios/guiones si corría antes que el patrón de CBU. Corregido reordenando los reemplazos por especificidad decreciente (CBU → tarjeta → DNI). Verificado localmente con 15 casos contra el código real del archivo (incluida la regresión exacta de CP-29, el caso NBSP original, los nuevos casos de DNI/CBU con espacios/guiones/NBSP, un caso combinado con los tres patrones y separadores mixtos, y controles negativos) — los 15 pasan. Detalle completo en `auditoria/CHANGELOG.md`.
+
+**Riesgo residual documentado, no corregido:** la misma verificación expuso un falso positivo preexistente desde la Fase 4 (no introducido por esta corrección): una secuencia larga de números cortos separados por espacios (ej. una lista numerada extensa) puede coincidir falsamente con el patrón de tarjeta o de CBU. Es un falso positivo de sobre-enmascarado (degrada la calidad de la extracción de la IA en ese caso puntual), no una fuga de datos — de severidad baja, muy distinta de la fuga real que motivó INC-FASE8-012. Resolverlo bien requiere un heurístico más estricto (rediseño), no un ajuste simple. **Decisión (27/07/2026, Carlos Rubén Bageta): aceptado como riesgo residual conocido, no se corrige por ahora.**
+
+**Estado (veredicto final):** Aprobado — 27/07/2026 (`PASA`).
+
+## Detalle de CP-06 — Promoción de Google (reutiliza FC-04, técnica nueva de envío)
+
+```text
+Fecha de ejecución: 27/07/2026
+message_id: 19fa1c3a956fb554 (nuevo, autoenviado)
+Técnica: script temporal de una sola vez, servicio avanzado de Gmail
+(Gmail.Users.Messages.send() con MIME crudo en base64url), para fijar un
+encabezado List-Unsubscribe que la ventana de redactar normal de Gmail no
+permite establecer. Sin instrumentación en codigo/ — el pipeline productivo
+corrió sin ninguna modificación.
+```
+
+**Por qué esta técnica y no un remitente de Google:** el enunciado original de CP-06 ("Promoción de Google") y la referencia a FC-09 (`drive-shares-noreply@google.com`) sugerían necesitar un remitente `google.com` falsificado, algo que Gmail no permite producir desde una cuenta normal. Revisando `codigo/filtros_correo.gs` se confirmó que **FC-04 es una alternativa igual de válida** (el propio enunciado de CP-06 dice "reutiliza FC-04 o FC-09") y su regla solo depende del encabezado `List-Unsubscribe`, sin ninguna condición sobre el remitente. Ese encabezado tampoco es producible desde la ventana de redactar normal, pero sí mediante el servicio avanzado de Gmail (ya habilitado en este proyecto desde DEC-005), enviando un mensaje MIME crudo con el encabezado incluido directamente.
+
+**Correo sintético enviado:**
+```text
+Asunto: [PRUEBA-AUTOMATIZACION] Descubri las novedades de este mes
+Cuerpo: Hola! Te compartimos las novedades y promociones de este mes. Sin accion requerida.
+Encabezado adicional: List-Unsubscribe: <mailto:baja@ejemplo-prueba.com>
+```
+
+### Resultado
+
+- `Log Mensajes`: `estado=SIN_TAREAS`, `etapa=FINALIZADO`, `cantidad_observaciones=0`, `cantidad_tareas=0`, `resultado_gmail=SOLO_ETIQUETADO`, `intentos=0`, sin `codigo_http` ni `modelo` (cero llamadas a OpenAI). Columna `error`: "Encabezado List-Unsubscribe presente (boletín, promoción o comunicación masiva)." — coincide textualmente con el mensaje de `codigo/filtros_correo.gs`.
+- `Registro Tareas`: ninguna fila para este `message_id`.
+- `Indice Idempotencia`: exactamente una entrada, `task_id` vacío, `estado_final=SIN_TAREAS`.
+- Gmail: etiquetas `Recibidos` y `Pruebas-Automatizacion` conservadas, `Revisión manual/Sin tareas detectadas` aplicada, **sin** `Procesado`.
+
+**Nota sobre el primer log recibido:** la primera ejecución mostró una línea `"CP-29: cuerpo ya enmascarado..."` — instrumentación temporal ya retirada del repo (`codigo/script_refactorizado.gs`) tras la aprobación de CP-29. Confirmó que el proyecto de prueba tenía una copia desactualizada de ese archivo (mismo patrón que CP-09). No afectó este resultado: esa línea es solo un log de depuración leftover, sin relación con la lógica de extracción ni con el filtro determinístico que decide este caso. Corregido volviendo a copiar el archivo actual al proyecto de prueba.
+
+**Conclusión:** CP-06 PASA. Confirma, en producción real, que el filtro determinístico basado en `List-Unsubscribe` (RF de la Fase 6) descarta correctamente un correo promocional antes de llegar a la IA, sin generar ninguna tarea ni escritura indebida — mismo comportamiento ya confirmado por CP-07 y CP-16 para sus respectivas reglas.
+
+**Estado (veredicto final):** Aprobado — 27/07/2026 (`PASA`).
+
+## Detalle de CP-35 — Sin filas duplicadas en Indice Idempotencia tras recuperaciones sucesivas (H-05/H-06)
+
+```text
+Fecha de ejecución: 27/07/2026
+message_id: 19fa1dc793d189d7 (nuevo)
+task_id: ALI-373E343149F446E3-001
+Instrumentación: gancho gateado por cfg.modoPrueba + property CP35_DUPLICAR_FINALIZACION
+en finalizarMensaje() (codigo/script_refactorizado.gs) — ya retirado del código.
+```
+
+**Antecedente:** este caso estuvo bloqueado desde la auditoría del 20/07/2026 (H-05/H-06, `documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 9) porque `finalizarMensaje()` siempre agregaba una fila nueva a `Indice Idempotencia` sin comprobar duplicados por `message_id`+`task_id`, y porque `Log Mensajes` se marcaba `FINALIZADO` antes de confirmar esa escritura. Corrección aplicada en esta sesión: nueva función `upsertIndiceIdempotencia()` (indexada por la clave compuesta, análoga a `obtenerIdsYaProcesados()`) y `finalizarMensaje()` reordenado para confirmar el upsert antes de `actualizarLogMensajes()`.
+
+### Verificación local previa a la corrida real
+20 verificaciones con mocks de Sheets/`PropertiesService` sobre el código real extraído del archivo: inserción nueva sin tareas, inserción nueva con tareas, doble invocación mismo mensaje/mismo estado (no duplica), doble invocación mismo mensaje/distinto estado (el valor final refleja la segunda llamada), lote mixto con claves nuevas y existentes en la misma llamada, orden de llamadas (el upsert corre antes que `actualizarLogMensajes()`), y comportamiento de la instrumentación temporal (exactamente una llamada extra, sin recursión sin límite, e inerte fuera de `cfg.modoPrueba`) — las 20 pasan.
+
+### Corrida real
+- Correo sintético normal (genera 1 tarea). Log: `"procesarCorreosDeTareas(): 1 mensajes elegibles, procesando 1."` → `consultarIAExtractora()` → `"CP-35: forzando una segunda invocación real de finalizarMensaje()..."` — **exactamente una vez**, confirmando que el guard contra recursión funcionó (no hay una segunda línea, ni una cadena).
+- `Indice Idempotencia`: **una sola fila** para `message_id 19fa1dc793d189d7` + `task_id ALI-373E343149F446E3-001`, con `estado_final = CP35_SEGUNDA_LLAMADA` — el valor de la *segunda* invocación, no el de la primera (`PROCESADO`), confirmando que fue una actualización real y no un no-op ni una fila fantasma.
+- `Log Mensajes`: la misma fila (no duplicada), `estado = CP35_SEGUNDA_LLAMADA`, `etapa = FINALIZADO`, `cantidad_observaciones=1`, `cantidad_tareas=1`, `resultado_gmail=SOLO_ETIQUETADO`.
+
+**Conclusión:** CP-35 PASA. Confirma, en producción real, que dos invocaciones de `finalizarMensaje()` para el mismo mensaje/tareas producen una sola fila final en `Indice Idempotencia` (actualizada, no duplicada) y que `Log Mensajes` no se marca `FINALIZADO` como una operación separada e inconsistente — cierra H-05 y H-06.
+
+**Estado (veredicto final):** Aprobado — 27/07/2026 (`PASA`). **Con esto queda cerrado el último punto que condicionaba la aprobación de la Fase 8.**
+
 ## Resumen final (completar al terminar)
 
 ```text
@@ -1490,9 +1597,9 @@ Total de casos que condicionan la aprobación de esta fase: 36 (CP-01 a CP-29, C
   [Corregido 21/07/2026: el conteo anterior indicaba 37, error aritmético — 29 (CP-01 a CP-29) + 7 (CP-31 a CP-37) = 36. No cambia el alcance ni el estado de ningún caso.]
   CP-10, CP-36, CP-37 incorporados desde Lote 1 (DEC-009, 21/07/2026)
 Diferido a Fase 10 (no condiciona esta fase): 1 (CP-30, DEC-004)
-Bloqueado que todavía condiciona la Fase 8: 1 (CP-35 — ver nota de auditoría abajo)
+Bloqueado que todavía condiciona la Fase 8: 0 (CP-35 pasó a Aprobado el 27/07/2026, ver nota de auditoría abajo — ya no queda ningún caso Bloqueado que condicione esta fase)
 Bloqueados pendientes de Lotes 2/3 (no condicionan esta fase): 2 (CP-38, CP-39)
-Aprobados: 33 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-07, CP-08, CP-09, CP-10, CP-11, CP-12, CP-13, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-25, CP-26, CP-27, CP-28, CP-31, CP-32, CP-33, CP-34, CP-36, CP-37)
+Aprobados: 36 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-06, CP-07, CP-08, CP-09, CP-10, CP-11, CP-12, CP-13, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-25, CP-26, CP-27, CP-28, CP-29, CP-31, CP-32, CP-33, CP-34, CP-35, CP-36, CP-37)
 Rechazados: 0
   CP-19 pasó de Rechazado (21/07/2026, INC-FASE8-008) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución fallida original se conserva íntegro en el detalle de CP-19.
   CP-23 pasó de Rechazado (22/07/2026, INC-FASE8-009) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución vulnerable original se conserva íntegro en el detalle de CP-23.
@@ -1515,7 +1622,11 @@ Rechazados: 0
   CP-08 pasó de Pendiente a Aprobado (26/07/2026, instrumentación temporal en codigo/cliente_openai.gs -- distinto de la familia de recuperación: consultarIAExtractora() devolvió contenidoCrudo inválido sin llamar a la API real de OpenAI. validarRespuestaIA() lo detecto y el mensaje se cerro REVISION_MANUAL/FINALIZADO de inmediato (sin manifiesto), sin fila en Registro Tareas, con etiqueta Revisión manual/Error de procesamiento. Aprobo al primer intento). El registro de la corrida se conserva integro en el detalle de CP-08.
   CP-09 pasó de Pendiente a Aprobado (26/07/2026, instrumentación temporal en codigo/cliente_openai.gs, opción b -- HTTP 503 simulado en el intento 1 y HTTP 200 con contenido válido en el intento 2, preservando intacto el bucle real de reintentos (solo se reemplazó el objeto response de UrlFetchApp.fetch()). Log Mensajes.intentos=2, tarea generada normalmente en el segundo intento, sin duplicados. Dos intentos previos se descartaron por una copia desactualizada del archivo en el proyecto de prueba, sin relación con el pipeline). El registro de la corrida se conserva integro en el detalle de CP-09.
   CP-13 pasó de Pendiente a Aprobado (26/07/2026, instrumentación temporal mínima -- un delay artificial de 15s en procesarCorreosDeTareas() para hacer confiable el timing de dos ejecuciones manuales casi simultáneas. Una pestaña obtuvo el lock y proceso normalmente; la otra registro unicamente el rechazo por lock y termino sin tocar Gmail/Sheets. Aprobo al primer intento. Hallazgo colateral sin impacto en esta aprobacion: se detecto un archivo Código.gs sin usar en el proyecto de prueba con una funcion de mismo nombre, generando una colision de espacio de nombres -- el usuario decidio eliminarlo). El registro de ambas pestañas se conserva integro en el detalle de CP-13.
-Pendientes (ejecutables con estado Pendiente, no corridos aún): 2
+  CP-29 pasó de Pendiente a Aprobado (27/07/2026, instrumentación temporal en codigo/script_refactorizado.gs -- primera corrida real reveló un dato sensible sin enmascarar (tarjeta), causa raíz en un separador NBSP no tolerado por el patrón (INC-FASE8-012); corregido en codigo/prompts_ia.gs y confirmado en una segunda corrida real con mensaje nuevo, ambos valores enmascarados correctamente. Endurecimiento adicional de DNI/CBU aplicado después por decisión de Carlos Rubén Bageta, con un bug de interacción encontrado y corregido en la propia verificación local -- ver auditoria/CHANGELOG.md). El registro de ambas corridas se conserva íntegro en el detalle de CP-29.
+  CP-06 pasó de Pendiente a Aprobado (27/07/2026, message_id 19fa1c3a956fb554, sin instrumentación de código -- correo sintético autoenviado con encabezado List-Unsubscribe mediante un script temporal usando el servicio avanzado de Gmail, tras confirmar que la regla que dispara RevisionSinTareas para FC-04 depende solo de ese encabezado y no del remitente como se creía originalmente. El filtro determinístico lo descartó correctamente antes de llegar a la IA, sin generar tarea ni escritura indebida. Aprobó al primer intento real). El registro de la corrida se conserva íntegro en el detalle de CP-06.
+Pendientes (ejecutables con estado Pendiente, no corridos aún): 0
+  [Corregido 27/07/2026: CP-29 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 2 a 1.]
+  [Corregido 27/07/2026: CP-06 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 1 a 0. No quedan casos Pendientes ejecutables sin corregir.]
   [Corregido 22/07/2026: esta lista omitía a CP-27, ya aprobado desde el 20/07/2026 (CP-27 — Modo prueba con ID productivo); no cambia el alcance ni el estado de ningún caso.]
   [Corregido 23/07/2026 (semántica): CP-35 estaba contabilizado dentro de "Pendientes"; su estado individual es Bloqueado (ver nota de auditoría abajo), no Pendiente. Se lo separa como bloqueado que todavía condiciona la Fase 8. Pendientes pasa de 20 a 19; no cambia el estado individual de ningún caso.]
   [Corregido 24/07/2026: CP-03 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 19 a 18.]
@@ -1548,14 +1659,25 @@ Pendientes (ejecutables con estado Pendiente, no corridos aún): 2
   CP-08 fue ejecutado y aprobado el 26/07/2026
   CP-09 fue ejecutado y aprobado el 26/07/2026
   CP-13 fue ejecutado y aprobado el 26/07/2026
-Casos sin aprobación que todavía condicionan la Fase 8: 3 (2 Pendientes + CP-35 Bloqueado)
-Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 6
+  CP-29 fue ejecutado y aprobado el 27/07/2026 (segunda corrida real, tras corrección de INC-FASE8-012)
+  CP-06 fue ejecutado y aprobado el 27/07/2026
+  CP-35 pasó de Bloqueado a Aprobado el 27/07/2026, tras aplicar y verificar en producción real la corrección de H-05/H-06 (ver detalle) — cierra el último punto que condicionaba la Fase 8
+Casos sin aprobación que todavía condicionan la Fase 8: 0. **Todos los 36 casos que condicionan la aprobación de la Fase 8 (CP-01 a CP-29, CP-31 a CP-37) están Aprobados. La Fase 8 puede darse por completa según el criterio de DEC-004/DEC-009.**
+Sin aprobación total (CP-38 + CP-39 + CP-30, ninguno condiciona esta fase): 3
 
-Nota (auditoría 20/07/2026): CP-35 pasó a "bloqueado" — no puede considerarse
+Nota (auditoría 20/07/2026): CP-35 pasó a "bloqueado" — no podía considerarse
 una verificación válida del criterio "no existen duplicados" hasta que
-finalizarMensaje() implemente upsert (ver documentacion/RECUPERACION_INTERRUPCIONES.md,
-sección 9). Se recomienda no cerrar la Fase 8 sin resolver este punto, aunque
-la decisión final le corresponde a Carlos Rubén Bageta.
+finalizarMensaje() implementara upsert (ver documentacion/RECUPERACION_INTERRUPCIONES.md,
+sección 9). Se recomendó no cerrar la Fase 8 sin resolver este punto.
+
+**Resuelto (27/07/2026):** `finalizarMensaje()` ahora hace upsert por la clave
+compuesta `message_id+task_id` (nueva función `upsertIndiceIdempotencia()`) y
+confirma esa escritura antes de marcar `Log Mensajes` como `FINALIZADO` (cierra
+H-05 y H-06). Verificado localmente (20 casos con mocks de Sheets) y luego en
+producción real forzando una doble invocación de `finalizarMensaje()` para el
+mismo mensaje — una sola fila final por `task_id`, genuinamente actualizada,
+sin duplicados. CP-35 pasa de Bloqueado a Aprobado. Con esto, todos los casos
+que condicionan la Fase 8 están Aprobados.
 CP-38 y CP-39 permanecen bloqueados hasta la aprobación de los Lotes 2/3.
 
 Nota (Lote 1, 21/07/2026): volver a copiar al proyecto de Apps Script de prueba:

@@ -1,5 +1,204 @@
 # Changelog
 
+## [2026-07-27] — CP-35 Aprobado: corrida real completa, instrumentación temporal retirada — cierra la Fase 8
+
+### Corrida real
+Correo sintético normal (genera 1 tarea), con `CP35_DUPLICAR_FINALIZACION=true`. Log recibido:
+```text
+procesarCorreosDeTareas(): 1 mensajes elegibles, procesando 1.
+consultarIAExtractora(): usando prompt versión v4-INC-FASE8-011-informativo-sin-tareas
+CP-35: forzando una segunda invocación real de finalizarMensaje() (instrumentación temporal de prueba).
+```
+La línea de instrumentación apareció **exactamente una vez** — confirma que el guard contra recursión (`estadoFinal !== 'CP35_SEGUNDA_LLAMADA'`) funcionó también en producción real, no solo en los mocks locales.
+
+- `Indice Idempotencia` (`message_id 19fa1dc793d189d7`, `task_id ALI-373E343149F446E3-001`): **una sola fila**, `estado_final = CP35_SEGUNDA_LLAMADA` — el valor de la *segunda* invocación, no el de la primera (`PROCESADO`), confirmando una actualización real (no un no-op, no una fila duplicada).
+- `Log Mensajes`: la misma fila (no duplicada), `estado = CP35_SEGUNDA_LLAMADA`, `etapa = FINALIZADO`.
+
+**Conclusión:** CP-35 PASA. Confirma en producción real que dos invocaciones de `finalizarMensaje()` para el mismo mensaje/tareas producen una sola fila final en `Indice Idempotencia` (H-05) y que el orden transaccional protege la barrera real antes que la observabilidad (H-06).
+
+### Cambios
+- `codigo/script_refactorizado.gs`: retirado el bloque "INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-35" de `finalizarMensaje()`. La corrección de H-05/H-06 en sí (`upsertIndiceIdempotencia()` + reordenamiento) queda permanente, no era instrumentación temporal.
+- `pruebas/CASOS_DE_PRUEBA.md`: CP-35 → Aprobado.
+- `pruebas/resultados/RESULTADOS_FASE_8.md`: tabla resumen, nuevo "Detalle de CP-35", y resumen final actualizados (Aprobados 35 → 36; Bloqueado que condiciona la fase: 1 → 0).
+- `documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 9: marcada como aplicada **y verificada** (no solo aplicada en código).
+
+### Estado — Fase 8 completa
+**Los 36 casos que condicionan la aprobación de la Fase 8 (CP-01 a CP-29, CP-31 a CP-37) están todos Aprobados.** CP-30 permanece Diferido a la Fase 10 (DEC-004, no condiciona). CP-38/CP-39 permanecen Bloqueados por los Lotes 2/3 (fuera del conteo de 36, no condicionan esta fase). No queda ningún caso Pendiente ni Bloqueado que condicione el cierre de la Fase 8.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante el registro de esta entrada (los datos provienen del log y las capturas ya reportados por Carlos Rubén Bageta).
+
+---
+
+## [2026-07-27] — Instrumentación temporal de prueba para CP-35: doble invocación forzada de finalizarMensaje()
+
+### Contexto
+Con la corrección de H-05/H-06 ya aplicada y verificada localmente (entrada siguiente), falta la regresión real que exige el propio diseño (`documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 9): "forzando dos invocaciones de `finalizarMensaje()` para el mismo mensaje y confirmando una sola fila final por `task_id` (actualizada, no duplicada)". El diseño actual del pipeline hace esto genuinamente improbable en un flujo real (LockService, chequeo de manifiesto, etc.), por lo que se necesita instrumentación temporal para forzarlo.
+
+### Instrumentación temporal (`codigo/script_refactorizado.gs`, `finalizarMensaje()`)
+Gancho al final de la función, después del upsert y de `actualizarLogMensajes()`:
+
+- Si `cfg.modoPrueba === true` y la property `CP35_DUPLICAR_FINALIZACION === 'true'`, y el `estadoFinal` de la invocación actual **no** es ya el valor centinela, se vuelve a invocar `finalizarMensaje()` con los mismos `mensajeDescriptor`/`tareas` pero `estadoFinal = 'CP35_SEGUNDA_LLAMADA'`.
+- El chequeo sobre `estadoFinal` es lo que impide una segunda re-entrada (la llamada anidada recibe exactamente ese valor, así que su propio chequeo no vuelve a dispararse) — verificado localmente que no hay recursión sin límite.
+- Efecto esperado: dos invocaciones reales de `finalizarMensaje()` para el mismo mensaje/tareas, la segunda con un `estadoFinal` distinguible, para poder confirmar en la planilla real tanto la ausencia de duplicados (H-05) como que el valor final corresponde genuinamente a la segunda llamada (no es un no-op).
+
+### Verificación local antes de la corrida real
+Con mocks de `PropertiesService`/`Logger`/hoja de Sheets: con `cfg.modoPrueba=true` y la property en `'true'`, se confirmó exactamente una fila para `message_id+task_id` (sin duplicar) con `estado_final='CP35_SEGUNDA_LLAMADA'`, y `actualizarLogMensajes()` invocado exactamente 2 veces (sin recursión adicional). Con `cfg.modoPrueba=false`, se confirmó que la instrumentación no se dispara en absoluto (1 sola invocación, estado final real sin alterar) — barrera de producción intacta.
+
+### Procedimiento (una sola corrida)
+1. Copiar `codigo/script_refactorizado.gs` actualizado (con la corrección de H-05/H-06 y esta instrumentación) al proyecto de prueba.
+2. `CP35_DUPLICAR_FINALIZACION=true` en Script Properties.
+3. Procesar cualquier correo sintético operativo normal que genere al menos una tarea (no requiere ningún correo especial para este caso).
+4. Ejecutar `procesarCorreosDeTareas()` — se espera ver en el log la línea `"CP-35: forzando una segunda invocación real..."` una sola vez.
+5. Confirmar en `Indice Idempotencia`: **una sola fila** por cada `task_id` de ese mensaje (no duplicada), con `estado_final = CP35_SEGUNDA_LLAMADA`.
+6. Confirmar en `Log Mensajes`: la fila de ese mensaje también quedó con `estado = CP35_SEGUNDA_LLAMADA` (mismo mecanismo, sin fila duplicada — `actualizarLogMensajes()` ya actualiza en el lugar).
+7. `CP35_DUPLICAR_FINALIZACION=false`.
+
+### Cambios
+- `codigo/script_refactorizado.gs`: `finalizarMensaje()` gana el gancho condicional descrito arriba.
+- Ningún otro archivo de `codigo/` cambia en esta entrada.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante este diseño. No se aprueba CP-35 en esta entrada — requiere que el usuario ejecute el procedimiento y reporte el resultado.
+
+---
+
+## [2026-07-27] — Corrección de H-05/H-06: upsert y reordenamiento en finalizarMensaje() (aplicando la propuesta de RECUPERACION_INTERRUPCIONES.md, sección 9)
+
+### Contexto
+Con CP-06 aprobado, el único punto que condiciona el cierre de la Fase 8 es CP-35, bloqueado desde la auditoría del 20/07/2026 porque el código no garantizaba estructuralmente la ausencia de duplicados en `Indice Idempotencia` (H-05) ni el orden correcto entre esa escritura y `Log Mensajes` (H-06). El diseño de la corrección ya estaba completamente especificado como propuesta, sin aplicar, en `documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 9. Esta entrada aplica esa propuesta tal cual, sin cambiar su diseño.
+
+### Corrección a aplicar
+`codigo/script_refactorizado.gs`, `finalizarMensaje()` (única función de cierre; los tres puntos de invocación —`finalizarMensajeSinTareas()`, el camino con tareas de `procesarUnMensaje()`, y `gestionarErrorMensaje()`/`ERROR_DEFINITIVO`— pasan por ella sin cambios):
+
+1. **Nueva función `upsertIndiceIdempotencia(filas, cfg)`** (H-05): antes de escribir, lee `Indice Idempotencia` completa y construye un mapa de la clave compuesta `message_id + '|' + task_id` → número de fila real (análogo a `obtenerIdsYaProcesados()`, líneas 530-543, pero indexado por la clave compuesta en vez de solo `message_id`). Para cada fila a escribir: si la clave ya existe, **actualiza** `estado_final`/`fecha` en esa fila exacta (`getRange(filaExistente, 3, 1, 2).setValues(...)`); si no existe, la agrega al lote de filas nuevas, que se insertan todas juntas al final (mismo patrón de una sola escritura por lote que ya usaba el código).
+2. **Reordenamiento** (H-06): `finalizarMensaje()` ahora llama a `upsertIndiceIdempotencia()` **antes** de `actualizarLogMensajes()` (antes era al revés). Justificación ya registrada en la sección 9: `Indice Idempotencia` es la única barrera real contra el reprocesamiento (`obtenerMensajesPendientesDesdeGmail()` excluye por su presencia, nunca por `Log Mensajes`); confirmar esa barrera primero significa que una interrupción a mitad de la función deja protegido lo que importa, y `Log Mensajes` —solo observabilidad— puede quedar levemente rezagado sin consecuencia funcional.
+3. Sin cambios de firma en `finalizarMensaje()` ni en ningún llamador.
+
+### Verificación planeada
+Local primero (mocks de `obtenerHojaTecnica()`/`getRange()`/`setValues()` en Node, sin Apps Script real): inserción nueva sin tareas, inserción nueva con tareas, doble invocación mismo mensaje mismo estado (debe actualizar, no duplicar), doble invocación mismo mensaje distinto estado (el valor final debe reflejar la segunda llamada), lote mixto con algunas claves nuevas y otras ya existentes. Después, instrumentación temporal para forzar una doble invocación real de `finalizarMensaje()` (CP-35), confirmando en la planilla real una sola fila por `task_id`.
+
+### Estado
+Diseño registrado; código y verificación local se aplican a continuación en esta misma sesión. `documentacion/RECUPERACION_INTERRUPCIONES.md` se actualiza para reflejar la propuesta como aplicada una vez verificada localmente.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante el registro de esta entrada.
+
+---
+
+## [2026-07-27] — CP-06 Aprobado: técnica nueva de envío (MIME crudo con List-Unsubscribe), sin instrumentación de código
+
+### Contexto
+CP-06 ("Promoción de Google") quedaba registrado como bloqueado en la práctica: su enunciado y la referencia a FC-09 (`drive-shares-noreply@google.com`, `pruebas/CASOS_CORREOS_NO_OPERATIVOS.md`) sugerían necesitar un remitente `google.com` falsificado, algo que una cuenta de Gmail normal no puede producir (ni la ventana de redactar ni ningún envío estándar permiten fijar un remitente `From:` arbitrario).
+
+### Hallazgo antes de escribir ningún código
+El propio enunciado de CP-06 ofrece una alternativa: "Reutiliza FC-04 o FC-09". Revisando `codigo/filtros_correo.gs` se confirmó que la regla de FC-04 depende **exclusivamente** del encabezado `List-Unsubscribe` (`datosCorreo.encabezados.listUnsubscribe`), sin ninguna condición sobre el remitente. Ese encabezado tampoco es fijable desde la ventana de redactar normal de Gmail, pero sí mediante el servicio avanzado de Gmail (`Gmail.Users.Messages.send()`, ya habilitado en el proyecto de prueba desde DEC-005), enviando un mensaje MIME crudo (base64url) con el encabezado incluido directamente en el origen del mensaje.
+
+### Técnica utilizada (sin cambios en `codigo/`)
+Script temporal de una sola vez, provisto en el chat (no versionado como parte de la Fase 8, análogo a cómo cada CP anterior compuso su correo sintético manualmente): construye un mensaje MIME crudo con `To`, `Subject`, `Content-Type`, y `List-Unsubscribe: <mailto:baja@ejemplo-prueba.com>`, lo codifica en base64url (`Utilities.base64EncodeWebSafe`) y lo envía con `Gmail.Users.Messages.send({ raw: ... }, 'me')`. Ningún archivo de `codigo/` se modificó — el pipeline productivo corrió sin instrumentación alguna.
+
+### Corrida real
+- `message_id 19fa1c3a956fb554`, correo autoenviado con asunto `[PRUEBA-AUTOMATIZACION] Descubri las novedades de este mes`.
+- `Log Mensajes`: `estado=SIN_TAREAS`, `etapa=FINALIZADO`, 0 observaciones, 0 tareas, `resultado_gmail=SOLO_ETIQUETADO`, `intentos=0`, sin `codigo_http` ni `modelo` (cero llamadas a OpenAI); columna `error`: "Encabezado List-Unsubscribe presente (boletín, promoción o comunicación masiva)." — coincide textualmente con `codigo/filtros_correo.gs`.
+- `Registro Tareas`: sin fila nueva. `Indice Idempotencia`: una entrada, `task_id` vacío, `estado_final=SIN_TAREAS`.
+- Gmail: etiqueta `Revisión manual/Sin tareas detectadas` aplicada, sin `Procesado`.
+- Aprobó al primer intento real.
+
+**Nota sin impacto en el resultado:** la primera ejecución mostró una línea de instrumentación de CP-29 ya retirada del repo — copia desactualizada de `codigo/script_refactorizado.gs` en el proyecto de prueba (mismo patrón que CP-09), corregida volviendo a copiar el archivo actual. No afectó la lógica de extracción ni la del filtro determinístico que decide este caso.
+
+### Cambios
+- `pruebas/CASOS_DE_PRUEBA.md`: CP-06 → Aprobado.
+- `pruebas/resultados/RESULTADOS_FASE_8.md`: tabla resumen, nuevo "Detalle de CP-06", y resumen final actualizados (Aprobados 34 → 35, Pendientes 1 → 0).
+
+### Estado
+**Con CP-06 aprobado, ya no queda ningún caso `Pendiente` sin ejecutar en la Fase 8.** El único punto que todavía condiciona el cierre de la fase es **CP-35** (bloqueado, requiere el upsert de `finalizarMensaje()` propuesto en `documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 9). CP-30 permanece Diferido a la Fase 10 (no condiciona); CP-38/CP-39 permanecen Bloqueados por los Lotes 2/3 (fuera del conteo de 36 casos que condicionan esta fase).
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante el registro de esta entrada (los datos provienen de las capturas ya reportadas por Carlos Rubén Bageta).
+
+---
+
+## [2026-07-27] — Endurecimiento adicional de DNI/CBU en enmascararDatosSensibles() (decisión post-CP-29)
+
+### Contexto
+Tras la segunda corrida real aprobada de CP-29 (ver entrada siguiente), decisión de Carlos Rubén Bageta: aprovechar que INC-FASE8-012 ya identificó una clase de fragilidad (separadores no anticipados en patrones de datos sensibles) para endurecer también DNI y CBU ahora, en vez de dejarlo como riesgo residual sin corregir. Motivo: el patrón de CBU vigente (`\b\d{22}\b`, sin ningún separador tolerado) es, en la práctica, más frágil que el de tarjeta ya corregido — un CBU real casi siempre se escribe o copia en grupos separados por espacios.
+
+### Verificación local ANTES de aplicar el cambio (crítica en este caso — encontró un bug de interacción)
+Endurecer ingenuamente DNI y CBU (agregando tolerancia a `\s`/`-`, igual que se hizo con tarjeta) y probarlo localmente reveló un problema real de interacción: con el orden de reemplazos vigente (tarjeta, DNI, CBU, alias, password), el patrón de tarjeta (`(?:\d[\s-]?){13,16}`, ya endurecido por INC-FASE8-012) corre ANTES que el de CBU y, al ser un rango greedy, le "gana" un prefijo de 13-16 dígitos a cualquier CBU de 22 dígitos agrupado con espacios o guiones — dejando el resto del CBU sin enmascarar (ej.: "0000 0031 0000 0000 0000 00" → `[TARJETA_ENMASCARADA]0000 00`, en vez de `[CBU_ENMASCARADO]`).
+
+**Corrección de diseño:** reordenar los reemplazos por longitud/especificidad decreciente — CBU (22 dígitos, el más largo) ahora corre PRIMERO, antes que tarjeta (13-16), que a su vez sigue corriendo antes que DNI (7-8, el más corto, sin cambios en su posición relativa). Así cada patrón reclama sus dígitos antes de que uno más corto/genérico pueda coincidir con un sub-tramo suyo.
+
+### Corrección aplicada
+`codigo/prompts_ia.gs`, `enmascararDatosSensibles()`:
+- **Orden de reemplazos:** CBU → tarjeta → DNI → alias → password (antes: tarjeta → DNI → CBU → alias → password).
+- **CBU:** `/\b\d{22}\b/g` → `/\b(?:\d[\s-]?){22}\b/g` (tolera espacio/guion opcional entre cada dígito, mismo mecanismo que tarjeta).
+- **DNI:** `/\b\d{1,2}\.?\d{3}\.?\d{3}\b/g` → `/\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\b/g` (el separador ahora acepta punto O cualquier espacio en blanco, incluido NBSP; antes solo punto).
+
+Verificado localmente (11 casos): separadores existentes sin romperse (punto, sin separador, guiones), los nuevos casos que motivaron el cambio (DNI con espacios/NBSP, CBU agrupado con espacios/guiones), un caso combinado con los tres patrones y separadores mixtos en el mismo texto, la regresión exacta del cuerpo de CP-29, y controles negativos (teléfono corto, alias bancario) — los 10 relevantes pasan.
+
+### Riesgo residual documentado (NO corregido en esta entrada — requiere rediseño, no un ajuste simple)
+La misma verificación local expuso un falso positivo **preexistente desde la Fase 4** (no introducido por esta corrección ni por INC-FASE8-012): una secuencia larga de números cortos separados por espacios (por ejemplo, una lista numerada "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22") puede alcanzar igualmente 13-16 (o incluso 22) "dígito + separador opcional" consecutivos y coincidir con el patrón de tarjeta o de CBU, aunque no sea un dato sensible. Es un falso positivo (sobre-enmascarado), no una fuga de datos: el texto se reemplaza por una etiqueta en vez de quedar expuesto, por lo que es de severidad baja/cosmética (puede degradar la calidad de la extracción de la IA en un correo con una lista larga de números) — muy distinto de la fuga real que motivó INC-FASE8-012. Resolverlo bien requeriría un heurístico más estricto (por ejemplo, exigir grupos de longitud uniforme como los de una tarjeta real) — un rediseño, no un cambio de una línea. **Decisión (27/07/2026, Carlos Rubén Bageta): aceptado como riesgo residual conocido, no se corrige por ahora.**
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta corrección. Ningún dato real participó de la verificación local.
+
+---
+
+## [2026-07-27] — CP-29 Aprobado: corrida real completa, instrumentación temporal retirada
+
+### Segunda corrida real (con la corrección de INC-FASE8-012 aplicada)
+Mismo correo sintético de `pruebas/CASOS_DE_PRUEBA.md`, con un mensaje nuevo (el primer intento ya había quedado cerrado/procesado). Log recibido:
+```text
+procesarCorreosDeTareas(): 1 mensajes elegibles, procesando 1.
+CP-29: cuerpo ya enmascarado (instrumentación temporal de prueba): Por favor actualicen el medio de pago del cliente. Nueva tarjeta: [TARJETA_ENMASCARADA]. DNI del titular: [DNI_ENMASCARADO].
+consultarIAExtractora(): usando prompt versión v4-INC-FASE8-011-informativo-sin-tareas
+```
+Ambos valores quedaron enmascarados correctamente antes de llegar a la IA. El procesamiento continuó con normalidad hasta completar la ejecución.
+
+**Conclusión:** CP-29 PASA. Confirma, en producción real, que la corrección de INC-FASE8-012 (tolerancia a NBSP en el patrón de tarjeta) resuelve el caso original sin reintroducir el problema.
+
+### Cambios
+- `codigo/script_refactorizado.gs`: retirado el bloque "INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-29" de `extraerDatosCorreo()`.
+- `pruebas/CASOS_DE_PRUEBA.md`: CP-29 → Aprobado.
+- `pruebas/resultados/RESULTADOS_FASE_8.md`: tabla resumen y "Detalle de CP-29" actualizados con la segunda corrida.
+- `pruebas/resultados/INCIDENCIAS_FASE_8.md`: INC-FASE8-012 → cerrada.
+
+### Estado
+Con CP-29 aprobado, el único caso **Pendiente** ejecutable que queda de la Fase 8 es **CP-06** (bloqueado en la práctica por no poder producir un encabezado de remitente falsificado). CP-30 permanece Diferido a la Fase 10 (DEC-004, no condiciona esta fase); CP-35 permanece Bloqueado (requiere upsert en `finalizarMensaje()`, H-05/H-06); CP-38/CP-39 permanecen Bloqueados (Lotes 2/3, fuera del conteo de 36 casos que condicionan esta fase).
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante el registro de esta entrada (los datos provienen del log ya reportado por Carlos Rubén Bageta).
+
+---
+
+## [2026-07-27] — CP-29: primera corrida real revela dato sensible sin enmascarar (tarjeta) — corrección antes de la segunda corrida
+
+### Contexto
+Primera corrida real de CP-29 (dato sensible en el cuerpo). El log de instrumentación temporal mostró el DNI correctamente reemplazado por `[DNI_ENMASCARADO]`, pero la tarjeta "4551 8712 3456 7890" quedó completa, sin enmascarar — contradiciendo la verificación local previa a la corrida (que sí había confirmado el reemplazo por `[TARJETA_ENMASCARADA]` sobre ese mismo texto exacto, con separadores de espacio ASCII).
+
+### Diagnóstico
+Se descartó una diferencia de versión: el usuario confirmó que el contenido de `enmascararDatosSensibles()` en su proyecto de Apps Script (pestaña `prompts_ia.gs`) es idéntico, carácter por carácter, al del repo — se había sospechado inicialmente el mismo patrón que la copia desactualizada de CP-09, descartado esta vez con evidencia directa.
+
+Con el código descartado como causa, se revisó la cadena de extracción/normalización (`extraerDatosCorreo()` → `extraerContenidoNuevo()` → `normalizarCuerpo()` → `enmascararDatosSensibles()`, `codigo/script_refactorizado.gs`): ninguna de esas funciones decodifica entidades HTML ni normaliza espacios Unicode; solo tocan `\r\n`/`\r` y espacios/tabs ASCII colgantes de fin de línea. `mensaje.getPlainBody()` (Gmail) puede producir un espacio no separable (U+00A0, NBSP) en el cuerpo en texto plano cuando el correo original fue compuesto o reenviado desde contenido HTML — un carácter visualmente indistinguible de un espacio normal, incluso en un volcado `JSON.stringify` de depuración.
+
+El patrón de tarjeta vigente, `/\b(?:\d[ -]?){13,16}\b/g`, solo tolera el espacio ASCII (U+0020) y el guion (U+002D) como separador opcional entre dígitos. Verificado localmente con Node: insertando un U+00A0 entre "8712" y "3456" en el cuerpo sintético exacto de CP-29, y pasándolo por la cadena real completa (`extraerContenidoNuevo` + `normalizarCuerpo` + `enmascararDatosSensibles`), el resultado reproduce **exactamente** el bug observado — DNI enmascarado, tarjeta completa sin enmascarar — porque ninguno de los dos fragmentos que quedan separados por el NBSP alcanza el mínimo de 13 dígitos que exige `{13,16}`.
+
+**Causa raíz confirmada:** el patrón de tarjeta de `enmascararDatosSensibles()` (`codigo/prompts_ia.gs`) no tolera separadores de espacio en blanco distintos del espacio ASCII, y Gmail puede introducir ese tipo de separador en el cuerpo en texto plano de un correo real. No es un problema de versión, de la cadena de extracción/normalización (que no debe encargarse de esto — no es su responsabilidad normalizar datos sensibles), ni de la instrumentación temporal de CP-29 (que solo registra el resultado ya enmascarado, sin alterarlo).
+
+### Corrección (aplicada en esta entrada)
+`codigo/prompts_ia.gs`, `enmascararDatosSensibles()`: el patrón de tarjeta cambia de `/\b(?:\d[ -]?){13,16}\b/g` a `/\b(?:\d[\s-]?){13,16}\b/g` — `\s` (en JavaScript/Apps Script, sin la bandera `u`) coincide con cualquier separador Unicode de espacio en blanco, incluido U+00A0, además del espacio ASCII y el salto de línea; se mantiene el guion como alternativa. Verificado localmente que el nuevo patrón sigue enmascarando correctamente separadores ASCII, guiones y dígitos sin separador, y que no genera falsos positivos sobre una secuencia corta de dígitos (ej. un teléfono de 6 dígitos).
+
+### Riesgo residual documentado (no corregido en esta entrada, requiere decisión de alcance)
+Los patrones de DNI (`\.?`, solo punto) y CBU (`\d{22}` rígido, sin separador alguno) comparten la misma clase de fragilidad frente a formatos reales con separadores no anticipados (por ejemplo, un CBU real suele escribirse en grupos separados por espacios). CP-29 no ejercita esos patrones directamente y no hay evidencia real de que hayan fallado; queda pendiente de decisión si se endurecen ahora o en una revisión posterior.
+
+### Estado
+CP-29 permanece **Pendiente** — la primera corrida real no pasa (dato sensible expuesto), la causa ya está corregida en el repo, pero falta una segunda corrida real (mensaje nuevo, `message_id` distinto) que confirme el enmascarado correcto antes de aprobar. La instrumentación temporal de CP-29 (`codigo/script_refactorizado.gs`, gancho en `extraerDatosCorreo()`) permanece activa para esa segunda corrida.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta corrección. Ningún dato real (solo el correo sintético ya especificado en `pruebas/CASOS_DE_PRUEBA.md`) participó de la verificación local.
+
+---
+
 ## [2026-07-27] — Instrumentación temporal de prueba para CP-29: dato sensible en el cuerpo
 
 ### Contexto

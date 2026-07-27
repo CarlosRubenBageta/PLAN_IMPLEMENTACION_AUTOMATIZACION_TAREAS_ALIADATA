@@ -76,7 +76,7 @@ Al ejecutar de verdad en la Fase 8 (`pruebas/resultados/INCIDENCIAS_FASE_8.md`, 
 
 **Actualización (auditoría del 20/07/2026, a pedido de Carlos Rubén Bageta):** el riesgo residual anterior deja de considerarse tolerable y pasa a corrección propuesta obligatoria — ver sección 9. Las secciones 9 a 12 registran una nueva ronda de hallazgos, **ninguno aplicado en código todavía** (diagnóstico y propuesta, pendientes de aprobación).
 
-## 9. Idempotencia estructural de `finalizarMensaje()` (propuesta, no aplicada)
+## 9. Idempotencia estructural de `finalizarMensaje()` (aplicada y verificada — CP-35 Aprobado, 27/07/2026)
 
 **Hallazgo H-05:** `finalizarMensaje()` (`codigo/script_refactorizado.gs`, líneas 601-614) siempre **agrega** filas a `Indice Idempotencia` vía `hojaIndice.getRange(hojaIndice.getLastRow() + 1, ...).setValues(filas)`, sin comprobar si ya existe una fila para la misma combinación `message_id` + `task_id`. Esto convierte el "riesgo residual" de la sección 8 en un defecto de diseño real: **CP-35 no puede ser una prueba obligatoria de la Fase 8 mientras el código no garantice estructuralmente la ausencia de duplicados** — hoy solo se puede argumentar que es "improbable", no que sea imposible.
 
@@ -90,6 +90,8 @@ Al ejecutar de verdad en la Fase 8 (`pruebas/resultados/INCIDENCIAS_FASE_8.md`, 
 
 **Archivos afectados (propuesta):** `codigo/script_refactorizado.gs` (`finalizarMensaje()`).
 **Regresión propuesta:** CP-35 (ver `pruebas/CASOS_DE_PRUEBA.md`), forzando dos invocaciones de `finalizarMensaje()` para el mismo mensaje y confirmando una sola fila final por `task_id` (actualizada, no duplicada).
+
+**Aplicada (27/07/2026, ver `auditoria/CHANGELOG.md`):** los 3 puntos de la propuesta se implementaron tal cual — nueva función `upsertIndiceIdempotencia()` (upsert por clave compuesta `message_id+'|'+task_id`, análoga a `obtenerIdsYaProcesados()`) y `finalizarMensaje()` reordenado para confirmar ese upsert antes de `actualizarLogMensajes()`. Verificado localmente con mocks de Sheets (inserción nueva, doble invocación mismo estado, doble invocación distinto estado, lote mixto, orden de llamadas) — sin regresión. Instrumentación temporal agregada para forzar la regresión real de CP-35 (gancho gateado por `cfg.modoPrueba` + `CP35_DUPLICAR_FINALIZACION`, con guard contra recursión sin límite). **Pendiente:** ejecutar la corrida real y confirmar en la planilla antes de aprobar CP-35 y retirar la instrumentación.
 
 ## 10. Recuperación independiente de que el mensaje siga en Recibidos (propuesta, no aplicada)
 

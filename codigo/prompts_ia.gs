@@ -223,15 +223,45 @@ function construirPromptSistema() {
  * PENDIENTE de ajuste con casos reales (Fase 8, pruebas controladas): estos
  * patrones son heurísticos y pueden requerir refinamiento según los correos
  * reales que procese `tareas@alia-data.com`.
+ *
+ * INC-FASE8-012 (27/07/2026): la primera corrida real de CP-29 mostró un
+ * número de tarjeta completo sin enmascarar. `mensaje.getPlainBody()` puede
+ * devolver un espacio no separable (U+00A0, NBSP) en vez de un espacio ASCII
+ * cuando el correo se compuso o pasó por contenido HTML; el patrón anterior
+ * ([ -]?) no lo reconocía como separador, y ninguna función de la cadena de
+ * extracción/normalización toca ese carácter. El patrón de tarjeta ahora usa
+ * \s (cualquier espacio en blanco Unicode, incluido NBSP) en vez de un
+ * espacio ASCII literal.
+ *
+ * Endurecimiento adicional (27/07/2026, decisión de Carlos Rubén Bageta tras
+ * aprobar CP-29): DNI y CBU tenían la misma clase de fragilidad frente a
+ * separadores no anticipados. Al endurecerlos se detectó localmente que el
+ * ORDEN de los reemplazos importa: el patrón de tarjeta (13-16 dígitos,
+ * greedy) corría antes que el de CBU y le ganaba un prefijo a cualquier CBU
+ * de 22 dígitos agrupado con espacios/guiones, dejando el resto sin
+ * enmascarar. Los reemplazos ahora van de más a menos específico/largo (CBU
+ * -> tarjeta -> DNI) para que cada patrón reclame sus dígitos primero.
+ *
+ * Riesgo residual documentado, preexistente desde la Fase 4, NO corregido
+ * aquí (ver auditoria/CHANGELOG.md para el detalle): una secuencia larga de
+ * números cortos separados por espacios (ej. una lista numerada extensa)
+ * puede coincidir falsamente con el patrón de tarjeta o de CBU. Es un falso
+ * positivo (sobre-enmascarado), no una fuga de datos; resolverlo bien
+ * requiere un heurístico más estricto, no un ajuste simple. Decisión de
+ * Carlos Rubén Bageta (27/07/2026): aceptado como riesgo residual conocido,
+ * no se corrige por ahora.
  */
 function enmascararDatosSensibles(texto) {
   return texto
-    // Tarjetas de crédito/débito (13 a 16 dígitos, con o sin separadores).
-    .replace(/\b(?:\d[ -]?){13,16}\b/g, '[TARJETA_ENMASCARADA]')
-    // DNI argentino (7-8 dígitos, con o sin puntos).
-    .replace(/\b\d{1,2}\.?\d{3}\.?\d{3}\b/g, '[DNI_ENMASCARADO]')
-    // CBU/CVU (22 dígitos).
-    .replace(/\b\d{22}\b/g, '[CBU_ENMASCARADO]')
+    // CBU/CVU (22 dígitos, con o sin separadores). Corre PRIMERO porque es
+    // el patrón más largo/específico -- ver nota de endurecimiento arriba.
+    .replace(/\b(?:\d[\s-]?){22}\b/g, '[CBU_ENMASCARADO]')
+    // Tarjetas de crédito/débito (13 a 16 dígitos, con o sin separadores;
+    // \s cubre espacio ASCII, tab, salto de línea y NBSP -- ver INC-FASE8-012).
+    .replace(/\b(?:\d[\s-]?){13,16}\b/g, '[TARJETA_ENMASCARADA]')
+    // DNI argentino (7-8 dígitos; separador opcional de punto o cualquier
+    // espacio en blanco, incluido NBSP).
+    .replace(/\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\b/g, '[DNI_ENMASCARADO]')
     // Alias bancario tipo "palabra.palabra.palabra".
     .replace(/\b[a-zA-Z0-9]+\.[a-zA-Z0-9]+\.[a-zA-Z0-9]+\b/g, '[ALIAS_ENMASCARADO]')
     // Contraseñas/claves/tokens mencionados explícitamente ("contraseña: xxxx").

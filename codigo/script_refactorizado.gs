@@ -786,20 +786,68 @@ function finalizarMensajeSinTareas(mensajeDescriptor, estadoFinal, motivo, cfg, 
   finalizarMensaje(mensajeDescriptor, estadoFinal, [], cfg);
 }
 
-/** Cierra el registro del mensaje: FINALIZADO en Log Mensajes + fila(s) en Indice Idempotencia. */
+/**
+ * Cierra el registro del mensaje: upsert en Indice Idempotencia + FINALIZADO
+ * en Log Mensajes.
+ *
+ * H-05/H-06 (documentacion/RECUPERACION_INTERRUPCIONES.md, sección 9):
+ * - H-05 (idempotencia estructural): antes se agregaba siempre una fila
+ *   nueva a Indice Idempotencia, sin comprobar si la combinación
+ *   message_id+task_id ya existía. Ahora se hace upsert (ver
+ *   upsertIndiceIdempotencia() abajo): si la clave ya existe, se actualiza
+ *   esa fila en lugar de agregar una duplicada.
+ * - H-06 (orden transaccional): Indice Idempotencia es la única barrera
+ *   real contra el reprocesamiento (obtenerMensajesPendientesDesdeGmail()
+ *   excluye por su presencia, nunca por Log Mensajes). El upsert ahora se
+ *   confirma ANTES de marcar Log Mensajes como FINALIZADO: ante una
+ *   interrupción a mitad de esta función, la barrera real queda protegida
+ *   primero, y Log Mensajes -solo observabilidad- puede quedar levemente
+ *   rezagado sin consecuencia funcional.
+ */
 function finalizarMensaje(mensajeDescriptor, estadoFinal, tareas, cfg) {
-  actualizarLogMensajes(mensajeDescriptor, { estado: estadoFinal, etapa: ETAPAS.FINALIZADO, fecha_fin: new Date() }, cfg);
+  var ahora = new Date();
+  var filasDeseadas = tareas.length === 0
+    ? [[mensajeDescriptor.messageId, '', estadoFinal, ahora]]
+    : tareas.map(function (t) {
+        return [mensajeDescriptor.messageId, t.taskId, estadoFinal, ahora];
+      });
 
+  upsertIndiceIdempotencia(filasDeseadas, cfg);
+
+  actualizarLogMensajes(mensajeDescriptor, { estado: estadoFinal, etapa: ETAPAS.FINALIZADO, fecha_fin: ahora }, cfg);
+}
+
+/**
+ * Inserta o actualiza filas en Indice Idempotencia según la clave compuesta
+ * message_id+'|'+task_id (H-05). Si la clave ya existe, actualiza
+ * estado_final y fecha en la fila existente; si no existe, la agrega.
+ * Análoga a obtenerIdsYaProcesados() pero indexada por la clave compuesta y
+ * con el número de fila real, para poder actualizar en el lugar.
+ */
+function upsertIndiceIdempotencia(filas, cfg) {
   var hojaIndice = obtenerHojaTecnica(HOJAS_TECNICAS.INDICE_IDEMPOTENCIA, cfg);
-  var filas;
-  if (tareas.length === 0) {
-    filas = [[mensajeDescriptor.messageId, '', estadoFinal, new Date()]];
-  } else {
-    filas = tareas.map(function (t) {
-      return [mensajeDescriptor.messageId, t.taskId, estadoFinal, new Date()];
-    });
+  var datos = hojaIndice.getDataRange().getValues();
+  var filaPorClave = {};
+  // Fila 0 = encabezados (message_id, task_id, estado_final, fecha).
+  for (var i = 1; i < datos.length; i++) {
+    var clave = String(datos[i][0]) + '|' + String(datos[i][1]);
+    filaPorClave[clave] = i + 1; // Número de fila real en la hoja, 1-indexado.
   }
-  hojaIndice.getRange(hojaIndice.getLastRow() + 1, 1, filas.length, 4).setValues(filas);
+
+  var filasNuevas = [];
+  filas.forEach(function (fila) {
+    var clave = String(fila[0]) + '|' + String(fila[1]);
+    var filaExistente = filaPorClave[clave];
+    if (filaExistente) {
+      hojaIndice.getRange(filaExistente, 3, 1, 2).setValues([[fila[2], fila[3]]]);
+    } else {
+      filasNuevas.push(fila);
+    }
+  });
+
+  if (filasNuevas.length > 0) {
+    hojaIndice.getRange(hojaIndice.getLastRow() + 1, 1, filasNuevas.length, 4).setValues(filasNuevas);
+  }
 }
 
 // ============================================================================
@@ -812,17 +860,6 @@ function extraerDatosCorreo(mensajeDescriptor, cfg) {
   var soloContenidoNuevo = extraerContenidoNuevo(cuerpoOriginal);
   var normalizado = normalizarCuerpo(soloContenidoNuevo, cfg);
   var enmascarado = enmascararDatosSensibles(normalizado.texto);
-
-  // INICIO INSTRUMENTACIÓN TEMPORAL CP-29 (auditoria/CHANGELOG.md, 27/07/2026) — RETIRAR TRAS LA CORRIDA REAL.
-  // Registra ÚNICAMENTE el cuerpo ya enmascarado (después de
-  // enmascararDatosSensibles()) para verificar que los datos sensibles del
-  // correo sintético de CP-29 quedaron reemplazados. Nunca registra cfg,
-  // options ni ningún otro dato. Gateada por cfg.modoPrueba y por una
-  // property exclusiva de esta prueba.
-  if (cfg.modoPrueba && PropertiesService.getScriptProperties().getProperty('CP29_LOGUEAR_CUERPO_ENMASCARADO') === 'true') {
-    Logger.log('CP-29: cuerpo ya enmascarado (instrumentación temporal de prueba): ' + enmascarado);
-  }
-  // FIN INSTRUMENTACIÓN TEMPORAL CP-29
 
   return {
     messageId: mensajeDescriptor.messageId,

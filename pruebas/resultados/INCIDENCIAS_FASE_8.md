@@ -625,6 +625,41 @@ Sin reabrir la incidencia ni reemplazar la evidencia formal del 23/07/2026, se e
 
 ---
 
+## INC-FASE8-012 — Patrón de tarjeta no enmascara números con espacio no separable (NBSP) como separador
+
+**Detectada por:** Carlos Rubén Bageta, durante la primera ejecución real de CP-29 (dato sensible en el cuerpo), 27/07/2026.
+**Caso de prueba relacionado:** CP-29 (`pruebas/CASOS_DE_PRUEBA.md`).
+**Entorno:** Prueba (proyecto de Apps Script de prueba, correo sintético — ningún dato real de un cliente).
+**Severidad:** Alta (fuga de dato potencialmente sensible hacia un tercero, OpenAI, si un correo real de un empleado contuviera una tarjeta con este tipo de separador; en esta corrida el valor era sintético, no un dato real).
+
+### Evidencia real
+- Log de instrumentación temporal (`CP29_LOGUEAR_CUERPO_ENMASCARADO`, `codigo/script_refactorizado.gs`): `"CP-29: cuerpo ya enmascarado (instrumentación temporal de prueba): Por favor actualicen el medio de pago del cliente. Nueva tarjeta: 4551 8712 3456 7890. DNI del titular: [DNI_ENMASCARADO]."`
+- El DNI se reemplazó correctamente por `[DNI_ENMASCARADO]`. La tarjeta quedó completa, sin reemplazar.
+
+### Diagnóstico
+1. **Hipótesis descartada — versión desactualizada de `prompts_ia.gs` (precedente CP-09):** el usuario proporcionó el contenido completo de `enmascararDatosSensibles()` de su proyecto de Apps Script; es idéntico, carácter por carácter, al de `codigo/prompts_ia.gs` en el repo. No es un problema de sincronización de archivos.
+2. **Verificación local del patrón vigente contra el texto exacto del caso** (Node.js, fuera de Apps Script): `/\b(?:\d[ -]?){13,16}\b/g` reemplaza correctamente "4551 8712 3456 7890" (separado por espacios ASCII) por `[TARJETA_ENMASCARADA]`. El patrón, en abstracto, es correcto para el texto tal como aparece escrito en `CASOS_DE_PRUEBA.md`.
+3. **Causa real — separador Unicode en el cuerpo real del correo:** `mensaje.getPlainBody()` puede devolver un espacio no separable (U+00A0, NBSP) en vez de un espacio ASCII (U+0020) cuando el correo se compuso o pasó por contenido HTML — comportamiento de Gmail, no del script. Ninguna función de la cadena de extracción (`extraerContenidoNuevo()`, `normalizarCuerpo()`, ambas en `codigo/script_refactorizado.gs`) normaliza espacios Unicode; solo tratan `\r\n`/`\r` y espacios/tabs ASCII colgantes de fin de línea. El NBSP llega intacto a `enmascararDatosSensibles()`.
+4. **Reproducción exacta confirmada localmente:** insertando un U+00A0 real entre "8712" y "3456" en el cuerpo sintético exacto del caso, y pasándolo por la cadena completa (`extraerContenidoNuevo` → `normalizarCuerpo` → `enmascararDatosSensibles`), el resultado es idéntico al observado en la corrida real: DNI enmascarado, tarjeta intacta. Razón mecánica: `[ -]?` no incluye U+00A0, por lo que la repetición `(?:\d[ -]?){13,16}` no puede cruzar ese carácter; ninguno de los dos fragmentos que quedan a cada lado (8 dígitos cada uno) alcanza el mínimo de 13 dígitos exigido.
+
+**Explícitamente NO se atribuye esta incidencia a:** una versión desactualizada de `prompts_ia.gs` (descartado con evidencia directa del usuario), a `extraerContenidoNuevo()`/`normalizarCuerpo()` (su responsabilidad es recortar citas/firmas y limitar longitud, no normalizar datos sensibles), ni a la instrumentación temporal de CP-29 (solo registra el resultado ya calculado por `enmascararDatosSensibles()`, sin transformarlo).
+
+### Corrección aplicada (registrada antes del cambio en `auditoria/CHANGELOG.md`)
+`codigo/prompts_ia.gs`, `enmascararDatosSensibles()`: patrón de tarjeta cambiado de `/\b(?:\d[ -]?){13,16}\b/g` a `/\b(?:\d[\s-]?){13,16}\b/g`. `\s` cubre cualquier separador Unicode de espacio en blanco (incluido U+00A0), sin cambiar el resto del comportamiento (mínimo/máximo de dígitos, guion como alternativa). Verificado localmente que separadores ASCII, guiones, ausencia de separador y el propio caso NBSP se enmascaran correctamente, y que una secuencia corta de dígitos (ej. un teléfono de 6 dígitos) sigue sin dispararse.
+
+### Riesgo residual documentado (fuera de esta corrección)
+Los patrones de DNI (`\.?`, solo punto) y CBU (`\d{22}`, sin ningún separador) comparten la misma clase de fragilidad ante formatos reales con separadores no anticipados. No ejercitados por CP-29 y sin evidencia real de falla; queda como decisión pendiente de Carlos Rubén Bageta si se endurecen en esta fase o en una revisión posterior.
+
+**Resuelto (27/07/2026):** Carlos Rubén Bageta decidió endurecerlos de inmediato en vez de dejarlos como riesgo residual sin corregir. La verificación local previa al cambio encontró un bug de interacción real adicional (el patrón de tarjeta le ganaba un prefijo a un CBU agrupado con espacios/guiones al correr primero) — corregido reordenando los reemplazos por especificidad decreciente (CBU → tarjeta → DNI). Ver `auditoria/CHANGELOG.md`, entrada "Endurecimiento adicional de DNI/CBU en enmascararDatosSensibles()", para el detalle completo, incluido un nuevo riesgo residual documentado (falso positivo con listas numeradas largas, preexistente desde la Fase 4, no corregido — requiere rediseño del heurístico).
+
+### Segunda corrida real (confirmación)
+Mismo correo sintético, mensaje nuevo. Log: `"CP-29: cuerpo ya enmascarado (instrumentación temporal de prueba): Por favor actualicen el medio de pago del cliente. Nueva tarjeta: [TARJETA_ENMASCARADA]. DNI del titular: [DNI_ENMASCARADO]."` — ambos valores enmascarados correctamente, procesamiento continuó con normalidad.
+
+### Estado
+**Cerrada (27/07/2026).** Corrección verificada en producción real (segunda corrida) — CP-29 Aprobado. Instrumentación temporal retirada de `codigo/script_refactorizado.gs`. Riesgo residual de DNI/CBU también resuelto (ver arriba). El nuevo riesgo residual (falso positivo con listas numeradas largas) queda **aceptado por decisión explícita de Carlos Rubén Bageta (27/07/2026), sin corregir por ahora** — fuera del alcance de esta incidencia.
+
+---
+
 ## Nota sobre la sección anterior de este documento
 
 La propuesta original de Claude Cowork para INC-FASE8-004/005 (leer/validar permisos, reescribir `aplicarResultadoGmail()`, y hacer que `gestionarErrorMensaje()` llamara directamente a `reanudarDesdeManifiesto()`) fue revisada por Carlos Rubén Bageta, que aprobó el diagnóstico pero corrigió la estrategia de implementación de INC-FASE8-005 (ver el detalle completo en la sección de esa incidencia, arriba: la comprobación de manifiesto se movió a la **entrada** de `procesarUnMensaje()`, no al manejador de errores). El diseño efectivamente aplicado es el descrito en cada incidencia arriba, no la propuesta inicial.
