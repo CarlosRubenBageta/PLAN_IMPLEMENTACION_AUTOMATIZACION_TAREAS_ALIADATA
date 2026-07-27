@@ -66,28 +66,6 @@ function construirPayloadOpenAI(datosCorreo, cfg) {
  * registra el cuerpo completo del correo en logs (solo métricas).
  */
 function consultarIAExtractora(datosCorreo, cfg) {
-  // INICIO INSTRUMENTACIÓN TEMPORAL CP-08 (auditoria/CHANGELOG.md, 26/07/2026) — RETIRAR TRAS LA CORRIDA REAL.
-  // Devuelve un contenidoCrudo deliberadamente inválido, sin llamar a la API
-  // real de OpenAI (esta prueba ejercita validarRespuestaIA(), no la
-  // clasificación real). Gateada por cfg.modoPrueba (nunca en la cuenta
-  // productiva) y por una property exclusiva de esta prueba.
-  if (cfg.modoPrueba && PropertiesService.getScriptProperties().getProperty('CP08_FORZAR_JSON_INVALIDO') === 'true') {
-    Logger.log('CP-08: devolviendo contenidoCrudo inválido por instrumentación temporal de prueba (sin llamar a la API real de OpenAI).');
-    return {
-      exito: true,
-      truncada: false,
-      codigoHttp: 200,
-      duracionSegundos: 0,
-      requestId: null,
-      intentos: 1,
-      contenidoCrudo: 'esto no es json',
-      tokensEntrada: null,
-      tokensSalida: null,
-      costoEstimado: 0
-    };
-  }
-  // FIN INSTRUMENTACIÓN TEMPORAL CP-08
-
   // INC-FASE8-010 (v2): registro no sensible de la versión de prompt
   // efectivamente usada en esta llamada. Nunca se registra el prompt
   // completo ni el cuerpo del correo — solo el identificador corto

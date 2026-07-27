@@ -50,7 +50,7 @@ Captura revisada por Claude Cowork. Muestra:
 | CP-05 | Correo informativo | 23/07/2026; regresión automatizada 24/07/2026 | Ver detalle completo debajo de la tabla. Resumen del cierre formal: `DRY_RUN=true` confirmó `resultado=SIN_TAREAS`/`observaciones=0`, sin escrituras; ejecución formal (`DRY_RUN=false`) confirmó `cantidad_observaciones=0`, `cantidad_tareas=0`, ninguna fila en `Registro Tareas`, una entrada en `Indice Idempotencia` (`estado_final=SIN_TAREAS`), etiqueta `Revisión manual/Sin tareas detectadas` aplicada, mensaje no archivado. Regresión automatizada posterior: `INT-FASE8-01-INFORMATIVO` obtuvo `SIMULACION_OK` y `FORMAL_OK` con un `message_id` nuevo y comprobó automáticamente el mismo resultado. | Cierre formal verificado manualmente por Carlos Rubén Bageta; piloto automatizado `runId dcd52847-c431-4625-8d0e-d3ca82f0f096`, `message_id 19f920a199a6666b` | Aprobado — 23/07/2026 (cierre de INC-FASE8-011; ratificado automáticamente el 24/07/2026) |
 | CP-06 | Promoción de Google | | | | Pendiente |
 | CP-07 | Notificación de Apps Script | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: `FORMAL_OK` confirmó automáticamente `Log Mensajes` (`SIN_TAREAS`), ninguna fila nueva en `Registro Tareas`, 1 entrada en `Indice Idempotencia` (`task_id` vacío), sin llamada a OpenAI (sin línea `consultarIAExtractora()`), y etiqueta `Revisión manual/Error de automatización` confirmada visualmente en Gmail. Disparado por asunto, no por remitente. Aprobó al primer intento. | Registro `[AUTO-FASE8]` de la corrida real — `runId 9a2f73ca-684b-48e0-9fb9-fbd5ffb57382`, `message_id 19f96cb239f5ec62` | Aprobado — 24/07/2026 |
-| CP-08 | JSON inválido | | | | Pendiente |
+| CP-08 | JSON inválido | 26/07/2026 (instrumentación temporal en `codigo/cliente_openai.gs`) | Ver detalle completo debajo de la tabla. Resumen: `consultarIAExtractora()` devolvió `contenidoCrudo` inválido sin llamar a la API real; `validarRespuestaIA()` lo detectó y el mensaje se cerró `REVISION_MANUAL`/`FINALIZADO`, sin fila en `Registro Tareas`, con etiqueta `Revisión manual/Error de procesamiento`. Aprobó al primer intento. | Registro de ejecución de la corrida real | Aprobado — 26/07/2026 |
 | CP-09 | Error HTTP temporal | | | | Pendiente |
 | CP-10 | Hoja inexistente | 21/07/2026, ejecución formal ~21:18 | Hoja `Desarrollo IT` renombrada temporalmente a `Desarrollo IT__CP10_TEMP` (mismo comportamiento de hoja inexistente). Lote de 2 mensajes: uno a la hoja inexistente (`REVISION_MANUAL`/`ERROR_ESCRITURA`), otro a `Finanzas` (`PROCESADO`/`ESCRITA`). Ver detalle completo debajo de la tabla. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
 | CP-11 | Mismo mensaje dos veces | 21/07/2026, ~21:43 | `procesarCorreosDeTareas()` informó `0 mensajes elegibles, procesando 0` reutilizando los dos mensajes ya cerrados de CP-10. Ver detalle completo debajo de la tabla. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
@@ -1196,6 +1196,30 @@ reanudarDesdeManifiesto(): todas las tareas de 19fa107c79d673bb ya estaban ESCRI
 
 **Con CP-34 cierra la familia completa de recuperación desde manifiesto (INC-FASE8-005):** CP-12 (Variante A: excepción capturada; Variante B: runtime interrumpido), CP-25 (reproducción del incidente real original), CP-26 (falla en etapa RESERVADA), CP-32 (recuperación con tareas ya ESCRITA, evidencia propia), CP-33 (recuperación con tareas en RESERVADA, evidencia propia) y CP-34 (segunda falla durante la recuperación, sin recursión) — las seis variantes del mecanismo validadas en producción real, cada una con su propio `message_id`.
 
+## Detalle de CP-08 — JSON inválido de la IA (instrumentación temporal en `codigo/cliente_openai.gs`)
+
+```text
+Fecha de ejecución: 26/07/2026
+Instrumentación: gancho gateado por cfg.modoPrueba + property CP08_FORZAR_JSON_INVALIDO
+en consultarIAExtractora() (codigo/cliente_openai.gs, NO script_refactorizado.gs) —
+ya retirado del código.
+```
+
+**Diseño distinto de la familia CP-12/25/26/32/33/34:** esta prueba no interrumpe una ejecución en curso — reemplaza directamente el resultado de `consultarIAExtractora()` (sin llamar a la API real de OpenAI, sin costo ni token real) para ejercitar `validarRespuestaIA()` con una respuesta que no es JSON válido. Es una prueba de una sola corrida: `finalizarMensajeSinTareas()` cierra el mensaje de inmediato, sin manifiesto persistido ni recuperación posterior.
+
+**Nota de trazabilidad:** el mensaje de log de esta instrumentación no incluyó el `messageId` (a diferencia de los ganchos de la familia CP-12/25/26/32/33/34, cuyos mensajes de error sí lo hacían) — una omisión menor de diseño en esta ronda, sin impacto en la validez de la prueba: el estado final se confirmó igualmente por los campos de `Log Mensajes`/`Registro Tareas`/`Indice Idempotencia`/Gmail.
+
+### Corrida única
+
+- Log: "1 mensajes elegibles, procesando 1" → "CP-08: devolviendo contenidoCrudo inválido por instrumentación temporal de prueba (sin llamar a la API real de OpenAI)." — **sin** ninguna línea `"consultarIAExtractora(): usando prompt versión..."`, confirmando que el bypass se disparó antes de cualquier consulta real a OpenAI.
+- `validarRespuestaIA()` intentó `JSON.parse('esto no es json')`, capturó la excepción y devolvió `{ valida: false, motivo: 'La IA no devolvió JSON válido: ...' }`.
+- `procesarUnMensaje()` verificó `!validacionIA.valida` y llamó a `finalizarMensajeSinTareas(mensajeDescriptor, ESTADOS.REVISION_MANUAL, validacionIA.motivo, cfg, 'RevisionErrorProcesamiento')`.
+- Confirmado: `Log Mensajes.estado=REVISION_MANUAL`, `etapa=FINALIZADO`; sin fila nueva en `Registro Tareas`; `Indice Idempotencia` con una entrada nueva (`task_id` vacío); etiqueta de Gmail `Revisión manual/Error de procesamiento` aplicada; sin filas nuevas en ninguna hoja de negocio.
+
+**Conclusión:** CP-08 PASA. Confirma, en producción real y sin gastar ninguna llamada real de OpenAI, que `validarRespuestaIA()` detecta correctamente un `contenidoCrudo` que no es JSON válido y que el pipeline deriva el mensaje a revisión manual con la etiqueta correcta, sin crear ninguna fila de tarea.
+
+**Estado (veredicto final):** Aprobado — 26/07/2026 (`PASA`).
+
 ## Detalle de CP-07 — Notificación de Apps Script (aprobado vía automatizador de integración Fase 2A)
 
 ```text
@@ -1402,7 +1426,7 @@ Total de casos que condicionan la aprobación de esta fase: 36 (CP-01 a CP-29, C
 Diferido a Fase 10 (no condiciona esta fase): 1 (CP-30, DEC-004)
 Bloqueado que todavía condiciona la Fase 8: 1 (CP-35 — ver nota de auditoría abajo)
 Bloqueados pendientes de Lotes 2/3 (no condicionan esta fase): 2 (CP-38, CP-39)
-Aprobados: 30 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-07, CP-10, CP-11, CP-12, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-25, CP-26, CP-27, CP-28, CP-31, CP-32, CP-33, CP-34, CP-36, CP-37)
+Aprobados: 31 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-07, CP-08, CP-10, CP-11, CP-12, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-25, CP-26, CP-27, CP-28, CP-31, CP-32, CP-33, CP-34, CP-36, CP-37)
 Rechazados: 0
   CP-19 pasó de Rechazado (21/07/2026, INC-FASE8-008) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución fallida original se conserva íntegro en el detalle de CP-19.
   CP-23 pasó de Rechazado (22/07/2026, INC-FASE8-009) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución vulnerable original se conserva íntegro en el detalle de CP-23.
@@ -1422,7 +1446,8 @@ Rechazados: 0
   CP-32 pasó de Pendiente a Aprobado (26/07/2026, flujo clásico con instrumentación temporal, message_id 19fa0d6ae4f8f334 -- mismo mecanismo ya probado por CP-25, ejecutado con su propia evidencia siguiendo la misma disciplina aplicada a CP-25 respecto de CP-12. reanudarDesdeManifiesto() confirmo sin volver a consultar la IA ni reescribir tareas, sin duplicados. Un primer intento con otro correo se descarto por una property no creada, mismo problema visto en CP-26). El registro de ambas corridas se conserva integro en el detalle de CP-32.
   CP-33 pasó de Pendiente a Aprobado (26/07/2026, flujo clásico con instrumentación temporal, message_id 19fa0f11793dc340 -- mismo mecanismo ya probado por CP-26, ejecutado con su propia evidencia siguiendo la misma disciplina aplicada a CP-32 respecto de CP-25. Aprobo al primer intento: reanudarDesdeManifiesto() escribio las tareas RESERVADA pendientes usando los mismos task_id ya reservados, sin volver a consultar la IA ni generar un manifiesto nuevo). El registro de ambas corridas se conserva integro en el detalle de CP-33.
   CP-34 pasó de Pendiente a Aprobado (26/07/2026, flujo clásico con instrumentación temporal, message_id 19fa107c79d673bb, 3 corridas -- mismo gancho de CP-12/CP-25/CP-32 mantenido activo durante dos corridas consecutivas. La segunda falla se capturo por el mismo camino que la primera, con una sola linea de error (sin cadena de reintentos, Log Mensajes sin cambios); la tercera corrida recupero el mensaje limpiamente sin duplicar tareas. Aprobo al primer intento. Cierra la familia completa de recuperacion desde manifiesto: CP-12, CP-25, CP-26, CP-32, CP-33 y CP-34). El registro de las tres corridas se conserva integro en el detalle de CP-34.
-Pendientes (ejecutables con estado Pendiente, no corridos aún): 5
+  CP-08 pasó de Pendiente a Aprobado (26/07/2026, instrumentación temporal en codigo/cliente_openai.gs -- distinto de la familia de recuperación: consultarIAExtractora() devolvió contenidoCrudo inválido sin llamar a la API real de OpenAI. validarRespuestaIA() lo detecto y el mensaje se cerro REVISION_MANUAL/FINALIZADO de inmediato (sin manifiesto), sin fila en Registro Tareas, con etiqueta Revisión manual/Error de procesamiento. Aprobo al primer intento). El registro de la corrida se conserva integro en el detalle de CP-08.
+Pendientes (ejecutables con estado Pendiente, no corridos aún): 4
   [Corregido 22/07/2026: esta lista omitía a CP-27, ya aprobado desde el 20/07/2026 (CP-27 — Modo prueba con ID productivo); no cambia el alcance ni el estado de ningún caso.]
   [Corregido 23/07/2026 (semántica): CP-35 estaba contabilizado dentro de "Pendientes"; su estado individual es Bloqueado (ver nota de auditoría abajo), no Pendiente. Se lo separa como bloqueado que todavía condiciona la Fase 8. Pendientes pasa de 20 a 19; no cambia el estado individual de ningún caso.]
   [Corregido 24/07/2026: CP-03 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 19 a 18.]
@@ -1452,8 +1477,9 @@ Pendientes (ejecutables con estado Pendiente, no corridos aún): 5
   CP-32 fue ejecutado y aprobado el 26/07/2026
   CP-33 fue ejecutado y aprobado el 26/07/2026
   CP-34 fue ejecutado y aprobado el 26/07/2026
-Casos sin aprobación que todavía condicionan la Fase 8: 6 (5 Pendientes + CP-35 Bloqueado)
-Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 9
+  CP-08 fue ejecutado y aprobado el 26/07/2026
+Casos sin aprobación que todavía condicionan la Fase 8: 5 (4 Pendientes + CP-35 Bloqueado)
+Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 8
 
 Nota (auditoría 20/07/2026): CP-35 pasó a "bloqueado" — no puede considerarse
 una verificación válida del criterio "no existen duplicados" hasta que

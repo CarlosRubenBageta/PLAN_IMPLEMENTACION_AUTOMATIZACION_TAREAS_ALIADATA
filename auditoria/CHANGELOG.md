@@ -1,5 +1,33 @@
 # Changelog
 
+## [2026-07-26] — CP-08 Aprobado: corrida real completa, instrumentación temporal retirada
+
+### Contexto
+Con la instrumentación agregada en la entrada anterior, la corrida real confirmó exactamente el comportamiento esperado, al primer intento y sin ninguna llamada real a OpenAI.
+
+```text
+Log: "1 mensajes elegibles, procesando 1."
+"CP-08: devolviendo contenidoCrudo inválido por instrumentación temporal de prueba
+(sin llamar a la API real de OpenAI)." — sin ninguna línea "usando prompt versión...",
+confirmando que el bypass se disparó antes de cualquier consulta real.
+Log Mensajes: estado=REVISION_MANUAL, etapa=FINALIZADO.
+Registro Tareas: sin fila nueva.
+Indice Idempotencia: 1 entrada nueva, task_id vacío.
+Gmail: etiqueta "Revisión manual/Error de procesamiento" aplicada.
+Hojas de negocio: sin filas nuevas.
+```
+
+### Aprobación
+**CP-08 pasa de Pendiente a Aprobado — 26/07/2026.** Confirma en producción real que `validarRespuestaIA()` detecta correctamente un `contenidoCrudo` que no es JSON válido y que `procesarUnMensaje()` deriva el mensaje a `REVISION_MANUAL`/`Revisión manual/Error de procesamiento` sin crear ninguna fila de tarea, exactamente como describe el caso. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### Retiro de la instrumentación temporal
+Con CP-08 aprobado, se retira de `codigo/cliente_openai.gs` el gancho `INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-08` agregado en la entrada anterior (`consultarIAExtractora()` vuelve exactamente a su forma previa a esa entrada). La property `CP08_FORZAR_JSON_INVALIDO` queda sin efecto en el código. Verificado antes y después del retiro: `node --check` sobre el archivo y las 5 suites locales (166/60/46/19/17 verificaciones), sin regresiones.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada — es exclusivamente el registro de la corrida real, la aprobación, y el retiro de la instrumentación.
+
+---
+
 ## [2026-07-26] — Instrumentación temporal de prueba para CP-08: JSON inválido de la IA
 
 ### Contexto
