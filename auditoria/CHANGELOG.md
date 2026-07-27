@@ -1,5 +1,42 @@
 # Changelog
 
+## [2026-07-27] — Instrumentación temporal de prueba para CP-29: dato sensible en el cuerpo
+
+### Contexto
+Último caso ejecutable de Fase 8. Verifica que `enmascararDatosSensibles()` (`codigo/prompts_ia.gs`) reemplace datos sensibles del cuerpo antes de que lleguen a la IA. Revisado el código: `extraerDatosCorreo()` (`codigo/script_refactorizado.gs`, línea 809) llama a `enmascararDatosSensibles(normalizado.texto)` y guarda el resultado en `datosCorreo.cuerpo` — el diseño normal deliberadamente no persiste ese texto en ningún log permanente, por lo que se necesita instrumentación temporal para verificarlo, tal como anticipa el propio enunciado de CP-29.
+
+### Instrumentación temporal (`codigo/script_refactorizado.gs`)
+Gancho en `extraerDatosCorreo()`, justo después de calcular `enmascarado` y antes del `return`:
+
+- Registra **únicamente** el valor de `enmascarado` (el cuerpo ya sanitizado) — nunca `cfg`, `options`, ni ningún otro dato, cumpliendo la advertencia de seguridad más estricta del documento de casos.
+- Se activa **solo** si `cfg.modoPrueba === true` **y** `CP29_LOGUEAR_CUERPO_ENMASCARADO === 'true'`.
+- Marcada "INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-29", para retirar tras la corrida real.
+
+### Verificación local antes de la corrida real
+Se ejecutó el cuerpo sintético exacto del caso a través de la cadena real (`extraerContenidoNuevo()` → `normalizarCuerpo()` → `enmascararDatosSensibles()`) en el harness local, confirmando que "4551 8712 3456 7890" se reemplaza por `[TARJETA_ENMASCARADA]` y "30.123.456" por `[DNI_ENMASCARADO]`, sin alterar el resto del texto.
+
+### Correo sintético (ya especificado en `pruebas/CASOS_DE_PRUEBA.md`)
+```text
+Asunto: [PRUEBA-AUTOMATIZACION] Actualizar datos de pago
+Cuerpo: Por favor actualicen el medio de pago del cliente. Nueva tarjeta: 4551 8712 3456 7890. DNI del titular: 30.123.456.
+```
+
+### Procedimiento (una sola corrida)
+1. Copiar `codigo/script_refactorizado.gs` actualizado al proyecto de prueba.
+2. `CP29_LOGUEAR_CUERPO_ENMASCARADO=true` en Script Properties.
+3. Enviar el correo sintético exacto de arriba (nunca reemplazar los datos por otros reales).
+4. Ejecutar `procesarCorreosDeTareas()` — se espera ver en el log la línea `"CP-29: cuerpo ya enmascarado..."` mostrando `[TARJETA_ENMASCARADA]` y `[DNI_ENMASCARADO]` en vez de los valores originales; el resto del procesamiento debería continuar normalmente (tarea(s) generada(s), `Log Mensajes` a `PROCESADO`).
+5. `CP29_LOGUEAR_CUERPO_ENMASCARADO=false`.
+
+### Cambios
+- `codigo/script_refactorizado.gs`: `extraerDatosCorreo()` gana el gancho condicional descrito arriba.
+- Ningún otro archivo de `codigo/` ni de `pruebas/` cambia en esta entrada.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante este diseño. No se modificó `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-29 en esta entrada — requiere que el usuario ejecute el procedimiento y reporte el resultado.
+
+---
+
 ## [2026-07-26] — CP-13 Aprobado: corrida real completa, instrumentación temporal retirada
 
 ### Contexto

@@ -813,6 +813,17 @@ function extraerDatosCorreo(mensajeDescriptor, cfg) {
   var normalizado = normalizarCuerpo(soloContenidoNuevo, cfg);
   var enmascarado = enmascararDatosSensibles(normalizado.texto);
 
+  // INICIO INSTRUMENTACIÓN TEMPORAL CP-29 (auditoria/CHANGELOG.md, 27/07/2026) — RETIRAR TRAS LA CORRIDA REAL.
+  // Registra ÚNICAMENTE el cuerpo ya enmascarado (después de
+  // enmascararDatosSensibles()) para verificar que los datos sensibles del
+  // correo sintético de CP-29 quedaron reemplazados. Nunca registra cfg,
+  // options ni ningún otro dato. Gateada por cfg.modoPrueba y por una
+  // property exclusiva de esta prueba.
+  if (cfg.modoPrueba && PropertiesService.getScriptProperties().getProperty('CP29_LOGUEAR_CUERPO_ENMASCARADO') === 'true') {
+    Logger.log('CP-29: cuerpo ya enmascarado (instrumentación temporal de prueba): ' + enmascarado);
+  }
+  // FIN INSTRUMENTACIÓN TEMPORAL CP-29
+
   return {
     messageId: mensajeDescriptor.messageId,
     threadId: mensajeDescriptor.threadId,
