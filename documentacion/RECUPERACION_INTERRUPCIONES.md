@@ -93,7 +93,7 @@ Al ejecutar de verdad en la Fase 8 (`pruebas/resultados/INCIDENCIAS_FASE_8.md`, 
 
 **Aplicada (27/07/2026, ver `auditoria/CHANGELOG.md`):** los 3 puntos de la propuesta se implementaron tal cual — nueva función `upsertIndiceIdempotencia()` (upsert por clave compuesta `message_id+'|'+task_id`, análoga a `obtenerIdsYaProcesados()`) y `finalizarMensaje()` reordenado para confirmar ese upsert antes de `actualizarLogMensajes()`. Verificado localmente con mocks de Sheets (inserción nueva, doble invocación mismo estado, doble invocación distinto estado, lote mixto, orden de llamadas) — sin regresión. Instrumentación temporal agregada para forzar la regresión real de CP-35 (gancho gateado por `cfg.modoPrueba` + `CP35_DUPLICAR_FINALIZACION`, con guard contra recursión sin límite). **Pendiente:** ejecutar la corrida real y confirmar en la planilla antes de aprobar CP-35 y retirar la instrumentación.
 
-## 10. Recuperación independiente de que el mensaje siga en Recibidos (propuesta, no aplicada)
+## 10. Recuperación independiente de que el mensaje siga en Recibidos (aplicada — CP-38 pendiente de verificación real, 27/07/2026)
 
 **Hallazgo H-07:** la corrección de INC-FASE8-005 (sección 8) depende de que `obtenerMensajesPendientes()` **vuelva a encontrar** el `message_id` en una ejecución posterior para que el chequeo de manifiesto en la entrada de `procesarUnMensaje()` se dispare. Pero `obtenerMensajesPendientes()` se construye a partir de `GmailApp.search(consulta, ...)` (`in:inbox` en producción, `GMAIL_QUERY_PRUEBA` en prueba) — si el mensaje **ya no está en la bandeja de entrada** (por ejemplo, porque `aplicarResultadoGmail()` alcanzó a archivarlo antes de que fallara algo posterior, o porque el estado de Gmail cambió por cualquier otra vía), la búsqueda nunca lo vuelve a traer, y el mecanismo de la sección 8 **nunca se activa** para ese mensaje — quedaría en `ERROR_TEMPORAL` para siempre, sin que nada lo retome.
 
@@ -107,7 +107,9 @@ Esta función complementa (no reemplaza) a `recuperarProcesamientosAbandonados()
 **Archivos afectados (propuesta):** `codigo/recuperacion.gs` (nueva función), `codigo/script_refactorizado.gs` (llamado desde `procesarCorreosDeTareas()`).
 **Regresión propuesta:** CP-38 (ver `pruebas/CASOS_DE_PRUEBA.md`) — forzar una falla de Gmail después de que el mensaje ya fue archivado por una operación previa exitosa (simulando que solo el paso posterior falló), y confirmar que se recupera igual, sin depender de que siga en la bandeja.
 
-## 11. Límite de reintentos para fallas de Gmail posteriores al manifiesto (propuesta, no aplicada)
+**Aplicada (27/07/2026, ver `auditoria/CHANGELOG.md`, DEC-010):** implementada tal cual la propuesta — `recuperarMensajesConManifiestoPendiente(cfg)` en `codigo/recuperacion.gs`, llamada desde `procesarCorreosDeTareasConConfiguracion_()` junto a `recuperarProcesamientosAbandonados()`, con los mismos guards (`opciones.omitirRecuperacion`, `cfg.dryRun`). Verificado localmente con mocks de Sheets: reanuda un `ERROR_TEMPORAL` con manifiesto y sin fila en `Indice Idempotencia`; no toca un `ERROR_TEMPORAL` sin manifiesto; no reanuda uno ya cerrado por otra vía; ignora mensajes que no están en `ERROR_TEMPORAL`. **Pendiente:** instrumentación temporal + corrida real para CP-38.
+
+## 11. Límite de reintentos para fallas de Gmail posteriores al manifiesto (aplicada — CP-39 pendiente de verificación real, 27/07/2026)
 
 **Hallazgo H-08:** ni la corrección de INC-FASE8-005 ni la propuesta de la sección 10 imponen un límite a cuántas veces se reintenta la actualización de Gmail para un mensaje con manifiesto. Una falla permanente (por ejemplo, un ID de etiqueta inválido, un permiso revocado) haría que el mensaje se reintente en cada ejecución, indefinidamente, sin nunca alertar a un humano ni cerrarse.
 
@@ -116,7 +118,9 @@ Esta función complementa (no reemplaza) a `recuperarProcesamientosAbandonados()
 **Archivos afectados (propuesta):** `codigo/script_refactorizado.gs` (`gestionarErrorMensaje()`, `registrarInicioProcesamiento()` o el punto donde se inicializa la fila), `documentacion/DISENO_HOJAS_TECNICAS.md` (nueva columna).
 **Regresión propuesta:** CP-39 (ver `pruebas/CASOS_DE_PRUEBA.md`) — forzar que la recuperación de Gmail falle repetidamente más allá del límite y confirmar el cierre `ERROR_DEFINITIVO` con tareas conservadas.
 
-## 12. Ajustes menores de la recuperación (propuesta, no aplicada)
+**Aplicada (27/07/2026, ver `auditoria/CHANGELOG.md`, DEC-007 actualizada):** columna 27 `intentos_gmail` agregada a `documentacion/DISENO_HOJAS_TECNICAS.md` y a `registrarInicioProcesamiento()`; propiedad obligatoria `LIMITE_REINTENTOS_GMAIL` validada en `validarConfiguracion()`; `gestionarErrorMensaje()` cuenta el intento en la rama que ya detecta manifiesto y, al superar el límite, cierra `ERROR_DEFINITIVO` pasando el manifiesto completo a `finalizarMensaje()` (las tareas ya escritas quedan conservadas, no se revierten). Verificado localmente con mocks de Sheets: por debajo del límite sigue `ERROR_TEMPORAL` con el contador incrementado; en el límite exacto todavía no cierra; al superarlo cierra `ERROR_DEFINITIVO` con la fila de `Indice Idempotencia` escrita. **Pendiente:** instrumentación temporal + corrida real para CP-39. **Nota:** Carlos Rubén Bageta todavía debe agregar la columna `intentos_gmail` y la propiedad `LIMITE_REINTENTOS_GMAIL=5` en el proyecto de Apps Script de prueba antes de esa corrida.
+
+## 12. Ajustes menores de la recuperación (aplicados, 27/07/2026)
 
 - **H-10 — `reanudarDesdeManifiesto()` y tareas `ANULADA`:** el filtro `pendientes = tareas.filter(t => t.estadoEscritura !== ESCRITA)` (`codigo/recuperacion.gs`) trataría una tarea `ANULADA` (estado del enum `ESTADOS_ESCRITURA_TAREA`, hoy no generado por ningún código, pero previsto desde la Fase 2 para tareas descartadas por duplicado de contenido) como "pendiente de escribir", intentando escribirla de nuevo. Propuesta: excluir explícitamente `ANULADA` del filtro de pendientes (solo `RESERVADA`/`ERROR_ESCRITURA` deben reintentarse).
 - **H-11 — `unidades_gmail_api` no acumula:** `actualizarLogMensajes(..., { unidades_gmail_api: 1 }, cfg)` sobrescribe el valor en cada llamada a `aplicarResultadoGmail()`. Si un mensaje requiere más de una llamada real a Gmail (una fallida + una exitosa en la recuperación), el valor final no refleja el consumo real acumulado. Propuesta: leer el valor actual antes de escribir y sumar, en vez de sobrescribir.
@@ -124,6 +128,13 @@ Esta función complementa (no reemplaza) a `recuperarProcesamientosAbandonados()
 
 **Archivos afectados (propuesta):** `codigo/recuperacion.gs` (H-10), `codigo/script_refactorizado.gs` (H-11, H-12).
 **Regresión propuesta:** casos de prueba a definir junto con CP-32/CP-33 (H-10), verificación manual del campo `unidades_gmail_api` en CP-38 (H-11), y verificación del campo `error` en CP-38 (H-12).
+
+**Aplicados (27/07/2026, ver `auditoria/CHANGELOG.md`, DEC-011):**
+- **H-10:** el filtro de `pendientes` en `reanudarDesdeManifiesto()` pasó de `estadoEscritura !== ESCRITA` a una lista explícita (`RESERVADA` o `ERROR_ESCRITURA` únicamente).
+- **H-11:** `aplicarResultadoGmail()` acumula `unidades_gmail_api` (nuevo helper compartido `obtenerValorNumericoLogMensajes()`, también usado por H-08) en vez de sobrescribir.
+- **H-12, con una precisión sobre la propuesta:** `finalizarMensaje()` limpia `error` **solo** cuando `estadoFinal === PROCESADO`. La propuesta original incluía también `SIN_TAREAS`, pero `finalizarMensajeSinTareas()` escribe deliberadamente el `motivo_sin_tareas` en esa misma columna antes de llegar a `finalizarMensaje()` — limpiarlo ahí borraría ese texto legítimo (confirmado revisando el flujo real, no solo la propuesta en abstracto). `finalizarMensajeSinTareas()` nunca cierra con `PROCESADO`, así que restringir a ese único estado cubre el escenario real de H-12 (mensaje que se recupera con éxito tras una falla) sin ese efecto colateral.
+
+Verificado localmente con mocks de Sheets: `ANULADA` queda fuera de las tareas que se reintentan escribir; `unidades_gmail_api` se acumula entre dos llamadas (1 previa + 1 nueva = 2, no sobrescribe a 1); `error` se limpia en `PROCESADO` pero se conserva intacto en `SIN_TAREAS` y en `ERROR_DEFINITIVO`. Sin instrumentación temporal ni corrida real propia — se verifican junto con CP-38/CP-39 (comparten el mismo camino de código que H-07/H-08).
 
 ## 13. Nota relacionada: precisión del descubrimiento de mensajes (H-03)
 

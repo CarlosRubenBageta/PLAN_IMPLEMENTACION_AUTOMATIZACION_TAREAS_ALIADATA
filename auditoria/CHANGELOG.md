@@ -1,5 +1,68 @@
 # Changelog
 
+## [2026-07-27] — H-07/H-08/H-10/H-11/H-12 aplicados y verificados localmente; instrumentación temporal para CP-38/CP-39
+
+### Implementación (código)
+Los cinco hallazgos se implementaron tal como se diseñó en la entrada anterior, sin desvíos salvo la precisión ya registrada en H-12 (limpiar `error` solo en `PROCESADO`, no en `SIN_TAREAS`):
+- `codigo/recuperacion.gs`: nueva `recuperarMensajesConManifiestoPendiente()` (H-07); `reanudarDesdeManifiesto()` con el filtro de pendientes corregido (H-10).
+- `codigo/script_refactorizado.gs`: `procesarCorreosDeTareasConConfiguracion_()` llama a la nueva función de H-07 junto a `recuperarProcesamientosAbandonados()`; `validarConfiguracion()` valida `LIMITE_REINTENTOS_GMAIL`; `registrarInicioProcesamiento()` inicializa la columna 27 `intentos_gmail`; `gestionarErrorMensaje()` cuenta y cierra `ERROR_DEFINITIVO` al superar el límite (H-08); `aplicarResultadoGmail()` acumula `unidades_gmail_api` vía el nuevo helper compartido `obtenerValorNumericoLogMensajes()` (H-11); `finalizarMensaje()` limpia `error` solo en `PROCESADO` (H-12).
+- `documentacion/DISENO_HOJAS_TECNICAS.md`: columna 27 documentada.
+
+### Verificación local (21 verificaciones, mocks de Sheets, sin Apps Script real)
+Extraído el código real de ambos archivos (por rango de línea, sin duplicados) y probado contra mocks de `Log Mensajes`/`Registro Tareas`/`Indice Idempotencia`:
+- H-07 (5 casos): reanuda un `ERROR_TEMPORAL` con manifiesto sin cerrar; ignora uno sin manifiesto, uno ya cerrado en `Indice Idempotencia`, y uno que no está en `ERROR_TEMPORAL`; cuenta correctamente los reanudados.
+- H-10 (5 casos): `RESERVADA`/`ERROR_ESCRITURA` se incluyen como pendientes; `ESCRITA`/`ANULADA` quedan excluidas.
+- H-08 (7 casos): por debajo del límite sigue `ERROR_TEMPORAL` con el contador incrementado; en el límite exacto todavía no cierra; al superarlo cierra `ERROR_DEFINITIVO` con la fila de `Indice Idempotencia` escrita (tareas conservadas).
+- H-11 (1 caso): `unidades_gmail_api` se acumula (1 previo + 1 nuevo = 2, no sobrescribe).
+- H-12 (3 casos): `error` se limpia en `PROCESADO`; se conserva intacto en `SIN_TAREAS` (el `motivo_sin_tareas` legítimo) y en `ERROR_DEFINITIVO`.
+
+Las 21 pasan. `node --check` sin errores en los 12 archivos `.gs` del proyecto.
+
+### Instrumentación temporal para la regresión real
+
+**CP-38 (H-07), en `procesarUnMensaje()`:** gancho gateado por `cfg.modoPrueba` + `CP38_FORZAR_FALLO_POSTERIOR`, entre `actualizarLogMensajes(etapa: GMAIL_ACTUALIZADO)` y `finalizarMensaje()` — dispara DESPUÉS de que `aplicarResultadoGmail()` ya haya archivado el mensaje de verdad. Requiere que Carlos Rubén Bageta ponga `PERMITIR_ARCHIVADO=true` **temporalmente** (la convención de este proyecto es `false` en modo prueba, ver `configuracion/PARAMETROS_EJEMPLO.md`) — es la única forma de que el mensaje realmente salga de `in:inbox` y quede fuera del alcance de `obtenerMensajesPendientesDesdeGmail()`, que es exactamente la brecha que H-07 corrige. Revertir a `false` al terminar.
+
+**CP-39 (H-08), en `aplicarResultadoGmail()`:** gancho gateado por `cfg.modoPrueba` + `CP39_FORZAR_FALLO_GMAIL_REPETIDO`, mismo mecanismo ya usado en CP-12/CP-25/CP-32/CP-34 (falla incondicional mientras la property esté en `'true'`). No requiere `PERMITIR_ARCHIVADO=true` — el mensaje permanece en la bandeja entre corridas, y el chequeo de manifiesto ya existente en la entrada de `procesarUnMensaje()` lo vuelve a encontrar en cada ejecución manual sucesiva.
+
+### Procedimiento (pendiente de ejecución por Carlos Rubén Bageta)
+Ver mensaje de la sesión para el detalle completo paso a paso de CP-38 y CP-39, incluidas las propiedades nuevas que hay que agregar (`LIMITE_REINTENTOS_GMAIL`) y la columna nueva de la hoja (`intentos_gmail`).
+
+### Estado
+Código aplicado y verificado localmente. **No se aprueba CP-38 ni CP-39 en esta entrada** — requieren que el usuario ejecute el procedimiento y reporte el resultado. DEC-007/DEC-010/DEC-011 permanecen "Aprobada y aplicada" (la aplicación en código ya ocurrió; lo pendiente es la verificación en producción real, no la decisión).
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada.
+
+---
+
+## [2026-07-27] — Decisión y diseño: aplicar los Lotes 2/3 (H-07, H-08, H-10, H-11, H-12) antes de la Fase 9
+
+### Contexto
+Carlos Rubén Bageta decidió explícitamente resolver la última condición abierta de DEC-009: en vez de diferir los Lotes 2/3 (como se hizo con CP-30/DEC-004), pidió aplicarlos ahora — H-07 y H-08 (las dos brechas reales) y H-10/H-11/H-12 (ajustes menores), todos ya diseñados en `documentacion/RECUPERACION_INTERRUPCIONES.md`, secciones 10 a 12, sin aplicar hasta esta entrada.
+
+### Diseño a aplicar (sin cambios respecto a la propuesta original, salvo una precisión en H-12)
+
+**H-07 (→ CP-38):** nueva función `recuperarMensajesConManifiestoPendiente(cfg)` en `codigo/recuperacion.gs` — busca en `Log Mensajes` filas `ERROR_TEMPORAL` con manifiesto persistido y sin fila en `Indice Idempotencia`, y las reanuda directamente vía `reanudarDesdeManifiesto()`, sin depender de que `obtenerMensajesPendientesDesdeGmail()` vuelva a traer el mensaje (que no ocurre si ya fue archivado). Se llama desde `procesarCorreosDeTareasConConfiguracion_()`, junto a `recuperarProcesamientosAbandonados()` y con los mismos guards (`opciones.omitirRecuperacion`, `cfg.dryRun`).
+
+**H-08 (→ CP-39, DEC-007):** nueva columna 27 `intentos_gmail` en `Log Mensajes` (distinta de `intentos`, que mide reintentos de la IA) y nueva propiedad obligatoria `LIMITE_REINTENTOS_GMAIL` (propuesta: `5`), validada en `validarConfiguracion()` con el mismo criterio estricto que `UMBRAL_ABANDONO_MIN`. En `gestionarErrorMensaje()`, la rama que ya detecta un manifiesto persistido (INC-FASE8-005) ahora cuenta el intento; al superar el límite, cierra `ERROR_DEFINITIVO` **conservando las tareas ya escritas** (se pasan a `finalizarMensaje()`, que hace upsert en `Indice Idempotencia` por cada una — no se revierte ni se descarta ningún dato de negocio).
+
+**H-10:** `reanudarDesdeManifiesto()` (`codigo/recuperacion.gs`) cambia su filtro de "pendientes" de `estadoEscritura !== ESCRITA` (que trataría una tarea `ANULADA` como pendiente) a una lista explícita: solo `RESERVADA` o `ERROR_ESCRITURA` se reintentan.
+
+**H-11:** `aplicarResultadoGmail()` deja de escribir `unidades_gmail_api: 1` a secas (sobrescribiendo) y pasa a acumular: nuevo helper compartido `obtenerValorNumericoLogMensajes(mensajeDescriptor, nombreCampo, cfg)` (usado también por H-08 para `intentos_gmail`) lee el valor actual antes de sumar 1.
+
+**H-12, con una precisión sobre la propuesta original:** la propuesta decía limpiar `error` en `finalizarMensaje()` cuando `estadoFinal` es `PROCESADO` **o `SIN_TAREAS`**. Revisando `finalizarMensajeSinTareas()` se confirmó que **NO puede incluirse `SIN_TAREAS`**: esa función escribe deliberadamente el `motivo_sin_tareas` en la columna `error` (comportamiento intencional, ya confirmado al aprobar CP-05) **antes** de llamar a `finalizarMensaje()` — limpiarlo ahí borraría ese texto legítimo. `finalizarMensajeSinTareas()` nunca cierra con `estadoFinal=PROCESADO` (solo `SIN_TAREAS`/`REVISION_MANUAL`), así que restringir la limpieza a **únicamente `PROCESADO`** resuelve el escenario real que describe H-08 (un mensaje que se recupera con éxito tras una falla de Gmail) sin tocar el caso de `SIN_TAREAS`.
+
+### Verificación planeada
+Local primero (mocks de Sheets en Node, sin Apps Script real): recuperación de un `ERROR_TEMPORAL` con manifiesto que ya no aparecería en una búsqueda de Gmail; límite de reintentos agotado (cierra `ERROR_DEFINITIVO`, tareas conservadas) vs. no agotado (sigue en `ERROR_TEMPORAL`, contador incrementado); `ANULADA` excluida del filtro de pendientes; acumulación de `unidades_gmail_api` en dos llamadas; limpieza de `error` solo en `PROCESADO`, intacto en `SIN_TAREAS`. Después, instrumentación temporal para CP-38 (mensaje archivado antes de una falla posterior) y CP-39 (fallas de Gmail repetidas más allá del límite).
+
+### Estado
+Diseño registrado; implementación y verificación local se aplican a continuación en esta misma sesión. `auditoria/DECISIONES.md` y `documentacion/RECUPERACION_INTERRUPCIONES.md` se actualizan una vez verificado localmente.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante el registro de esta entrada.
+
+---
+
 ## [2026-07-27] — Corrección de documentación desactualizada detectada por auditoría externa (ChatGPT)
 
 ### Contexto

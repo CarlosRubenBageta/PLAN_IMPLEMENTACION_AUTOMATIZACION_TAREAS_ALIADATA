@@ -369,19 +369,23 @@ Cuerpo: Por favor actualicen el medio de pago del cliente. Nueva tarjeta: 4551 8
 
 ## CP-38 — Recuperación tras archivado previo, sin depender de la búsqueda de Gmail (H-07)
 
-**Bloqueado — requiere aplicar la propuesta de `recuperarMensajesConManifiestoPendiente()` (`documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 10).**
+**Corrección aplicada (27/07/2026, DEC-010):** `recuperarMensajesConManifiestoPendiente()` implementada y verificada localmente (`documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 10). El caso pasa a ejecutable.
 
-**Procedimiento:** forzar una falla de Gmail después de que el mensaje ya fue archivado por una llamada previa exitosa (simular que solo un paso posterior, no relacionado con el archivado en sí, es el que falla), de modo que el mensaje quede `ERROR_TEMPORAL` con manifiesto pero **ya no esté en la bandeja de entrada** (por lo tanto, `in:inbox`/`GMAIL_QUERY_PRUEBA` no lo traerían de nuevo).
-**Resultado esperado:** en la ejecución siguiente, el mensaje se recupera igual, sin depender de que la búsqueda de Gmail lo encuentre — vía la nueva función que escanea `Log Mensajes` directamente. Verificar también, de paso, que `unidades_gmail_api` refleja el consumo acumulado (H-11) y que `Log Mensajes.error` queda limpio o anotado como resuelto tras el cierre exitoso (H-12).
-**Estado:** Bloqueado — requiere aplicar la corrección.
+**Instrumentación temporal:** gancho gateado por `cfg.modoPrueba` + `CP38_FORZAR_FALLO_POSTERIOR` en `procesarUnMensaje()` (`codigo/script_refactorizado.gs`), justo después de que `aplicarResultadoGmail()` archive el mensaje de verdad. **Requiere `PERMITIR_ARCHIVADO=true` temporalmente** (la convención de este proyecto es `false` en modo prueba) — es la única forma de que el mensaje realmente salga de `in:inbox`.
+
+**Procedimiento:** forzar una falla después de que el mensaje ya fue archivado por una llamada previa exitosa, de modo que el mensaje quede `ERROR_TEMPORAL` con manifiesto pero **ya no esté en la bandeja de entrada** (por lo tanto, `in:inbox`/`GMAIL_QUERY_PRUEBA` no lo traerían de nuevo).
+**Resultado esperado:** en la ejecución siguiente, el mensaje se recupera igual, sin depender de que la búsqueda de Gmail lo encuentre — vía la nueva función que escanea `Log Mensajes` directamente. Verificar también, de paso, que `unidades_gmail_api` refleja el consumo acumulado (H-11) y que `Log Mensajes.error` queda limpio tras el cierre exitoso (H-12).
+**Estado:** Pendiente — corrección aplicada y verificada localmente; falta la corrida real.
 
 ## CP-39 — Límite de reintentos Gmail y salida a error permanente (H-08, DEC-007)
 
-**Bloqueado — requiere aplicar `LIMITE_REINTENTOS_GMAIL`/`intentos_gmail` (`documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 11).**
+**Corrección aplicada (27/07/2026, DEC-007 actualizada):** columna `intentos_gmail`, propiedad `LIMITE_REINTENTOS_GMAIL` y lógica de cierre implementadas y verificadas localmente (`documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 11). El caso pasa a ejecutable.
+
+**Instrumentación temporal:** gancho gateado por `cfg.modoPrueba` + `CP39_FORZAR_FALLO_GMAIL_REPETIDO` en `aplicarResultadoGmail()` (`codigo/script_refactorizado.gs`), mismo mecanismo ya usado en CP-12/CP-25/CP-32/CP-34.
 
 **Procedimiento:** forzar que la actualización de Gmail falle de manera persistente (no transitoria) para un mensaje con manifiesto, a lo largo de más ejecuciones que `LIMITE_REINTENTOS_GMAIL`.
 **Resultado esperado:** tras agotar el límite, el mensaje se cierra `ERROR_DEFINITIVO`, se escribe `Indice Idempotencia` (deja de reintentarse), y las tareas ya escritas en los tableros de negocio **permanecen** (no se revierten). Antes de agotar el límite, el mensaje debe seguir reintentándose normalmente en cada ejecución.
-**Estado:** Bloqueado — requiere aplicar la corrección.
+**Estado:** Pendiente — corrección aplicada y verificada localmente; falta la corrida real.
 
 ---
 

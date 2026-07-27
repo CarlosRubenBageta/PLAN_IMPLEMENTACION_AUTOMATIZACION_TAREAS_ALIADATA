@@ -178,6 +178,15 @@ function validarConfiguracion() {
     errores.push('UMBRAL_ABANDONO_MIN inválido o ausente.');
   }
 
+  // H-08 (documentacion/RECUPERACION_INTERRUPCIONES.md, sección 11; DEC-007):
+  // límite de reintentos de recuperación de Gmail para un mensaje con
+  // manifiesto persistido, antes de cerrarlo ERROR_DEFINITIVO en vez de
+  // reintentarlo indefinidamente.
+  cfg.limiteReintentosGmail = parseInt(PROP.getProperty('LIMITE_REINTENTOS_GMAIL'), 10);
+  if (!cfg.limiteReintentosGmail || cfg.limiteReintentosGmail <= 0) {
+    errores.push('LIMITE_REINTENTOS_GMAIL inválido o ausente.');
+  }
+
   cfg.versionScript = PROP.getProperty('VERSION_SCRIPT');
   if (!cfg.versionScript) errores.push('Falta VERSION_SCRIPT.');
 
@@ -404,6 +413,10 @@ function procesarCorreosDeTareasConConfiguracion_(cfg, opciones) {
     Logger.log('procesarCorreosDeTareas(): DRY_RUN=true, se omite recuperarProcesamientosAbandonados() (no debe persistir ni recuperar mensajes reales durante una simulación).');
   } else {
     recuperarProcesamientosAbandonados(cfg);
+    // H-07 (documentacion/RECUPERACION_INTERRUPCIONES.md, sección 10):
+    // mecanismo distinto y complementario — mismos guards que la línea de
+    // arriba (nunca en DRY_RUN ni cuando el llamador pide omitir recuperación).
+    recuperarMensajesConManifiestoPendiente(cfg);
   }
 
   var mensajes = obtenerMensajesPendientesDesdeGmail(cfg);
@@ -689,6 +702,17 @@ function procesarUnMensaje(mensajeDescriptor, cfg) {
   aplicarResultadoGmail(mensajeDescriptor, huboFallaEscritura ? 'RevisionErrorProcesamiento' : 'Procesado', cfg);
   actualizarLogMensajes(mensajeDescriptor, { etapa: ETAPAS.GMAIL_ACTUALIZADO }, cfg);
 
+  // INICIO INSTRUMENTACIÓN TEMPORAL CP-38 (auditoria/CHANGELOG.md, 27/07/2026) — RETIRAR TRAS LA CORRIDA REAL.
+  // Fuerza una falla DESPUÉS de que aplicarResultadoGmail() ya haya archivado
+  // el mensaje de verdad (requiere PERMITIR_ARCHIVADO=true temporalmente),
+  // dejándolo con manifiesto persistido y sin cerrar — exactamente el
+  // escenario de H-07: un mensaje que ya no está en la búsqueda de Gmail
+  // (in:inbox) porque quedó archivado antes de que fallara un paso posterior.
+  if (cfg.modoPrueba && PropertiesService.getScriptProperties().getProperty('CP38_FORZAR_FALLO_POSTERIOR') === 'true') {
+    throw new Error('CP-38: falla simulada por instrumentación temporal de prueba, después de archivar en Gmail (retirar tras la corrida). messageId=' + mensajeDescriptor.messageId);
+  }
+  // FIN INSTRUMENTACIÓN TEMPORAL CP-38
+
   // Paso 11-12: marcar el mensaje y cerrar en Indice Idempotencia.
   finalizarMensaje(mensajeDescriptor, huboFallaEscritura ? ESTADOS.REVISION_MANUAL : ESTADOS.PROCESADO, tareas, cfg);
 }
@@ -814,7 +838,20 @@ function finalizarMensaje(mensajeDescriptor, estadoFinal, tareas, cfg) {
 
   upsertIndiceIdempotencia(filasDeseadas, cfg);
 
-  actualizarLogMensajes(mensajeDescriptor, { estado: estadoFinal, etapa: ETAPAS.FINALIZADO, fecha_fin: ahora }, cfg);
+  var camposLog = { estado: estadoFinal, etapa: ETAPAS.FINALIZADO, fecha_fin: ahora };
+  // H-12 (documentacion/RECUPERACION_INTERRUPCIONES.md, sección 12): un
+  // mensaje que se recupera con éxito tras una falla previa (gestionarError
+  // Mensaje() ya escribió un `error` real) no debe quedar con ese texto
+  // stale una vez PROCESADO -- confunde a quien audite la hoja. Restringido
+  // a PROCESADO únicamente: SIN_TAREAS llega acá con `error` conteniendo el
+  // `motivo_sin_tareas` legítimo, escrito a propósito por
+  // finalizarMensajeSinTareas() antes de esta llamada -- limpiarlo ahí
+  // también borraría ese texto intencional. REVISION_MANUAL/ERROR_DEFINITIVO
+  // conservan su `error` sin cambios (no son cierres exitosos).
+  if (estadoFinal === ESTADOS.PROCESADO) {
+    camposLog.error = '';
+  }
+  actualizarLogMensajes(mensajeDescriptor, camposLog, cfg);
 }
 
 /**
@@ -1100,6 +1137,17 @@ function aplicarResultadoGmail(mensajeDescriptor, claveResultado, cfg) {
     return;
   }
 
+  // INICIO INSTRUMENTACIÓN TEMPORAL CP-39 (auditoria/CHANGELOG.md, 27/07/2026) — RETIRAR TRAS LA CORRIDA REAL.
+  // Falla incondicional mientras la property esté en 'true' (mismo mecanismo
+  // ya usado en CP-12/CP-25/CP-32/CP-34), para forzar reintentos repetidos
+  // de Gmail sobre el mismo mensaje con manifiesto y confirmar que
+  // gestionarErrorMensaje() cierra ERROR_DEFINITIVO al superar
+  // LIMITE_REINTENTOS_GMAIL (H-08), conservando las tareas ya escritas.
+  if (cfg.modoPrueba && PropertiesService.getScriptProperties().getProperty('CP39_FORZAR_FALLO_GMAIL_REPETIDO') === 'true') {
+    throw new Error('CP-39: falla de Gmail simulada por instrumentación temporal de prueba (retirar tras la corrida).');
+  }
+  // FIN INSTRUMENTACIÓN TEMPORAL CP-39
+
   if (!cfg.permitirEtiquetado && !cfg.permitirArchivado) {
     actualizarLogMensajes(mensajeDescriptor, {
       resultado_gmail: 'OMITIDO_POR_CONFIGURACION',
@@ -1137,9 +1185,13 @@ function aplicarResultadoGmail(mensajeDescriptor, claveResultado, cfg) {
     // Se relanza para que el llamador (procesarUnMensaje() /
     // reanudarDesdeManifiesto()) la trate como una falla real de Gmail
     // posterior a la escritura (ver gestionarErrorMensaje(), INC-FASE8-005).
+    // H-11 (documentacion/RECUPERACION_INTERRUPCIONES.md, sección 12):
+    // unidades_gmail_api se acumula (no se sobrescribe) para reflejar el
+    // consumo real cuando un mensaje necesita más de una llamada a Gmail
+    // (por ejemplo, esta fallida + una exitosa posterior en la recuperación).
     actualizarLogMensajes(mensajeDescriptor, {
       resultado_gmail: 'ERROR_GMAIL',
-      unidades_gmail_api: 1,
+      unidades_gmail_api: obtenerValorNumericoLogMensajes(mensajeDescriptor, 'unidades_gmail_api', cfg) + 1,
       error: String(errorGmail.message || errorGmail)
     }, cfg);
     throw errorGmail;
@@ -1147,11 +1199,33 @@ function aplicarResultadoGmail(mensajeDescriptor, claveResultado, cfg) {
 
   // Registrar consumo de unidades de cuota (sección 7.3.6 del plan) y el
   // resultado descriptivo (columna resultado_gmail, sin completar hasta esta
-  // corrección).
+  // corrección). H-11: acumulado, no sobrescrito (ver nota arriba).
   actualizarLogMensajes(mensajeDescriptor, {
     resultado_gmail: resultadoDescriptivo,
-    unidades_gmail_api: 1
+    unidades_gmail_api: obtenerValorNumericoLogMensajes(mensajeDescriptor, 'unidades_gmail_api', cfg) + 1
   }, cfg);
+}
+
+/**
+ * Lee el valor numérico actual de un campo de Log Mensajes (0 si no existe
+ * fila para el mensaje o el valor no es numérico). Usado por H-08
+ * (`intentos_gmail`) y H-11 (`unidades_gmail_api`) para acumular en vez de
+ * sobrescribir entre llamadas sucesivas para el mismo mensaje.
+ */
+function obtenerValorNumericoLogMensajes(mensajeDescriptor, nombreCampo, cfg) {
+  var hoja = obtenerHojaTecnica(HOJAS_TECNICAS.LOG_MENSAJES, cfg);
+  var datos = hoja.getDataRange().getValues();
+  var encabezados = datos[0];
+  var idxMessageId = encabezados.indexOf('message_id');
+  var idxCampo = encabezados.indexOf(nombreCampo);
+
+  for (var fila = 1; fila < datos.length; fila++) {
+    if (datos[fila][idxMessageId] === mensajeDescriptor.messageId) {
+      var valor = datos[fila][idxCampo];
+      return (typeof valor === 'number' && !isNaN(valor)) ? valor : 0;
+    }
+  }
+  return 0;
 }
 
 // ============================================================================
@@ -1191,12 +1265,14 @@ function registrarInicioProcesamiento(mensajeDescriptor, cfg) {
     }
   }
 
-  // Las 26 columnas de Log Mensajes, en el orden exacto de
-  // documentacion/DISENO_HOJAS_TECNICAS.md, sección 1. Corrección (detectada
-  // al verificar la alineación de encabezados): la versión anterior tenía
-  // solo 25 valores (faltaba el placeholder de request_id), lo que corría
-  // una columna hacia la izquierda todo lo posterior a costo_estimado y
-  // dejaba version_script sin escribir. Ver auditoria/INCIDENCIAS.md, INC-001.
+  // Las 27 columnas de Log Mensajes, en el orden exacto de
+  // documentacion/DISENO_HOJAS_TECNICAS.md, sección 1. Corrección histórica
+  // (detectada al verificar la alineación de encabezados): una versión
+  // anterior tenía solo 25 valores (faltaba el placeholder de request_id),
+  // lo que corría una columna hacia la izquierda todo lo posterior a
+  // costo_estimado y dejaba version_script sin escribir. Ver
+  // auditoria/INCIDENCIAS.md, INC-001. Columna 27 (intentos_gmail) agregada
+  // por H-08.
   var filaNueva = [
     mensajeDescriptor.messageId,             // 1  message_id
     mensajeDescriptor.threadId,              // 2  thread_id
@@ -1223,7 +1299,8 @@ function registrarInicioProcesamiento(mensajeDescriptor, cfg) {
     0,                                       // 23 longitud_normalizada
     0,                                       // 24 duracion_llamada_ia
     0,                                       // 25 unidades_gmail_api
-    cfg.versionScript                        // 26 version_script
+    cfg.versionScript,                       // 26 version_script
+    0                                        // 27 intentos_gmail (H-08)
   ];
   hoja.getRange(hoja.getLastRow() + 1, 1, 1, filaNueva.length).setValues([filaNueva]);
 }
@@ -1302,8 +1379,35 @@ function gestionarErrorMensaje(mensajeDescriptor, error, cfg) {
   }
 
   if (manifiesto.length > 0) {
+    // H-08 (documentacion/RECUPERACION_INTERRUPCIONES.md, sección 11;
+    // DEC-007): sin límite, este camino reintentaría para siempre una falla
+    // de Gmail permanente. intentos_gmail cuenta cada vez que se llega acá
+    // con un manifiesto ya persistido; al superar cfg.limiteReintentosGmail,
+    // se cierra ERROR_DEFINITIVO conservando las tareas ya escritas (no se
+    // revierten ni se descartan) en vez de reintentar indefinidamente.
+    var intentosGmailNuevo = obtenerValorNumericoLogMensajes(mensajeDescriptor, 'intentos_gmail', cfg) + 1;
+
+    if (intentosGmailNuevo > cfg.limiteReintentosGmail) {
+      try {
+        actualizarLogMensajes(mensajeDescriptor, {
+          estado: ESTADOS.ERROR_DEFINITIVO,
+          error: String(error.message || error),
+          intentos_gmail: intentosGmailNuevo
+        }, cfg);
+      } catch (errorSecundario) {
+        Logger.log('No se pudo registrar el error en Log Mensajes: ' + errorSecundario.message);
+      }
+      Logger.log('gestionarErrorMensaje(): ' + mensajeDescriptor.messageId + ' superó LIMITE_REINTENTOS_GMAIL (' + cfg.limiteReintentosGmail + '); cierre ERROR_DEFINITIVO con las tareas ya escritas conservadas.');
+      finalizarMensaje(mensajeDescriptor, ESTADOS.ERROR_DEFINITIVO, manifiesto, cfg);
+      return;
+    }
+
     try {
-      actualizarLogMensajes(mensajeDescriptor, { estado: ESTADOS.ERROR_TEMPORAL, error: String(error.message || error) }, cfg);
+      actualizarLogMensajes(mensajeDescriptor, {
+        estado: ESTADOS.ERROR_TEMPORAL,
+        error: String(error.message || error),
+        intentos_gmail: intentosGmailNuevo
+      }, cfg);
     } catch (errorSecundario) {
       Logger.log('No se pudo registrar el error en Log Mensajes: ' + errorSecundario.message);
     }

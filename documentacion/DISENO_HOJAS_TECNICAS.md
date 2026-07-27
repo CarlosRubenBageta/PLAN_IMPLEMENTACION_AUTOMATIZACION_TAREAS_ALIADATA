@@ -44,6 +44,7 @@ Registrar el resultado del procesamiento de cada mensaje de Gmail, independiente
 | 24 | `duracion_llamada_ia` | decimal (s) | `1.8` | Tiempo de la llamada a OpenAI |
 | 25 | `unidades_gmail_api` | integer | `2` | Consumo de cuota de Gmail API para este mensaje (obligatorio registrar, sección 7.3.6 del plan) |
 | 26 | `version_script` | string | `v3.0.0` | Versión del script que procesó el mensaje, para correlacionar incidencias con despliegues |
+| 27 | `intentos_gmail` | integer | `0` | Corrección H-08 (auditoría 20/07/2026, DEC-007): cantidad de veces que `gestionarErrorMensaje()` detectó un manifiesto persistido y registró `ERROR_TEMPORAL` por una falla de Gmail. Distinta de `intentos` (columna 12, reintentos de la IA). Al superar `LIMITE_REINTENTOS_GMAIL`, el mensaje se cierra `ERROR_DEFINITIVO` en vez de reintentarse indefinidamente (ver `documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 11) |
 
 ### Regla de escritura
 
