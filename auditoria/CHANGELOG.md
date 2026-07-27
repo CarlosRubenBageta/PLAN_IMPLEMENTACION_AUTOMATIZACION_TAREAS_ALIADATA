@@ -1,5 +1,41 @@
 # Changelog
 
+## [2026-07-26] — CP-13 Aprobado: corrida real completa, instrumentación temporal retirada
+
+### Contexto
+Con la instrumentación agregada en la entrada anterior, la corrida real confirmó exactamente el comportamiento esperado, al primer intento, en dos pestañas del editor de Apps Script.
+
+```text
+Pestaña 1 (obtuvo el lock):
+23:44:56  Se ha iniciado la ejecución
+23:44:57  CP-13: manteniendo el lock 15 segundos adicionales (instrumentación temporal de prueba)...
+23:45:13  procesarCorreosDeTareas(): 0 mensajes elegibles, procesando 0.
+23:45:13  Se ha completado la ejecución
+
+Pestaña 2 (no obtuvo el lock, disparada ~8 segundos después de la pestaña 1):
+23:45:04  Se ha iniciado la ejecución
+23:45:10  procesarCorreosDeTareas(): no se pudo obtener el lock; ejecución en curso. Se omite esta corrida.
+23:45:10  Se ha completado la ejecución
+```
+
+La pestaña 2 no registró **ninguna** otra línea (ni `validarConfiguracion()`, ni acceso a Gmail/Sheets) — confirma que el rechazo por lock ocurre antes de cualquier acceso real.
+
+### Hallazgo colateral (no afecta la aprobación de CP-13): archivo `Código.gs` sin usar en el proyecto de prueba
+Al revisar la captura de la pestaña 2, se detectó que el proyecto de prueba de Apps Script todavía contiene un archivo `Código.gs` — el script original pre-Fase-1 que motivó todo este proyecto de refactorización — con su **propia** definición de `procesarCorreosDeTareas()` (sin `LockService`, sin ninguna de las correcciones de Fase 1-8). Como Apps Script comparte un único espacio de nombres entre todos los archivos `.gs` de un proyecto, dos funciones con el mismo nombre generan una colisión silenciosa: una sobrescribe a la otra sin ningún aviso, y el resultado depende de un detalle no garantizado (orden de archivos). En esta corrida "ganó" la versión correcta (`script_refactorizado.gs`), pero esto no es una garantía estructural.
+
+El usuario confirmó que `Código.gs` nunca se modificó durante todo el proceso (es efectivamente el script original, ya preservado también en `codigo/script_actual.gs` del repositorio) y decidió eliminarlo del proyecto de prueba para eliminar la colisión de raíz. Esto queda pendiente de confirmación de que se realizó, pero no bloquea la aprobación de CP-13 (el resultado de esta corrida real ya demostró el comportamiento correcto del lock).
+
+### Aprobación
+**CP-13 pasa de Pendiente a Aprobado — 26/07/2026.** Confirma en producción real que `LockService.getScriptLock().tryLock(5000)` impide efectivamente dos ejecuciones concurrentes de `procesarCorreosDeTareas()`: la segunda ejecución registra el mensaje de rechazo esperado y termina de inmediato, sin ningún acceso a Gmail ni Sheets. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### Retiro de la instrumentación temporal
+Con CP-13 aprobado, se retira de `codigo/script_refactorizado.gs` el gancho `INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-13` agregado en la entrada anterior (`procesarCorreosDeTareas()` vuelve exactamente a su forma previa a esa entrada). La property `CP13_EXTENDER_LOCK` queda sin efecto en el código. Verificado antes y después del retiro: `node --check` sobre el archivo y las 5 suites locales (166/60/46/19/17 verificaciones), sin regresiones.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada — es exclusivamente el registro de la corrida real, la aprobación, y el retiro de la instrumentación.
+
+---
+
 ## [2026-07-26] — Instrumentación temporal de prueba para CP-13: dos ejecuciones simultáneas
 
 ### Contexto

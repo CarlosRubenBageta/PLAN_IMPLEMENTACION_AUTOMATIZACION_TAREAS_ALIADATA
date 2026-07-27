@@ -335,21 +335,6 @@ function procesarCorreosDeTareas() {
       return;
     }
 
-    // INICIO INSTRUMENTACIÓN TEMPORAL CP-13 (auditoria/CHANGELOG.md, 26/07/2026) — RETIRAR TRAS LA CORRIDA REAL.
-    // Extiende artificialmente el tiempo que se mantiene el lock, para que
-    // una segunda ejecución disparada manualmente unos segundos después
-    // tenga una ventana cómoda para encontrar el lock ya tomado, sin
-    // depender de que el procesamiento real tarde más de los 5000 ms de
-    // tryLock() por casualidad. Gateada por MODO_PRUEBA (property cruda,
-    // cfg todavía no existe en este punto) y por una property exclusiva de
-    // esta prueba; nunca puede dispararse en la cuenta productiva.
-    if (PropertiesService.getScriptProperties().getProperty('MODO_PRUEBA') === 'true' &&
-        PropertiesService.getScriptProperties().getProperty('CP13_EXTENDER_LOCK') === 'true') {
-      Logger.log('CP-13: manteniendo el lock 15 segundos adicionales (instrumentación temporal de prueba) para dar tiempo a disparar una segunda ejecución.');
-      Utilities.sleep(15000);
-    }
-    // FIN INSTRUMENTACIÓN TEMPORAL CP-13
-
     var validacion = validarConfiguracion();
     if (!validacion.valido) {
       // Regla dura: si falla la validación crítica, no tocar Gmail ni Sheets.

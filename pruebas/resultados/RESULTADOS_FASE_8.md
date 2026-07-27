@@ -55,7 +55,7 @@ Captura revisada por Claude Cowork. Muestra:
 | CP-10 | Hoja inexistente | 21/07/2026, ejecución formal ~21:18 | Hoja `Desarrollo IT` renombrada temporalmente a `Desarrollo IT__CP10_TEMP` (mismo comportamiento de hoja inexistente). Lote de 2 mensajes: uno a la hoja inexistente (`REVISION_MANUAL`/`ERROR_ESCRITURA`), otro a `Finanzas` (`PROCESADO`/`ESCRITA`). Ver detalle completo debajo de la tabla. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
 | CP-11 | Mismo mensaje dos veces | 21/07/2026, ~21:43 | `procesarCorreosDeTareas()` informó `0 mensajes elegibles, procesando 0` reutilizando los dos mensajes ya cerrados de CP-10. Ver detalle completo debajo de la tabla. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
 | CP-12 | Caída después de escritura parcial | 24-25/07/2026 (Variantes A y B, flujo clásico con instrumentación temporal) | Ver detalle completo debajo de la tabla. Resumen: Variante A (excepción capturada) dejó `Log Mensajes` en `ERROR_TEMPORAL`/`ESCRITURA_COMPLETADA`, recuperado vía `reanudarDesdeManifiesto()` sin volver a consultar la IA (validado además sobre 5 mensajes viejos arrastrados por la query amplia, hallazgo no planeado sin impacto en aprobaciones vigentes). Variante B (runtime interrumpido, `return` sin excepción) dejó el mensaje genuinamente en `EN_PROCESO`/`ESCRITURA_COMPLETADA`; `recuperarProcesamientosAbandonados()` lo detectó por `UMBRAL_ABANDONO_MIN` y lo reanudó por la misma vía, sin duplicar tareas. Ambas variantes convergieron al mismo resultado final (`PROCESADO`, sin duplicados, sin nueva consulta a la IA). | Registro de ejecución de ambas corridas reales — `message_id 19f96ec29b3c8486` (A), `19f9734c63bb0299` (B) | Aprobado — 25/07/2026 |
-| CP-13 | Dos ejecuciones simultáneas | | | | Pendiente |
+| CP-13 | Dos ejecuciones simultáneas | 26/07/2026 (dos pestañas del editor, instrumentación temporal mínima) | Ver detalle completo debajo de la tabla. Resumen: `LockService.tryLock(5000)` impidió la segunda ejecución concurrente; el rechazo se registró y terminó sin tocar Gmail/Sheets. Aprobó al primer intento. Hallazgo colateral (sin impacto en esta aprobación): archivo `Código.gs` sin usar detectado en el proyecto de prueba, con una función de mismo nombre — el usuario decidió eliminarlo. | Registro de ejecución de ambas pestañas | Aprobado — 26/07/2026 |
 | CP-14 | Firma extensa | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: `SIMULACION_OK` confirmó 1 observación/1 tarea (`Gestión General/Alto`), sin escrituras; `FORMAL_OK` confirmó automáticamente `Log Mensajes`, 1 fila en `Registro Tareas`, 1 entrada en `Indice Idempotencia`, fila nueva en `Gestión General`, y etiqueta `Procesado` en Gmail. Aprobó al primer intento, pese a ser el primer cuerpo multi-párrafo del automatizador. | Registro `[AUTO-FASE8]` de la corrida real — `runId b8ed62db-4f41-418e-9acd-276d1bcdd4ee`, `message_id 19f9640b73453584` | Aprobado — 24/07/2026 |
 | CP-15 | Observaciones duplicadas | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: `SIMULACION_OK` confirmó 1 observación/1 tarea (`Finanzas/Alto`), sin escrituras; `FORMAL_OK` confirmó automáticamente `Log Mensajes`, 1 fila en `Registro Tareas`, 1 entrada en `Indice Idempotencia`, fila nueva en `Finanzas`, y etiqueta `Procesado` en Gmail. Aprobó al primer intento. | Registro `[AUTO-FASE8]` de la corrida real — `runId 01fbd80c-a874-4eed-82a6-c21a14b8070f`, `message_id 19f9621b19597350` | Aprobado — 24/07/2026 |
 | CP-16 | Cuerpo vacío | 24/07/2026 (automatizador de integración Fase 2A) | Ver detalle completo debajo de la tabla. Resumen: `FORMAL_OK` confirmó automáticamente `Log Mensajes` (`SIN_TAREAS`), ninguna fila nueva en `Registro Tareas`, 1 entrada en `Indice Idempotencia` (`task_id` vacío), y etiqueta `Revisión manual/Sin tareas detectadas` en Gmail — primer caso rechazado por filtro determinístico (sin llamada a OpenAI). Aprobó en el segundo intento (el primero expuso un defecto del verificador, no del pipeline). | Registro `[AUTO-FASE8]` de la corrida real — `runId 7efa4045-e9c8-4815-974c-b80eca8ee56f`, `message_id 19f9677c994bf546` | Aprobado — 24/07/2026 |
@@ -1246,6 +1246,46 @@ Dos corridas previas (correos "Blabla" y "blablabla2") terminaron con `Log Mensa
 
 **Estado (veredicto final):** Aprobado — 26/07/2026 (`PASA`).
 
+## Detalle de CP-13 — Dos ejecuciones simultáneas (instrumentación temporal mínima)
+
+```text
+Fecha de ejecución: 26/07/2026
+Instrumentación: delay artificial de 15s gateado por MODO_PRUEBA + property
+CP13_EXTENDER_LOCK, en procesarCorreosDeTareas() (codigo/script_refactorizado.gs),
+justo después de obtener el ScriptLock — ya retirado del código.
+```
+
+**Diseño:** a diferencia de todos los casos anteriores, CP-13 no ejercita ninguna lógica de negocio nueva — el mecanismo bajo prueba (`LockService.getScriptLock().tryLock(5000)`) ya existía sin cambios. La única instrumentación fue un delay artificial para hacer confiable el timing de dos clics manuales, sin depender de que el procesamiento real tardara por casualidad más de 5 segundos.
+
+### Corrida (dos pestañas del editor de Apps Script)
+
+Pestaña 1 (ejecutada primero, obtuvo el lock):
+```text
+23:44:56  Aviso           Se ha iniciado la ejecución
+23:44:57  Información     CP-13: manteniendo el lock 15 segundos adicionales (instrumentación temporal de prueba) para dar tiempo a disparar una segunda ejecución.
+23:45:13  Información     procesarCorreosDeTareas(): 0 mensajes elegibles, procesando 0.
+23:45:13  Aviso           Se ha completado la ejecución
+```
+
+Pestaña 2 (ejecutada ~8 segundos después, no obtuvo el lock):
+```text
+23:45:04  Aviso           Se ha iniciado la ejecución
+23:45:10  Información     procesarCorreosDeTareas(): no se pudo obtener el lock; ejecución en curso. Se omite esta corrida.
+23:45:10  Aviso           Se ha completado la ejecución
+```
+
+La pestaña 2 no registró ninguna otra línea — ni `validarConfiguracion()`, ni ningún acceso real a Gmail/Sheets — confirmando que el rechazo por lock ocurre antes de cualquier efecto observable.
+
+### Hallazgo colateral: archivo `Código.gs` sin usar en el proyecto de prueba
+
+Al revisar la captura de la pestaña 2, se detectó que el proyecto de prueba todavía contenía un archivo `Código.gs` — confirmado por el usuario como el script original pre-Fase-1 que motivó todo este proyecto de refactorización, nunca modificado durante el proceso — con su **propia** definición de `procesarCorreosDeTareas()` (sin `LockService`, sin ninguna corrección de Fase 1-8). Dos funciones con el mismo nombre en distintos archivos `.gs` del mismo proyecto generan una colisión silenciosa de espacio de nombres: una sobrescribe a la otra sin ningún aviso, y cuál "gana" depende de un detalle no garantizado (orden de archivos). En esta corrida "ganó" la versión correcta, pero esto no era una garantía estructural — de haber sido al revés, todas las pruebas de Fase 8 podrían haber estado validando código que no es el que realmente se ejecuta.
+
+No afecta la validez de esta aprobación (la corrida real ya demostró el comportamiento correcto), pero es un riesgo real hacia adelante. El usuario, tras confirmar que `Código.gs` es efectivamente el original sin usar (y que el repositorio ya preserva ese mismo original en `codigo/script_actual.gs` para referencia histórica), decidió eliminarlo del proyecto de prueba para eliminar la colisión de raíz.
+
+**Conclusión:** CP-13 PASA. Confirma, en producción real, que el control de concurrencia por `LockService` impide efectivamente que dos ejecuciones simultáneas de `procesarCorreosDeTareas()` procesen el mismo lote de mensajes; la ejecución que no obtiene el lock termina de inmediato sin ningún acceso real a Gmail ni Sheets.
+
+**Estado (veredicto final):** Aprobado — 26/07/2026 (`PASA`).
+
 ## Detalle de CP-07 — Notificación de Apps Script (aprobado vía automatizador de integración Fase 2A)
 
 ```text
@@ -1452,7 +1492,7 @@ Total de casos que condicionan la aprobación de esta fase: 36 (CP-01 a CP-29, C
 Diferido a Fase 10 (no condiciona esta fase): 1 (CP-30, DEC-004)
 Bloqueado que todavía condiciona la Fase 8: 1 (CP-35 — ver nota de auditoría abajo)
 Bloqueados pendientes de Lotes 2/3 (no condicionan esta fase): 2 (CP-38, CP-39)
-Aprobados: 32 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-07, CP-08, CP-09, CP-10, CP-11, CP-12, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-25, CP-26, CP-27, CP-28, CP-31, CP-32, CP-33, CP-34, CP-36, CP-37)
+Aprobados: 33 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-07, CP-08, CP-09, CP-10, CP-11, CP-12, CP-13, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-25, CP-26, CP-27, CP-28, CP-31, CP-32, CP-33, CP-34, CP-36, CP-37)
 Rechazados: 0
   CP-19 pasó de Rechazado (21/07/2026, INC-FASE8-008) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución fallida original se conserva íntegro en el detalle de CP-19.
   CP-23 pasó de Rechazado (22/07/2026, INC-FASE8-009) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución vulnerable original se conserva íntegro en el detalle de CP-23.
@@ -1474,7 +1514,8 @@ Rechazados: 0
   CP-34 pasó de Pendiente a Aprobado (26/07/2026, flujo clásico con instrumentación temporal, message_id 19fa107c79d673bb, 3 corridas -- mismo gancho de CP-12/CP-25/CP-32 mantenido activo durante dos corridas consecutivas. La segunda falla se capturo por el mismo camino que la primera, con una sola linea de error (sin cadena de reintentos, Log Mensajes sin cambios); la tercera corrida recupero el mensaje limpiamente sin duplicar tareas. Aprobo al primer intento. Cierra la familia completa de recuperacion desde manifiesto: CP-12, CP-25, CP-26, CP-32, CP-33 y CP-34). El registro de las tres corridas se conserva integro en el detalle de CP-34.
   CP-08 pasó de Pendiente a Aprobado (26/07/2026, instrumentación temporal en codigo/cliente_openai.gs -- distinto de la familia de recuperación: consultarIAExtractora() devolvió contenidoCrudo inválido sin llamar a la API real de OpenAI. validarRespuestaIA() lo detecto y el mensaje se cerro REVISION_MANUAL/FINALIZADO de inmediato (sin manifiesto), sin fila en Registro Tareas, con etiqueta Revisión manual/Error de procesamiento. Aprobo al primer intento). El registro de la corrida se conserva integro en el detalle de CP-08.
   CP-09 pasó de Pendiente a Aprobado (26/07/2026, instrumentación temporal en codigo/cliente_openai.gs, opción b -- HTTP 503 simulado en el intento 1 y HTTP 200 con contenido válido en el intento 2, preservando intacto el bucle real de reintentos (solo se reemplazó el objeto response de UrlFetchApp.fetch()). Log Mensajes.intentos=2, tarea generada normalmente en el segundo intento, sin duplicados. Dos intentos previos se descartaron por una copia desactualizada del archivo en el proyecto de prueba, sin relación con el pipeline). El registro de la corrida se conserva integro en el detalle de CP-09.
-Pendientes (ejecutables con estado Pendiente, no corridos aún): 3
+  CP-13 pasó de Pendiente a Aprobado (26/07/2026, instrumentación temporal mínima -- un delay artificial de 15s en procesarCorreosDeTareas() para hacer confiable el timing de dos ejecuciones manuales casi simultáneas. Una pestaña obtuvo el lock y proceso normalmente; la otra registro unicamente el rechazo por lock y termino sin tocar Gmail/Sheets. Aprobo al primer intento. Hallazgo colateral sin impacto en esta aprobacion: se detecto un archivo Código.gs sin usar en el proyecto de prueba con una funcion de mismo nombre, generando una colision de espacio de nombres -- el usuario decidio eliminarlo). El registro de ambas pestañas se conserva integro en el detalle de CP-13.
+Pendientes (ejecutables con estado Pendiente, no corridos aún): 2
   [Corregido 22/07/2026: esta lista omitía a CP-27, ya aprobado desde el 20/07/2026 (CP-27 — Modo prueba con ID productivo); no cambia el alcance ni el estado de ningún caso.]
   [Corregido 23/07/2026 (semántica): CP-35 estaba contabilizado dentro de "Pendientes"; su estado individual es Bloqueado (ver nota de auditoría abajo), no Pendiente. Se lo separa como bloqueado que todavía condiciona la Fase 8. Pendientes pasa de 20 a 19; no cambia el estado individual de ningún caso.]
   [Corregido 24/07/2026: CP-03 pasó de Pendiente a Aprobado (ver arriba); Pendientes pasa de 19 a 18.]
@@ -1506,8 +1547,9 @@ Pendientes (ejecutables con estado Pendiente, no corridos aún): 3
   CP-34 fue ejecutado y aprobado el 26/07/2026
   CP-08 fue ejecutado y aprobado el 26/07/2026
   CP-09 fue ejecutado y aprobado el 26/07/2026
-Casos sin aprobación que todavía condicionan la Fase 8: 4 (3 Pendientes + CP-35 Bloqueado)
-Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 7
+  CP-13 fue ejecutado y aprobado el 26/07/2026
+Casos sin aprobación que todavía condicionan la Fase 8: 3 (2 Pendientes + CP-35 Bloqueado)
+Sin aprobación total (Pendientes + CP-35 + CP-38 + CP-39 + CP-30): 6
 
 Nota (auditoría 20/07/2026): CP-35 pasó a "bloqueado" — no puede considerarse
 una verificación válida del criterio "no existen duplicados" hasta que

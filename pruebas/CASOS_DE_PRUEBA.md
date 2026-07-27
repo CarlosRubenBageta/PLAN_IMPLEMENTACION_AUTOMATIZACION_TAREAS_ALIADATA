@@ -153,7 +153,7 @@ Reutiliza **PE-08** (`pruebas/PRUEBAS_ESCRITURA.md`): eliminar temporalmente (en
 
 **Procedimiento:** disparar `procesarCorreosDeTareas()` dos veces con muy poca diferencia de tiempo (por ejemplo, dos ejecuciones manuales lanzadas en paralelo desde el editor, o dos activadores momentáneos).
 **Resultado esperado:** solo una ejecución obtiene el `LockService` (`tryLock`); la segunda registra en el log "no se pudo obtener el lock" y termina sin tocar Gmail ni Sheets.
-**Estado:** Pendiente.
+**Estado:** Aprobado — 26/07/2026. Ejecutado con una instrumentación temporal mínima (`cfg` cruda vía `MODO_PRUEBA` + property exclusiva `CP13_EXTENDER_LOCK`) que extiende artificialmente 15 segundos el tiempo que se mantiene el lock, para no depender del timing real de dos clics manuales. Dos pestañas del editor de Apps Script ejecutando `procesarCorreosDeTareas()` con ~8 segundos de diferencia: la primera mantuvo el lock, logueó el aviso de instrumentación y procesó normalmente ("0 mensajes elegibles"); la segunda registró únicamente `"no se pudo obtener el lock; ejecución en curso. Se omite esta corrida."` y terminó ahí, sin ninguna otra línea (sin `validarConfiguracion()`, sin acceso a Gmail/Sheets). Aprobó al primer intento. Instrumentación ya retirada del código. **Hallazgo colateral** (no afecta esta aprobación): se detectó un archivo `Código.gs` sin usar en el proyecto de prueba (el script original pre-Fase-1, nunca modificado) con su propia definición de `procesarCorreosDeTareas()`, generando una colisión de nombres silenciosa con `script_refactorizado.gs` — el usuario decidió eliminarlo del proyecto de prueba. Ver detalle completo en `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
 ## CP-14 — Firma extensa
 
