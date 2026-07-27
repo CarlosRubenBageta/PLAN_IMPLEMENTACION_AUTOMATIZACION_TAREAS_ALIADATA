@@ -35,12 +35,12 @@ Esta carpeta seleccionada actúa como raíz del proyecto (equivale a `Automatiza
 | 5. Idempotencia | **APROBADA** (20/07/2026, acta firmada; incluye enmienda a Registro Tareas de Fase 2) |
 | 6. Filtros determinísticos | **APROBADA** (20/07/2026, acta firmada) |
 | 7. Escritura en Sheets | **APROBADA** (20/07/2026, acta firmada) |
-| 8. Pruebas | **Casos preparados** — ejecución real pendiente, requiere acción de Rubén en Google Workspace |
+| 8. Pruebas | **Casos condicionantes aprobados (36/36)** (27/07/2026) — condicionada a que se resuelvan los Lotes 2/3 de la auditoría (DEC-009); ver acta |
 | 9 a 10 | Pendientes |
 
 **Para retomar el proyecto en una sesión nueva:** indicar a Cowork que lea este README y `entregables/FASE_8/ACTA_APROBACION_FASE_8.md`.
 
-**Acción pendiente de Rubén (no de Cowork) para poder cerrar la Fase 8:** copiar los archivos `codigo/*.gs` a un proyecto de Apps Script de prueba, configurar el modo prueba aislado, ejecutar los 30 casos de `pruebas/CASOS_DE_PRUEBA.md` y completar `pruebas/resultados/RESULTADOS_FASE_8.md` con la evidencia real. Recién entonces Cowork puede redactar el acta definitiva y continuar con la Fase 9.
+**Acción pendiente de Rubén para cerrar formalmente la Fase 8:** evaluar explícitamente los Lotes 2/3 de la auditoría del 20/07/2026 (hallazgos H-07, H-08, H-10, H-11, H-12, `auditoria/DECISIONES.md`) — aprobarlos o diferirlos de forma consciente, con el mismo criterio ya aplicado a CP-30/DEC-004. Con eso resuelto, el acta puede firmarse (responsable y fecha) y puede planificarse la Fase 9 (ventana de corte productiva).
 
 ## Reglas de seguridad esenciales
 

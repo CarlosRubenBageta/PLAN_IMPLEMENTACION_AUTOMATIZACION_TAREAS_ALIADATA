@@ -1689,7 +1689,7 @@ Nota (INC-FASE8-006, 21/07/2026): también volver a copiar:
   codigo/recuperacion.gs          (obtenerMetadatosMensaje + construirEnlaceCorreo reciben cfg)
   pruebas/debug_seguro_pruebas.gs (maxMensajesBusqueda en lugar de maxHilos en la vista segura)
 
-¿Todos los casos críticos (CP-01 a CP-29, CP-31 a CP-35) pasaron?
+¿Todos los casos críticos (CP-01 a CP-29, CP-31 a CP-37) pasaron?
 ¿Se detectaron duplicados?
 ¿Se generaron tareas falsas?
 ¿Las tareas llegaron a la hoja correcta?

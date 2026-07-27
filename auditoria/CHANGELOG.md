@@ -1,5 +1,29 @@
 # Changelog
 
+## [2026-07-27] — Corrección de documentación desactualizada detectada por auditoría externa (ChatGPT)
+
+### Contexto
+Carlos Rubén Bageta pidió una auditoría técnica independiente (ChatGPT) sobre el estado del repositorio tras el commit técnico de finalización `5d0cd20` (merge a `master` y push a `origin`; la Fase 8 queda técnicamente completa pero todavía condicionada, no formalmente cerrada — ver hallazgo 2). Verificados los cuatro hallazgos contra los archivos reales antes de aceptarlos — los cuatro resultaron ciertos:
+
+1. **[P0] `entregables/FASE_8/ACTA_APROBACION_FASE_8.md` seguía declarando la fase "PENDIENTE (bloqueada por falta de ejecución real)"**, con numeración de 29 casos (previa a CP-30/DEC-004) y afirmando que "la Fase 9 no puede iniciarse hasta que esta acta indique APROBADA". Nunca se actualizó durante toda la ejecución real de la Fase 8 (20/07/2026-27/07/2026) pese a que los 36 casos condicionantes ya estaban Aprobados.
+2. **[P1] DEC-009 exige que los Lotes 2/3 de la auditoría del 20/07/2026 (H-07, H-08, H-10, H-11, H-12) hayan sido evaluados explícitamente (aprobados o diferidos)** antes del cierre formal de la Fase 8 — no ocurrió (DEC-007/Lote 2 sigue como "Propuesta — pendiente de aprobación"). Ya identificado por Claude en la sesión anterior; la auditoría externa llegó de forma independiente a la misma conclusión.
+3. **[P1] `pruebas/evidencias/` solo contiene capturas de la preparación del entorno, CP-01 y CP-27** (15 archivos) — ningún otro caso de los 36 aprobados tiene evidencia archivada como imagen en el repositorio; se verificaron mediante capturas compartidas directamente en la conversación con Claude, nunca guardadas como archivo.
+4. **[P2] `README.md` y el cuestionario final de `RESULTADOS_FASE_8.md`** seguían con texto desactualizado (README: "ejecución real pendiente"; cuestionario final: omitía CP-36/CP-37 de la lista de casos críticos).
+
+### Corrección aplicada en esta entrada
+- `entregables/FASE_8/ACTA_APROBACION_FASE_8.md`: reescrita para reflejar la ejecución real completa (36/36 casos condicionantes Aprobados, con referencia a la evidencia real en `RESULTADOS_FASE_8.md`/`INCIDENCIAS_FASE_8.md`/`CHANGELOG.md`). La puerta de aprobación se marca **"TÉCNICAMENTE COMPLETA — CONDICIONADA"**, no `APROBADA` sin calificación: la condición de DEC-009 sobre los Lotes 2/3 sigue sin resolverse, y marcar el acta como aprobada sin esa resolución repetiría el mismo hallazgo P1 que motivó esta corrección. Se agregó también una sección explícita reconociendo la limitación de evidencia archivada (hallazgo 3), en vez de dejarla implícita.
+- `README.md`: tabla de estado de fases y la nota de "acción pendiente de Rubén" actualizadas — ya no piden copiar código ni ejecutar 30 casos (hecho); ahora señalan la resolución de los Lotes 2/3 como el único paso pendiente para la firma formal del acta.
+- `pruebas/resultados/RESULTADOS_FASE_8.md`: cuestionario final corregido de "CP-01 a CP-29, CP-31 a CP-35" a "CP-01 a CP-29, CP-31 a CP-37".
+
+### No corregido en esta entrada (requiere decisión o acción de Carlos Rubén Bageta, no solo texto)
+- **Hallazgo 2 (Lotes 2/3):** sigue pendiente de una decisión explícita — no se resuelve reescribiendo documentación.
+- **Hallazgo 3 (evidencia archivada):** no es reconstruible retroactivamente (las capturas de CP-02 a CP-26/CP-28/CP-29/CP-31 a CP-37 nunca se guardaron como archivo); la sección nueva del acta documenta la limitación en vez de fingir que no existe. Si Carlos Rubén Bageta conserva esas capturas y quiere archivarlas ahora, es una acción posterior, no parte de esta corrección.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta corrección — es exclusivamente documental.
+
+---
+
 ## [2026-07-27] — CP-35 Aprobado: corrida real completa, instrumentación temporal retirada — cierra la Fase 8
 
 ### Corrida real
