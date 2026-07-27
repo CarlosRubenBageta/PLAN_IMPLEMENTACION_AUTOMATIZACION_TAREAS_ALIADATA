@@ -371,21 +371,19 @@ Cuerpo: Por favor actualicen el medio de pago del cliente. Nueva tarjeta: 4551 8
 
 **Corrección aplicada (27/07/2026, DEC-010):** `recuperarMensajesConManifiestoPendiente()` implementada y verificada localmente (`documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 10). El caso pasa a ejecutable.
 
-**Instrumentación temporal:** gancho gateado por `cfg.modoPrueba` + `CP38_FORZAR_FALLO_POSTERIOR` en `procesarUnMensaje()` (`codigo/script_refactorizado.gs`), justo después de que `aplicarResultadoGmail()` archive el mensaje de verdad. **Requiere `PERMITIR_ARCHIVADO=true` temporalmente** (la convención de este proyecto es `false` en modo prueba) — es la única forma de que el mensaje realmente salga de `in:inbox`.
-
-**Procedimiento:** forzar una falla después de que el mensaje ya fue archivado por una llamada previa exitosa, de modo que el mensaje quede `ERROR_TEMPORAL` con manifiesto pero **ya no esté en la bandeja de entrada** (por lo tanto, `in:inbox`/`GMAIL_QUERY_PRUEBA` no lo traerían de nuevo).
-**Resultado esperado:** en la ejecución siguiente, el mensaje se recupera igual, sin depender de que la búsqueda de Gmail lo encuentre — vía la nueva función que escanea `Log Mensajes` directamente. Verificar también, de paso, que `unidades_gmail_api` refleja el consumo acumulado (H-11) y que `Log Mensajes.error` queda limpio tras el cierre exitoso (H-12).
-**Estado:** Pendiente — corrección aplicada y verificada localmente; falta la corrida real.
+**Procedimiento:** forzar una falla después de que el mensaje ya fue archivado por una llamada previa exitosa (instrumentación temporal gateada por `cfg.modoPrueba` + `CP38_FORZAR_FALLO_POSTERIOR` en `procesarUnMensaje()`, con `PERMITIR_ARCHIVADO=true` temporal — ya retirada del código), de modo que el mensaje quedara `ERROR_TEMPORAL` con manifiesto pero fuera de `in:inbox`.
+**Resultado esperado:** en la ejecución siguiente, el mensaje se recupera igual, sin depender de que la búsqueda de Gmail lo encuentre.
+**Estado:** Aprobado — 27/07/2026. Corrida real (`message_id 19fa40fc2e504081`): la primera ejecución instrumentada archivó el mensaje de verdad y luego forzó la falla, dejándolo `ERROR_TEMPORAL` con manifiesto y fuera de `in:inbox`. La ejecución siguiente registró `"recuperarMensajesConManifiestoPendiente(): 19fa40fc2e504081 en ERROR_TEMPORAL con manifiesto persistido; reanudando sin depender de la búsqueda de Gmail"`, mientras que la búsqueda normal (`procesarCorreosDeTareas()`) informó `"0 mensajes elegibles, procesando 0"` — confirmando que la recuperación no dependió en absoluto de que Gmail volviera a encontrar el mensaje, sino exclusivamente de la nueva función. `reanudarDesdeManifiesto()` detectó las tareas ya `ESCRITA` y repitió únicamente la actualización de Gmail. Verificado en la planilla real: `Log Mensajes` con `estado=PROCESADO`, `etapa=FINALIZADO`, `error` vacío (H-12) y `unidades_gmail_api=2` (acumulado, H-11); `Indice Idempotencia` con las 2 filas nuevas (`estado_final=PROCESADO`); `Registro Tareas` sin duplicar (las mismas 2 filas `ESCRITA` de la corrida original). Aprobó al primer intento real. Instrumentación temporal retirada. Ver detalle completo en `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
 ## CP-39 — Límite de reintentos Gmail y salida a error permanente (H-08, DEC-007)
 
 **Corrección aplicada (27/07/2026, DEC-007 actualizada):** columna `intentos_gmail`, propiedad `LIMITE_REINTENTOS_GMAIL` y lógica de cierre implementadas y verificadas localmente (`documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 11). El caso pasa a ejecutable.
 
-**Instrumentación temporal:** gancho gateado por `cfg.modoPrueba` + `CP39_FORZAR_FALLO_GMAIL_REPETIDO` en `aplicarResultadoGmail()` (`codigo/script_refactorizado.gs`), mismo mecanismo ya usado en CP-12/CP-25/CP-32/CP-34.
+**Hallazgo H-14 (detectado al preparar este caso, antes de instrumentar o correr nada):** con H-07 ya activo, un mensaje `ERROR_TEMPORAL` con manifiesto que no se archiva (el escenario exacto de este caso) se encontraba dos veces por ejecución — vía `recuperarMensajesConManifiestoPendiente()` y vía el chequeo de manifiesto de `procesarUnMensaje()` — duplicando `intentos_gmail` por corrida. Corregido y verificado localmente (DEC-012, `documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 14) antes de correr este caso.
 
 **Procedimiento:** forzar que la actualización de Gmail falle de manera persistente (no transitoria) para un mensaje con manifiesto, a lo largo de más ejecuciones que `LIMITE_REINTENTOS_GMAIL`.
-**Resultado esperado:** tras agotar el límite, el mensaje se cierra `ERROR_DEFINITIVO`, se escribe `Indice Idempotencia` (deja de reintentarse), y las tareas ya escritas en los tableros de negocio **permanecen** (no se revierten). Antes de agotar el límite, el mensaje debe seguir reintentándose normalmente en cada ejecución.
-**Estado:** Pendiente — corrección aplicada y verificada localmente; falta la corrida real.
+**Resultado esperado:** tras agotar el límite, el mensaje se cierra `ERROR_DEFINITIVO`, se escribe `Indice Idempotencia` (deja de reintentarse), y las tareas ya escritas en los tableros de negocio **permanecen** (no se revierten). Antes de agotar el límite, el mensaje debe seguir reintentándose normalmente en cada ejecución, exactamente 1 vez por ejecución (confirma H-14).
+**Estado:** Aprobado — 27/07/2026. Corrida real (`message_id 19fa443c94a40af2`, `LIMITE_REINTENTOS_GMAIL=6` en el proyecto de prueba): 7 ejecuciones manuales sucesivas. La primera generó y escribió 2 tareas y falló al actualizar Gmail (`intentos_gmail: 0→1`); las siguientes 5 fueron recuperadas exclusivamente por `recuperarMensajesConManifiestoPendiente()` (H-07) — cada una confirmó `"0 mensajes elegibles, procesando 0"` en la búsqueda normal, probando que H-14 excluye correctamente al mensaje de un segundo intento en la misma ejecución (`intentos_gmail` avanzó de a 1 por corrida: 2, 3, 4, 5, 6). La séptima superó el límite y cerró `ERROR_DEFINITIVO` (`"superó LIMITE_REINTENTOS_GMAIL (6); cierre ERROR_DEFINITIVO con las tareas ya escritas conservadas"`). Verificado en la planilla real: `Log Mensajes` con `estado=ERROR_DEFINITIVO`, `etapa=FINALIZADO`, `error` con el texto de la instrumentación **conservado** (confirma H-12: solo se limpia en `PROCESADO`, no en otros cierres), `intentos_gmail=7`; `Indice Idempotencia` con las 2 filas nuevas (`estado_final=ERROR_DEFINITIVO`); `Registro Tareas` sin duplicar (las mismas 2 filas `ESCRITA` originales). Nota: `resultado_gmail`/`unidades_gmail_api` no se modificaron durante esta prueba — el gancho de instrumentación interrumpe `aplicarResultadoGmail()` antes de la llamada real a `Gmail.Users.Messages.modify()`, así que nunca hubo una llamada real a la API en ninguna de las 7 corridas (comportamiento esperado de este mecanismo específico, no un defecto). Instrumentación temporal retirada. Ver detalle completo en `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
 ---
 
@@ -397,8 +395,8 @@ Cuerpo: Por favor actualicen el medio de pago del cliente. Nueva tarjeta: 4551 8
 | CP-08, CP-09, CP-12, CP-26, CP-29 | Instrumentación temporal de código (fault injection), a retirar después de cada prueba. **Ninguna de estas instrumentaciones puede loguear `cfg`/`options`/`payload` sin redactar — usar `pruebas/debug_seguro_pruebas.gs`** |
 | CP-31 a CP-35 | Corrección de INC-FASE8-004/005 ya aplicada; requiere volver a copiar `codigo/script_refactorizado.gs` al proyecto de prueba |
 | CP-10, CP-36, CP-37 | Corrección de Lote 1 (H-01, H-02, H-03, H-04, 21/07/2026) ya aplicada; requiere volver a copiar `codigo/script_refactorizado.gs` al proyecto de prueba |
-| CP-38 | Requiere `recuperarMensajesConManifiestoPendiente()` (H-07, Lote 2 — pendiente de aprobación) |
-| CP-39 | Requiere `LIMITE_REINTENTOS_GMAIL`/`intentos_gmail` (H-08, DEC-007, Lote 2 — pendiente de aprobación) |
+| CP-38 | `recuperarMensajesConManifiestoPendiente()` (H-07, DEC-010) aplicada y confirmada con corrida real (27/07/2026) — sin dependencias pendientes |
+| CP-39 | `LIMITE_REINTENTOS_GMAIL`/`intentos_gmail` (H-08, DEC-007) aplicada y confirmada con corrida real (27/07/2026) — sin dependencias pendientes |
 
 ## Alcance de la aprobación de la Fase 8
 
@@ -406,7 +404,7 @@ Por DEC-004, la aprobación de esta fase requiere **CP-01 a CP-29** aprobados y 
 
 **CP-10, CP-36 y CP-37** (Lote 1, 21/07/2026): correcciones aplicadas, pasan a "Pendiente — verificación pendiente". Se agregan al conteo de casos que condicionan la aprobación de la Fase 8 (DEC-009).
 
-**CP-38 y CP-39** permanecen bloqueados hasta que los Lotes 2 y 3 sean aprobados por Carlos Rubén Bageta (H-07, H-08, DEC-007). El hallazgo H-05/H-06 (idempotencia estructural de `finalizarMensaje()`) sigue pendiente de decisión — toca directamente el criterio "no existen duplicados" de la Fase 8.
+**CP-38 y CP-39** quedaron Aprobados el 27/07/2026 (Lotes 2/3 — H-07, H-08 — con corrida real confirmada para ambos; ver detalle arriba). Con esto, **los Lotes 2 y 3 de la auditoría del 20/07/2026 (H-07, H-08, H-10, H-11, H-12, y el hallazgo adicional H-14 detectado y corregido al preparar CP-39) quedan completamente cerrados**: decididos, aplicados y confirmados con evidencia real. El hallazgo H-05/H-06 (idempotencia estructural de `finalizarMensaje()`) quedó resuelto y confirmado con CP-35 (Aprobado, 27/07/2026).
 
 ## Referencias cruzadas
 

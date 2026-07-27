@@ -80,8 +80,8 @@ Captura revisada por Claude Cowork. Muestra:
 | CP-35 | Sin filas duplicadas en Indice Idempotencia tras recuperaciones sucesivas | 27/07/2026 | Ver detalle completo debajo de la tabla. Resumen: corrección H-05/H-06 aplicada (`upsertIndiceIdempotencia()` + reordenamiento en `finalizarMensaje()`), verificada localmente (20 casos) y luego con una corrida real forzando dos invocaciones de `finalizarMensaje()` para el mismo mensaje — una sola fila final por `task_id`, genuinamente actualizada (`estado_final=CP35_SEGUNDA_LLAMADA`), sin duplicados. Aprobó al primer intento real. | Registro de ejecución y capturas de `Indice Idempotencia`/`Log Mensajes` | Aprobado — 27/07/2026 |
 | CP-36 | Aislamiento de mensajes por hilo | 21/07/2026: `DRY_RUN=true` (repetido accidentalmente una vez, mismo resultado) y ejecución formal `DRY_RUN=false` | Ver detalle completo debajo de la tabla. Resumen: `procesarCorreosDeTareas()` informó `1 mensajes elegibles, procesando 1` en ambas modalidades; solo `message_id 19f8698d446c577a` (Mensaje A) fue procesado; el Mensaje B (mismo hilo, sin etiqueta) no generó fila alguna. | Verificación manual de Carlos Rubén Bageta sobre el registro real (sin captura archivada para esta fila) | Aprobado |
 | CP-37 | Validación estricta de MODO_PRUEBA/DRY_RUN/GMAIL_QUERY_PRUEBA | 21/07/2026 | 7 escenarios verificados: `MODO_PRUEBA=TRUE` rechazado (case-sensitive); `MODO_PRUEBA` ausente rechazado (barrera INC-FASE8-007); `DRY_RUN=TRUE` rechazado; `GMAIL_QUERY_PRUEBA` ausente rechazado; consulta sin `label:Pruebas-Automatizacion` rechazada; `ETIQUETA_PRUEBA` ausente rechazada; restauración final con planilla de prueba y `DRY_RUN=true` válida. | `pruebas/evidencias/CP-27/05.png` a `10.png` (6 capturas) | Aprobado |
-| CP-38 | Recuperación tras archivado previo, sin depender de la búsqueda de Gmail | | Nuevo caso (auditoría 20/07/2026, H-07). Requiere `recuperarMensajesConManifiestoPendiente()`. | | Bloqueado — requiere corrección |
-| CP-39 | Límite de reintentos Gmail y salida a error permanente | | Nuevo caso (auditoría 20/07/2026, H-08/DEC-007). Requiere columna `intentos_gmail` y `LIMITE_REINTENTOS_GMAIL`. | | Bloqueado — requiere DEC-007 |
+| CP-38 | Recuperación tras archivado previo, sin depender de la búsqueda de Gmail | 27/07/2026 | Ver detalle completo debajo de la tabla. Resumen: la instrumentación forzó una falla después de que el mensaje ya había sido archivado de verdad en Gmail, dejándolo `ERROR_TEMPORAL` con manifiesto y fuera de `in:inbox`. La ejecución siguiente lo recuperó vía la nueva `recuperarMensajesConManifiestoPendiente()`, sin que la búsqueda normal de Gmail lo encontrara (`"0 mensajes elegibles, procesando 0"`) — confirma H-07. De paso confirmó H-11 (`unidades_gmail_api` acumulado a 2, no sobrescrito) y H-12 (`error` limpio tras el cierre exitoso). Aprobó al primer intento real. | Registro de ejecución de ambas corridas reales — `message_id 19fa40fc2e504081` | Aprobado — 27/07/2026 |
+| CP-39 | Límite de reintentos Gmail y salida a error permanente | 27/07/2026 | Ver detalle completo debajo de la tabla. Resumen: 7 ejecuciones reales sucesivas — la primera generó y escribió las tareas y falló al actualizar Gmail; las 5 siguientes fueron recuperadas exclusivamente por H-07, confirmando de paso que H-14 evita un segundo intento por ejecución (`intentos_gmail` avanzó de a 1: 1→2→3→4→5→6); la séptima superó `LIMITE_REINTENTOS_GMAIL=6` y cerró `ERROR_DEFINITIVO` con las tareas conservadas. | Registro de ejecución de las 7 corridas reales — `message_id 19fa443c94a40af2` | Aprobado — 27/07/2026 |
 
 ## Detalle de CP-01 — Una observación, una tarea
 
@@ -1589,6 +1589,74 @@ en finalizarMensaje() (codigo/script_refactorizado.gs) — ya retirado del códi
 
 **Estado (veredicto final):** Aprobado — 27/07/2026 (`PASA`). **Con esto queda cerrado el último punto que condicionaba la aprobación de la Fase 8.**
 
+## Detalle de CP-38 — Recuperación tras archivado previo, sin depender de la búsqueda de Gmail (H-07)
+
+```text
+Fecha de ejecución: 27/07/2026
+message_id: 19fa40fc2e504081
+Instrumentación: gancho gateado por cfg.modoPrueba + property CP38_FORZAR_FALLO_POSTERIOR
+en procesarUnMensaje() (codigo/script_refactorizado.gs) — ya retirado del código.
+PERMITIR_ARCHIVADO=true (temporal, ya revertido).
+```
+
+**Antecedente:** este caso estuvo bloqueado desde la auditoría del 20/07/2026 (H-07, `documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 10) porque un mensaje archivado por `aplicarResultadoGmail()` antes de que fallara un paso posterior quedaba `ERROR_TEMPORAL` para siempre: la única vía de recuperación existente (`reanudarDesdeManifiesto()` disparado desde la entrada de `procesarUnMensaje()`) dependía de que `obtenerMensajesPendientesDesdeGmail()` volviera a encontrar el mensaje, cosa que no ocurre si ya salió de `in:inbox`. Corrección aplicada en la sesión del 27/07/2026 (DEC-010): nueva función `recuperarMensajesConManifiestoPendiente(cfg)` que escanea `Log Mensajes` directamente, sin pasar por ninguna búsqueda de Gmail.
+
+### Verificación local previa a la corrida real
+5 verificaciones con mocks de Sheets/`PropertiesService` sobre el código real extraído del archivo (ver `auditoria/CHANGELOG.md`, entrada del 27/07/2026): reanuda un `ERROR_TEMPORAL` con manifiesto sin cerrar; ignora uno sin manifiesto, uno ya cerrado en `Indice Idempotencia`, y uno que no está en `ERROR_TEMPORAL`; cuenta correctamente los mensajes reanudados — las 5 pasan.
+
+### Corrida real
+- **Primera ejecución** (instrumentada, `PERMITIR_ARCHIVADO=true`): el mensaje se procesó normalmente, `aplicarResultadoGmail()` lo archivó de verdad, y justo después la instrumentación forzó la excepción simulada — el mensaje quedó `ERROR_TEMPORAL` con manifiesto persistido y ya fuera de `in:inbox`.
+- **Segunda ejecución** (recuperación, instrumentación desactivada): log completo —
+  ```text
+  recuperarMensajesConManifiestoPendiente(): 19fa40fc2e504081 en ERROR_TEMPORAL con
+    manifiesto persistido; reanudando sin depender de la búsqueda de Gmail.
+  reanudarDesdeManifiesto(): todas las tareas de 19fa40fc2e504081 ya estaban ESCRITA;
+    se repite únicamente la actualización de Gmail.
+  recuperarMensajesConManifiestoPendiente(): 1 mensaje(s) reanudado(s).
+  procesarCorreosDeTareas(): 0 mensajes elegibles, procesando 0.
+  ```
+  La línea `"0 mensajes elegibles, procesando 0"` es la confirmación clave: la búsqueda normal de Gmail no encontró el mensaje (estaba archivado), y aun así se recuperó — prueba directa de que la recuperación ocurrió exclusivamente por la nueva función de H-07, no por el chequeo de manifiesto ya existente en la entrada de `procesarUnMensaje()` (que solo actúa sobre mensajes que la búsqueda sí trae).
+
+### Verificación en planilla real (confirmada por Carlos Rubén Bageta)
+- `Log Mensajes` (`message_id 19fa40fc2e504081`): `estado=PROCESADO`, `etapa=FINALIZADO`, `error` vacío (confirma H-12), `unidades_gmail_api=2` (confirma H-11: 1 de la corrida que archivó + 1 de la recuperación, acumulado, no sobrescrito).
+- `Indice Idempotencia`: 2 filas nuevas (una por tarea), `estado_final=PROCESADO`.
+- `Registro Tareas`: sin duplicar — las mismas 2 filas `ESCRITA` de la corrida original.
+
+**Conclusión:** CP-38 PASA. Confirma, en producción real, que un mensaje archivado antes de una falla posterior se recupera igual en la ejecución siguiente, sin depender de que la búsqueda de Gmail lo encuentre — cierra H-07. Confirma además, como efecto colateral de este mismo escenario, H-11 (acumulación de `unidades_gmail_api`) y H-12 (limpieza de `error` en cierres exitosos). H-10 (exclusión de `ANULADA`) no fue ejercitado por este escenario (ninguna tarea estaba `ANULADA`) y permanece verificado solo localmente con mocks.
+
+**Estado (veredicto final):** Aprobado — 27/07/2026 (`PASA`). Instrumentación temporal retirada de `codigo/script_refactorizado.gs`.
+
+## Detalle de CP-39 — Límite de reintentos Gmail y salida a error permanente (H-08, DEC-007)
+
+```text
+Fecha de ejecución: 27/07/2026
+message_id: 19fa443c94a40af2
+LIMITE_REINTENTOS_GMAIL: 6 (valor configurado en el proyecto de prueba)
+Instrumentación: gancho gateado por cfg.modoPrueba + property CP39_FORZAR_FALLO_GMAIL_REPETIDO
+en aplicarResultadoGmail() (codigo/script_refactorizado.gs) — ya retirado del código.
+7 ejecuciones manuales sucesivas, sin espera adicional entre corridas.
+```
+
+**Antecedente:** este caso estuvo bloqueado desde la auditoría del 20/07/2026 (H-08, DEC-007) hasta que se agregaron la columna `intentos_gmail` y la propiedad `LIMITE_REINTENTOS_GMAIL`, verificadas localmente (`documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 11). Al preparar el procedimiento de este caso —antes de instrumentar o correr nada— se detectó H-14 (ver `auditoria/CHANGELOG.md`, DEC-012): con H-07 ya activo, un mensaje `ERROR_TEMPORAL` con manifiesto que no se archiva (exactamente este escenario) se encontraba dos veces por ejecución, duplicando `intentos_gmail`. Corregido y verificado localmente antes de esta corrida.
+
+### Corrida real
+
+- **Ejecución 1** (12:58:53): `"1 mensajes elegibles, procesando 1"` → `consultarIAExtractora()` → tareas generadas y escritas → `aplicarResultadoGmail()` interrumpida por la instrumentación → `Error procesando mensaje ...: CP-39: falla de Gmail simulada...` → `intentos_gmail: 0→1`, `estado=ERROR_TEMPORAL`.
+- **Ejecuciones 2 a 6** (12:59:14 a 12:59:52): cada una repite el mismo patrón — `recuperarMensajesConManifiestoPendiente(): ... en ERROR_TEMPORAL con manifiesto persistido; reanudando sin depender de la búsqueda de Gmail` → `reanudarDesdeManifiesto(): ...ya estaban ESCRITA; se repite únicamente la actualización de Gmail` → falla de nuevo → **`procesarCorreosDeTareas(): 0 mensajes elegibles, procesando 0`** (confirma H-14: la búsqueda normal no vuelve a encontrar el mensaje en la misma ejecución). `intentos_gmail` avanza de a 1 por corrida: 2, 3, 4, 5, 6.
+- **Ejecución 7** (13:07:03): mismo patrón, pero esta vez `gestionarErrorMensaje(): 19fa443c94a40af2 superó LIMITE_REINTENTOS_GMAIL (6); cierre ERROR_DEFINITIVO con las tareas ya escritas conservadas` — `intentos_gmail: 6→7`, `7 > 6`, cierra.
+
+### Verificación en planilla real (confirmada por Carlos Rubén Bageta)
+
+- `Log Mensajes` (`message_id 19fa443c94a40af2`): `estado=ERROR_DEFINITIVO`, `etapa=FINALIZADO`, `error` con el texto de la instrumentación **conservado** (confirma H-12: se limpia solo en `PROCESADO`), `intentos_gmail=7`.
+- `Indice Idempotencia`: 2 filas nuevas (una por tarea), `estado_final=ERROR_DEFINITIVO`.
+- `Registro Tareas`: sin duplicar — las mismas 2 filas `ESCRITA` de la corrida original.
+
+**Nota sobre `resultado_gmail`/`unidades_gmail_api`:** a diferencia de CP-38 (donde la instrumentación corre después de una llamada real exitosa a Gmail), el gancho de CP-39 interrumpe `aplicarResultadoGmail()` **antes** de la llamada real a `Gmail.Users.Messages.modify()`. Por eso ninguna de las 7 ejecuciones hizo una llamada real a la API de Gmail, y `resultado_gmail`/`unidades_gmail_api` no cambiaron respecto de su valor inicial — comportamiento esperado de este mecanismo específico, no un defecto.
+
+**Conclusión:** CP-39 PASA. Confirma, en producción real, que `gestionarErrorMensaje()` cierra `ERROR_DEFINITIVO` al superar `LIMITE_REINTENTOS_GMAIL`, conservando las tareas ya escritas (no se revierten) — cierra H-08. Confirma además, en producción real, que H-14 evita el doble intento por ejecución que se había detectado leyendo el código antes de correr este caso.
+
+**Estado (veredicto final):** Aprobado — 27/07/2026 (`PASA`). Instrumentación temporal retirada de `codigo/script_refactorizado.gs`. **Con esto, los dos casos de regresión de los Lotes 2/3 (DEC-009) — CP-38 y CP-39 — están Aprobados.**
+
 ## Resumen final (completar al terminar)
 
 ```text
@@ -1598,7 +1666,9 @@ Total de casos que condicionan la aprobación de esta fase: 36 (CP-01 a CP-29, C
   CP-10, CP-36, CP-37 incorporados desde Lote 1 (DEC-009, 21/07/2026)
 Diferido a Fase 10 (no condiciona esta fase): 1 (CP-30, DEC-004)
 Bloqueado que todavía condiciona la Fase 8: 0 (CP-35 pasó a Aprobado el 27/07/2026, ver nota de auditoría abajo — ya no queda ningún caso Bloqueado que condicione esta fase)
-Bloqueados pendientes de Lotes 2/3 (no condicionan esta fase): 2 (CP-38, CP-39)
+Bloqueados pendientes de Lotes 2/3 (no condicionan esta fase): 0
+  [Corregido 27/07/2026: CP-38 pasó de Bloqueado a Aprobado (corrida real, H-07, ver detalle); el conteo pasa de 2 a 1.]
+  [Corregido 27/07/2026: CP-39 pasó de Bloqueado a Aprobado (corrida real, H-08, ver detalle); el conteo pasa de 1 a 0. No queda ningún caso bloqueado pendiente de los Lotes 2/3.]
 Aprobados: 36 (CP-01, CP-02, CP-03, CP-04, CP-05, CP-06, CP-07, CP-08, CP-09, CP-10, CP-11, CP-12, CP-13, CP-14, CP-15, CP-16, CP-17, CP-18, CP-19, CP-20, CP-21, CP-22, CP-23, CP-24, CP-25, CP-26, CP-27, CP-28, CP-29, CP-31, CP-32, CP-33, CP-34, CP-35, CP-36, CP-37)
 Rechazados: 0
   CP-19 pasó de Rechazado (21/07/2026, INC-FASE8-008) a Aprobado (22/07/2026, regresión real con message_id nuevo). El registro de la ejecución fallida original se conserva íntegro en el detalle de CP-19.
@@ -1663,7 +1733,7 @@ Pendientes (ejecutables con estado Pendiente, no corridos aún): 0
   CP-06 fue ejecutado y aprobado el 27/07/2026
   CP-35 pasó de Bloqueado a Aprobado el 27/07/2026, tras aplicar y verificar en producción real la corrección de H-05/H-06 (ver detalle) — cierra el último punto que condicionaba la Fase 8
 Casos sin aprobación que todavía condicionan la Fase 8: 0. **Todos los 36 casos que condicionan la aprobación de la Fase 8 (CP-01 a CP-29, CP-31 a CP-37) están Aprobados. La Fase 8 puede darse por completa según el criterio de DEC-004/DEC-009.**
-Sin aprobación total (CP-38 + CP-39 + CP-30, ninguno condiciona esta fase): 3
+Sin aprobación total (CP-30, no condiciona esta fase): 1
 
 Nota (auditoría 20/07/2026): CP-35 pasó a "bloqueado" — no podía considerarse
 una verificación válida del criterio "no existen duplicados" hasta que
@@ -1678,7 +1748,7 @@ producción real forzando una doble invocación de `finalizarMensaje()` para el
 mismo mensaje — una sola fila final por `task_id`, genuinamente actualizada,
 sin duplicados. CP-35 pasa de Bloqueado a Aprobado. Con esto, todos los casos
 que condicionan la Fase 8 están Aprobados.
-CP-38 y CP-39 permanecen bloqueados hasta la aprobación de los Lotes 2/3.
+**Actualizado (27/07/2026):** Carlos Rubén Bageta decidió aplicar los Lotes 2/3 en vez de diferirlos (DEC-007 actualizada, DEC-010, DEC-011, todas "Aprobada y aplicada"). **CP-38 pasó de Bloqueado a Aprobado** el mismo día, confirmado con corrida real (ver "Detalle de CP-38" arriba) — recuperó un mensaje archivado sin depender de la búsqueda de Gmail, tal como predice H-07, con `Log Mensajes`/`Indice Idempotencia`/`Registro Tareas` verificados en la planilla real. **CP-39 también pasó de Bloqueado a Aprobado** el mismo día (ver "Detalle de CP-39" arriba) — 7 ejecuciones reales confirmaron que `gestionarErrorMensaje()` cierra `ERROR_DEFINITIVO` al superar `LIMITE_REINTENTOS_GMAIL`, con las tareas conservadas. Al preparar CP-39 se detectó y corrigió además H-14 (doble intento por ejecución, DEC-012), confirmado en la propia corrida real de CP-39. **Con esto, los dos casos de regresión de los Lotes 2/3 (DEC-009) están Aprobados — no queda ningún caso pendiente que condicione el cierre formal de la Fase 8.**
 
 Nota (Lote 1, 21/07/2026): volver a copiar al proyecto de Apps Script de prueba:
   codigo/script_refactorizado.gs  (validarConfiguracion, obtenerMensajesPendientesDesdeGmail,

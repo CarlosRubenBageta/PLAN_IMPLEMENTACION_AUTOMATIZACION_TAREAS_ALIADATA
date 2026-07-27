@@ -407,19 +407,33 @@ function procesarCorreosDeTareasConConfiguracion_(cfg, opciones) {
   // provenga de una ejecución real anterior. Fase 2A: omitirRecuperacion
   // permite al automatizador E2E saltarse la recuperación también en una
   // ejecución formal (dryRun=false) de un único mensaje nuevo.
+  var idsAtendidosPorRecuperacionEstaEjecucion = [];
   if (opciones.omitirRecuperacion) {
     Logger.log('procesarCorreosDeTareasConConfiguracion_(): recuperación de abandonados omitida por opciones.omitirRecuperacion.');
   } else if (cfg.dryRun) {
     Logger.log('procesarCorreosDeTareas(): DRY_RUN=true, se omite recuperarProcesamientosAbandonados() (no debe persistir ni recuperar mensajes reales durante una simulación).');
   } else {
-    recuperarProcesamientosAbandonados(cfg);
+    var idsReanudadosAbandonados = recuperarProcesamientosAbandonados(cfg);
     // H-07 (documentacion/RECUPERACION_INTERRUPCIONES.md, sección 10):
     // mecanismo distinto y complementario — mismos guards que la línea de
     // arriba (nunca en DRY_RUN ni cuando el llamador pide omitir recuperación).
-    recuperarMensajesConManifiestoPendiente(cfg);
+    var idsReanudadosManifiesto = recuperarMensajesConManifiestoPendiente(cfg);
+    idsAtendidosPorRecuperacionEstaEjecucion = idsReanudadosAbandonados.concat(idsReanudadosManifiesto);
   }
 
-  var mensajes = obtenerMensajesPendientesDesdeGmail(cfg);
+  // H-14 (documentacion/RECUPERACION_INTERRUPCIONES.md, sección 14): un
+  // mensaje que las funciones de arriba ya intentaron reanudar vía
+  // reanudarDesdeManifiesto() en ESTA MISMA ejecución puede seguir siendo
+  // "elegible" para obtenerMensajesPendientesDesdeGmail() si no llegó a
+  // cerrarse (por ejemplo, la actualización de Gmail volvió a fallar) y
+  // nunca salió de la bandeja/consulta configurada. Sin este filtro,
+  // procesarUnMensaje() lo detecta por su propio chequeo de manifiesto
+  // (INC-FASE8-005) y lo reanuda una segunda vez en la misma corrida,
+  // duplicando el intento real contra Gmail sin ninguna razón operativa.
+  var idsAtendidosEstaEjecucion = new Set(idsAtendidosPorRecuperacionEstaEjecucion);
+  var mensajes = obtenerMensajesPendientesDesdeGmail(cfg).filter(function (mensajeDescriptor) {
+    return !idsAtendidosEstaEjecucion.has(mensajeDescriptor.messageId);
+  });
 
   var limite = Math.min(mensajes.length, cfg.maxMensajesPorEjecucion);
   Logger.log('procesarCorreosDeTareas(): ' + mensajes.length + ' mensajes elegibles, procesando ' + limite + '.');
@@ -701,17 +715,6 @@ function procesarUnMensaje(mensajeDescriptor, cfg) {
   // Paso 9-10: actualizar Gmail por mensaje individual.
   aplicarResultadoGmail(mensajeDescriptor, huboFallaEscritura ? 'RevisionErrorProcesamiento' : 'Procesado', cfg);
   actualizarLogMensajes(mensajeDescriptor, { etapa: ETAPAS.GMAIL_ACTUALIZADO }, cfg);
-
-  // INICIO INSTRUMENTACIÓN TEMPORAL CP-38 (auditoria/CHANGELOG.md, 27/07/2026) — RETIRAR TRAS LA CORRIDA REAL.
-  // Fuerza una falla DESPUÉS de que aplicarResultadoGmail() ya haya archivado
-  // el mensaje de verdad (requiere PERMITIR_ARCHIVADO=true temporalmente),
-  // dejándolo con manifiesto persistido y sin cerrar — exactamente el
-  // escenario de H-07: un mensaje que ya no está en la búsqueda de Gmail
-  // (in:inbox) porque quedó archivado antes de que fallara un paso posterior.
-  if (cfg.modoPrueba && PropertiesService.getScriptProperties().getProperty('CP38_FORZAR_FALLO_POSTERIOR') === 'true') {
-    throw new Error('CP-38: falla simulada por instrumentación temporal de prueba, después de archivar en Gmail (retirar tras la corrida). messageId=' + mensajeDescriptor.messageId);
-  }
-  // FIN INSTRUMENTACIÓN TEMPORAL CP-38
 
   // Paso 11-12: marcar el mensaje y cerrar en Indice Idempotencia.
   finalizarMensaje(mensajeDescriptor, huboFallaEscritura ? ESTADOS.REVISION_MANUAL : ESTADOS.PROCESADO, tareas, cfg);
@@ -1136,17 +1139,6 @@ function aplicarResultadoGmail(mensajeDescriptor, claveResultado, cfg) {
     Logger.log('[DRY_RUN] Se etiquetaría/archivaría el mensaje ' + mensajeDescriptor.messageId + ' con ' + claveResultado);
     return;
   }
-
-  // INICIO INSTRUMENTACIÓN TEMPORAL CP-39 (auditoria/CHANGELOG.md, 27/07/2026) — RETIRAR TRAS LA CORRIDA REAL.
-  // Falla incondicional mientras la property esté en 'true' (mismo mecanismo
-  // ya usado en CP-12/CP-25/CP-32/CP-34), para forzar reintentos repetidos
-  // de Gmail sobre el mismo mensaje con manifiesto y confirmar que
-  // gestionarErrorMensaje() cierra ERROR_DEFINITIVO al superar
-  // LIMITE_REINTENTOS_GMAIL (H-08), conservando las tareas ya escritas.
-  if (cfg.modoPrueba && PropertiesService.getScriptProperties().getProperty('CP39_FORZAR_FALLO_GMAIL_REPETIDO') === 'true') {
-    throw new Error('CP-39: falla de Gmail simulada por instrumentación temporal de prueba (retirar tras la corrida).');
-  }
-  // FIN INSTRUMENTACIÓN TEMPORAL CP-39
 
   if (!cfg.permitirEtiquetado && !cfg.permitirArchivado) {
     actualizarLogMensajes(mensajeDescriptor, {

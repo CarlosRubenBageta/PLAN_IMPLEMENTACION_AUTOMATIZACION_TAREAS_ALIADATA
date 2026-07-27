@@ -1,5 +1,97 @@
 # Changelog
 
+## [2026-07-27] — CP-39 aprobado: límite de reintentos de Gmail y cierre ERROR_DEFINITIVO (H-08); Lotes 2/3 completamente cerrados
+
+### Corrida real
+Carlos Rubén Bageta ejecutó el procedimiento instrumentado de CP-39 (`CP39_FORZAR_FALLO_GMAIL_REPETIDO=true`, `LIMITE_REINTENTOS_GMAIL=6` en el proyecto de prueba): 7 ejecuciones manuales sucesivas sobre el mismo `message_id 19fa443c94a40af2`. La primera generó y escribió las tareas y falló al actualizar Gmail (`intentos_gmail: 0→1`). Las 5 siguientes fueron recuperadas exclusivamente por `recuperarMensajesConManifiestoPendiente()` (H-07), cada una confirmando `"0 mensajes elegibles, procesando 0"` en la búsqueda normal de la misma ejecución — evidencia directa de que H-14 (ver entrada anterior) evita el doble intento por ejecución detectado al preparar este caso. `intentos_gmail` avanzó de a 1 por corrida (2, 3, 4, 5, 6). La séptima superó el límite: `gestionarErrorMensaje(): ... superó LIMITE_REINTENTOS_GMAIL (6); cierre ERROR_DEFINITIVO con las tareas ya escritas conservadas`.
+
+Nota operativa registrada durante la preparación: el primer intento de corrida no encontró el mensaje (`"0 mensajes elegibles"` desde la ejecución 1) porque el correo sintético no había quedado etiquetado con la etiqueta que exige `GMAIL_QUERY_PRUEBA`; se corrigió etiquetándolo y repitiendo desde la ejecución 1. Aclaración propia (no de Carlos): mi checklist original de verificación para este caso indicaba erróneamente que `resultado_gmail`/`unidades_gmail_api` debían reflejar intentos reales de Gmail — el gancho de instrumentación de CP-39 interrumpe `aplicarResultadoGmail()` *antes* de la llamada real a `Gmail.Users.Messages.modify()` (a diferencia de CP-38, cuyo gancho corre después de una llamada real exitosa), por lo que ninguna de las 7 ejecuciones hizo una llamada real a la API — `resultado_gmail`/`unidades_gmail_api` correctamente no cambiaron. Corregido al revisar la evidencia con Carlos Rubén Bageta antes de aprobar el caso.
+
+### Verificación en planilla real (confirmada por Carlos Rubén Bageta)
+- `Log Mensajes` (`message_id 19fa443c94a40af2`): `estado=ERROR_DEFINITIVO`, `etapa=FINALIZADO`, `error` con el texto de la instrumentación conservado (confirma H-12: se limpia solo en `PROCESADO`), `intentos_gmail=7`.
+- `Indice Idempotencia`: 2 filas nuevas (una por tarea), `estado_final=ERROR_DEFINITIVO`.
+- `Registro Tareas`: sin duplicar — las mismas 2 filas `ESCRITA` originales.
+
+### Estado
+**CP-39 → Aprobado.** Instrumentación temporal (`CP39_FORZAR_FALLO_GMAIL_REPETIDO` en `aplicarResultadoGmail()`, `codigo/script_refactorizado.gs`) retirada del código y verificada (cero referencias restantes). Actualizados: `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md`, `auditoria/DECISIONES.md` (DEC-007, DEC-012), `documentacion/RECUPERACION_INTERRUPCIONES.md` (secciones 11 y 14), `entregables/FASE_8/ACTA_APROBACION_FASE_8.md`, `README.md`. **Con CP-38 y CP-39 ambos Aprobados, los Lotes 2 y 3 de la auditoría del 20/07/2026 (H-07, H-08, H-10, H-11, H-12, y H-14) quedan completamente cerrados: decididos, aplicados y confirmados con evidencia real. No queda ningún caso pendiente que condicione el cierre formal de la Fase 8** (CP-30 permanece diferido a la Fase 10 por DEC-004, sin condicionar).
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada — la corrida real fue ejecutada por Carlos Rubén Bageta fuera de esta sesión; aquí solo se registra y verifica su resultado.
+
+---
+
+## [2026-07-27] — Hallazgo H-14: doble intento real de Gmail por ejecución cuando un mensaje con manifiesto no se archiva
+
+### Contexto
+Al preparar el procedimiento de CP-39 (H-08, límite de reintentos de Gmail) — leyendo el código antes de instrumentar o correr nada — se detectó una interacción no prevista entre H-07 (`recuperarMensajesConManifiestoPendiente()`, aplicada hoy mismo) y el chequeo de manifiesto ya existente en la entrada de `procesarUnMensaje()` (INC-FASE8-005, Fase 8 inicial, anterior a H-07).
+
+Un mensaje `ERROR_TEMPORAL` con manifiesto persistido que **no llega a archivarse** (permanece en `in:inbox` — ya sea porque `PERMITIR_ARCHIVADO=false` o porque la actualización de Gmail vuelve a fallar) se encuentra DOS VECES en la misma ejecución de `procesarCorreosDeTareasConConfiguracion_()`:
+1. Por `recuperarMensajesConManifiestoPendiente()` (H-07), que corre primero y llama a `reanudarDesdeManifiesto()`.
+2. Por la búsqueda normal de Gmail (`obtenerMensajesPendientesDesdeGmail()`), que todavía lo encuentra porque nunca salió de la bandeja/consulta configurada, y que lo entrega a `procesarUnMensaje()`, cuyo propio chequeo de manifiesto (línea ~599) lo reanuda **otra vez**.
+
+Cuando la reanudación falla en ambos intentos (el escenario exacto de CP-39: falla de Gmail persistente), `gestionarErrorMensaje()` se llama dos veces en la misma ejecución, incrementando `intentos_gmail`/`unidades_gmail_api` el doble de lo esperado — dos llamadas reales a la API de Gmail por ejecución en vez de una. No lo expuso la corrida real de CP-38 (ese caso archiva el mensaje, por lo que sale de la búsqueda normal); se detectó leyendo el código al preparar CP-39, antes de instrumentar o correr nada.
+
+No corrompe datos (sin duplicados en ninguna hoja, tareas conservadas), pero desperdicia cuota real de Gmail y desvía el conteo de `LIMITE_REINTENTOS_GMAIL` de la premisa original de DEC-007 (un intento real por ejecución manual).
+
+### Decisión (Carlos Rubén Bageta, 27/07/2026)
+Corregir antes de instrumentar y correr CP-39, para que el conteo de reintentos de H-08 se comporte según el diseño original (un intento real por ejecución).
+
+### Corrección propuesta
+`recuperarProcesamientosAbandonados(cfg)` y `recuperarMensajesConManifiestoPendiente(cfg)` (`codigo/recuperacion.gs`) pasan a devolver la lista de `message_id` que efectivamente intentaron reanudar vía `reanudarDesdeManifiesto()` en esta ejecución (haya tenido éxito o no). `procesarCorreosDeTareasConConfiguracion_()` (`codigo/script_refactorizado.gs`) junta esas listas y filtra los mensajes con esos IDs fuera del resultado de `obtenerMensajesPendientesDesdeGmail()`, antes del bucle principal — así `procesarUnMensaje()` nunca vuelve a ver, en la misma ejecución, un mensaje que la recuperación ya intentó.
+
+No afecta a los mensajes reabiertos sin manifiesto (`reabiertosCompletos`, dentro de `recuperarProcesamientosAbandonados()`): esos deliberadamente deben ser encontrados por la búsqueda normal en la misma ejecución para reprocesarse desde cero (comportamiento ya existente, sin relación con este hallazgo).
+
+**Archivos afectados:** `codigo/recuperacion.gs`, `codigo/script_refactorizado.gs`.
+**Regresión a verificar:** ninguna de las 36 aprobadas debería cambiar de comportamiento — el filtro solo tiene efecto cuando la reanudación de la MISMA ejecución vuelve a fallar; cuando tiene éxito, el mensaje ya queda excluido por `Indice Idempotencia` (escrita antes de que corra la búsqueda normal), por lo que el filtro nuevo es un no-op en ese caso. Regresión propia: CP-39 (ahora con el conteo esperado: 1 intento real por ejecución).
+
+### Estado
+Diseño registrado. Implementación y verificación local a continuación en esta misma sesión.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada.
+
+---
+
+## [2026-07-27] — H-14 aplicado y verificado localmente (DEC-012)
+
+### Implementación (código)
+Tal como se diseñó en la entrada anterior, sin desvíos:
+- `codigo/recuperacion.gs`: `recuperarProcesamientosAbandonados(cfg)` y `recuperarMensajesConManifiestoPendiente(cfg)` ahora devuelven la lista de `message_id` reanudados vía manifiesto en esta ejecución (éxito o falla; los reabiertos sin manifiesto quedan fuera, a propósito).
+- `codigo/script_refactorizado.gs`: `procesarCorreosDeTareasConConfiguracion_()` junta ambas listas en un `Set` y filtra el resultado de `obtenerMensajesPendientesDesdeGmail()` antes del bucle principal, para que `procesarUnMensaje()` nunca vuelva a ver, en la misma ejecución, un mensaje que la recuperación ya intentó.
+
+### Verificación local (18 verificaciones, mocks de Sheets, código real extraído por rango de línea, sin Apps Script real)
+- `recuperarProcesamientosAbandonados()` (6 casos): devuelve exactamente los ids reanudados vía manifiesto (éxito y falla); no incluye los reabiertos sin manifiesto (deben seguir siendo hallables por la búsqueda normal); no incluye los que están dentro del umbral de abandono; `gestionarErrorMensaje()` se sigue llamando solo para el que falla (regresión no rota).
+- `recuperarMensajesConManifiestoPendiente()` (5 casos): devuelve exactamente los ids reanudados vía manifiesto (éxito y falla); excluye correctamente los sin manifiesto, los ya cerrados en `Indice Idempotencia` y los que no están en `ERROR_TEMPORAL` (regresión no rota).
+- `procesarCorreosDeTareasConConfiguracion_()` (7 casos, el fix en sí): con `omitirRecuperacion`, ambos mensajes se procesan sin filtrar nada (baseline); cuando la recuperación atendió un id que la búsqueda normal también trae, ese id se excluye y `procesarUnMensaje()` no lo ve una segunda vez (**el caso que exponía el bug**); cuando la recuperación no encuentra nada, no hay falsos positivos; un id atendido que la búsqueda normal ni siquiera trae no rompe el filtro (`concat()` con ids de ambas funciones); `DRY_RUN=true` sigue omitiendo la recuperación sin alterar el filtrado.
+
+Las 18 pasan. `node --check` sin errores en ambos archivos.
+
+### Estado
+**H-14 aplicado y verificado localmente.** Sin instrumentación ni corrida real propia — no tiene un caso de prueba dedicado; se confirma indirectamente con la corrida real de CP-39 (el conteo de `intentos_gmail` debería avanzar exactamente 1 por ejecución, no 2). `auditoria/DECISIONES.md` (DEC-012) y `documentacion/RECUPERACION_INTERRUPCIONES.md` (sección 14) actualizados. Sigue pendiente instrumentar y correr CP-39.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada.
+
+---
+
+## [2026-07-27] — CP-38 aprobado: recuperación real tras archivado previo (H-07), sin depender de la búsqueda de Gmail
+
+### Corrida real
+Carlos Rubén Bageta ejecutó el procedimiento instrumentado de CP-38 (`CP38_FORZAR_FALLO_POSTERIOR`, `PERMITIR_ARCHIVADO=true` temporal): una primera ejecución archivó el mensaje de verdad en Gmail y luego forzó la falla simulada, dejándolo `ERROR_TEMPORAL` con manifiesto persistido y ya fuera de `in:inbox`. La ejecución siguiente (recuperación) registró `recuperarMensajesConManifiestoPendiente(): 19fa40fc2e504081 en ERROR_TEMPORAL con manifiesto persistido; reanudando sin depender de la búsqueda de Gmail`, mientras que la búsqueda normal de `procesarCorreosDeTareas()` informó `0 mensajes elegibles, procesando 0` — prueba directa de que el mensaje no fue hallado por el camino habitual y que la recuperación ocurrió exclusivamente por la nueva función de H-07. `reanudarDesdeManifiesto()` detectó las tareas ya `ESCRITA` y repitió únicamente la actualización de Gmail.
+
+### Verificación en planilla real (confirmada por Carlos Rubén Bageta)
+- `Log Mensajes` (`message_id 19fa40fc2e504081`): `estado=PROCESADO`, `etapa=FINALIZADO`, `error` vacío (confirma H-12), `unidades_gmail_api=2` (confirma acumulación de H-11: 1 de la corrida que archivó + 1 de la recuperación).
+- `Indice Idempotencia`: 2 filas nuevas (una por tarea), `estado_final=PROCESADO`.
+- `Registro Tareas`: sin duplicar — las mismas 2 filas `ESCRITA` de la corrida original.
+
+### Estado
+**CP-38 → Aprobado.** Instrumentación temporal (`CP38_FORZAR_FALLO_POSTERIOR` en `procesarUnMensaje()`, `codigo/script_refactorizado.gs`) retirada del código. Pendiente recordar a Carlos Rubén Bageta revertir `PERMITIR_ARCHIVADO` a `false` en el proyecto de prueba (convención del proyecto). Actualizados: `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md`, `auditoria/DECISIONES.md` (DEC-010), `documentacion/RECUPERACION_INTERRUPCIONES.md` (secciones 10 y 12), `entregables/FASE_8/ACTA_APROBACION_FASE_8.md`, `README.md`. De los dos casos de regresión de los Lotes 2/3 (DEC-009), solo **CP-39** permanece pendiente de corrida real.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada — la corrida real fue ejecutada por Carlos Rubén Bageta fuera de esta sesión; aquí solo se registra y verifica su resultado.
+
+---
+
 ## [2026-07-27] — H-07/H-08/H-10/H-11/H-12 aplicados y verificados localmente; instrumentación temporal para CP-38/CP-39
 
 ### Implementación (código)

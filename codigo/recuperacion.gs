@@ -56,6 +56,11 @@ function recuperarProcesamientosAbandonados(cfg) {
   var ahora = Date.now();
   var reanudados = 0;
   var reabiertosCompletos = 0;
+  // H-14 (documentacion/RECUPERACION_INTERRUPCIONES.md, sección 14): ids
+  // efectivamente reanudados vía manifiesto en esta ejecución, para que
+  // procesarCorreosDeTareasConConfiguracion_() los excluya de la búsqueda
+  // normal de Gmail y no se reanuden una segunda vez en la misma corrida.
+  var idsReanudadosEstaEjecucion = [];
 
   for (var fila = 1; fila < datos.length; fila++) {
     if (datos[fila][idxEstado] !== ESTADOS.EN_PROCESO) continue;
@@ -68,6 +73,7 @@ function recuperarProcesamientosAbandonados(cfg) {
 
     if (ETAPAS_CON_MANIFIESTO.indexOf(etapaAlcanzada) !== -1) {
       Logger.log('Mensaje abandonado ' + mensajeDescriptor.messageId + ' con manifiesto persistido (etapa ' + etapaAlcanzada + '); reanudando sin volver a consultar la IA.');
+      idsReanudadosEstaEjecucion.push(mensajeDescriptor.messageId);
       try {
         reanudarDesdeManifiesto(mensajeDescriptor, cfg);
         reanudados++;
@@ -90,6 +96,8 @@ function recuperarProcesamientosAbandonados(cfg) {
   if (reanudados > 0 || reabiertosCompletos > 0) {
     Logger.log('recuperarProcesamientosAbandonados(): ' + reanudados + ' reanudado(s) desde manifiesto, ' + reabiertosCompletos + ' reabierto(s) para reprocesamiento completo.');
   }
+
+  return idsReanudadosEstaEjecucion;
 }
 
 /**
@@ -114,6 +122,9 @@ function recuperarMensajesConManifiestoPendiente(cfg) {
   var idxEstado = encabezados.indexOf('estado');
   var idsProcesados = obtenerIdsYaProcesados(cfg);
   var reanudados = 0;
+  // H-14 (documentacion/RECUPERACION_INTERRUPCIONES.md, sección 14): ver
+  // nota equivalente en recuperarProcesamientosAbandonados().
+  var idsReanudadosEstaEjecucion = [];
 
   for (var fila = 1; fila < datos.length; fila++) {
     if (datos[fila][idxEstado] !== ESTADOS.ERROR_TEMPORAL) continue;
@@ -126,6 +137,7 @@ function recuperarMensajesConManifiestoPendiente(cfg) {
 
     var mensajeDescriptor = { messageId: messageId, threadId: datos[fila][idxThreadId] };
     Logger.log('recuperarMensajesConManifiestoPendiente(): ' + messageId + ' en ERROR_TEMPORAL con manifiesto persistido; reanudando sin depender de la búsqueda de Gmail.');
+    idsReanudadosEstaEjecucion.push(messageId);
     try {
       reanudarDesdeManifiesto(mensajeDescriptor, cfg);
       reanudados++;
@@ -137,6 +149,8 @@ function recuperarMensajesConManifiestoPendiente(cfg) {
   if (reanudados > 0) {
     Logger.log('recuperarMensajesConManifiestoPendiente(): ' + reanudados + ' mensaje(s) reanudado(s).');
   }
+
+  return idsReanudadosEstaEjecucion;
 }
 
 /**

@@ -1,6 +1,6 @@
 # Acta de aprobación — Fase 8
 
-**Estado de esta acta:** Actualizada el 27/07/2026 para reflejar la ejecución real ya completada. Los 36 casos que condicionan la aprobación de esta fase (CP-01 a CP-29, CP-31 a CP-37) están **Aprobados**, con evidencia real registrada en `pruebas/resultados/RESULTADOS_FASE_8.md` y las correcciones aplicadas documentadas en `auditoria/CHANGELOG.md` y `pruebas/resultados/INCIDENCIAS_FASE_8.md`. Esta redacción reemplaza la versión anterior (20/07/2026), que declaraba la fase pendiente de ejecución real — quedó desactualizada durante todo el período de ejecución (20/07/2026 a 27/07/2026) sin que nadie la corrigiera hasta esta revisión.
+**Estado de esta acta:** Actualizada el 27/07/2026 para reflejar la ejecución real ya completada. Los 36 casos que condicionan la aprobación de esta fase (CP-01 a CP-29, CP-31 a CP-37) están **Aprobados**, con evidencia real registrada en `pruebas/resultados/RESULTADOS_FASE_8.md` y las correcciones aplicadas documentadas en `auditoria/CHANGELOG.md` y `pruebas/resultados/INCIDENCIAS_FASE_8.md`. Esta redacción reemplaza la versión anterior (20/07/2026), que declaraba la fase pendiente de ejecución real — quedó desactualizada durante todo el período de ejecución (20/07/2026 a 27/07/2026) sin que nadie la corrigiera hasta esta revisión. **Actualizada nuevamente el mismo día:** los Lotes 2/3 (DEC-009) quedaron decididos y aplicados (DEC-007 actualizada, DEC-010, DEC-011), y CP-38 y CP-39 se confirmaron Aprobados con corrida real. Sin condiciones pendientes: la puerta de aprobación pasa de "CONDICIONADA" a **APROBADA**.
 
 ## Resumen de la ejecución real (20/07/2026 a 27/07/2026)
 
@@ -14,7 +14,13 @@ Ninguno de estos documentos contiene resultados fabricados: cada aprobación cit
 
 **DEC-009 (21/07/2026):** CP-31 a CP-39 se incorporaron como casos de regresión obligatorios surgidos de la auditoría del 20/07/2026. El cierre de la Fase 8 requiere CP-01 a CP-37 aprobados (**cumplido**) **más la confirmación de que los Lotes 2 y 3 de esa auditoría (hallazgos H-07, H-08, H-10, H-11, H-12) hayan sido evaluados explícitamente por Carlos Rubén Bageta — aprobados o diferidos de forma consciente, con el mismo criterio aplicado a CP-30/DEC-004.**
 
-**Estado de esa última condición: pendiente.** DEC-007 (Lote 2, H-07) figura todavía como "Propuesta — pendiente de aprobación (no aplicada en código)" en `auditoria/DECISIONES.md`; no hay una decisión registrada sobre el Lote 3. CP-38 y CP-39 permanecen Bloqueados en consecuencia. A diferencia de CP-30, su disposición (aplicar los Lotes 2/3 o diferirlos formalmente) todavía no fue decidida — por eso la puerta de aprobación de esta acta no se marca `APROBADA` sin calificación hasta que eso se resuelva.
+**Estado de esa última condición: resuelta.** Carlos Rubén Bageta decidió explícitamente aplicar los Lotes 2/3 (no diferirlos): DEC-007 pasó a "Aprobada y aplicada" (27/07/2026), y se registraron DEC-010 (H-07) y DEC-011 (H-10, H-11, H-12), todas "Aprobada y aplicada" en `auditoria/DECISIONES.md`. Con eso, la condición literal de DEC-009 (evaluación explícita de los Lotes 2/3) queda cumplida.
+
+Restaba, además, confirmar con corrida real que el código aplicado efectivamente cierra las brechas que motivaron H-07 y H-08 — el mismo criterio de verificación que se exigió a los otros 36 casos, nunca aprobados solo por texto de log. **Ambos quedaron confirmados con corrida real el 27/07/2026:**
+- **CP-38 (H-07):** recuperó un mensaje archivado (`message_id 19fa40fc2e504081`) sin depender de la búsqueda de Gmail, tal como predice el hallazgo, con `Log Mensajes`/`Indice Idempotencia`/`Registro Tareas` verificados en la planilla real.
+- **CP-39 (H-08):** 7 ejecuciones reales sobre `message_id 19fa443c94a40af2` — `gestionarErrorMensaje()` cerró `ERROR_DEFINITIVO` al superar `LIMITE_REINTENTOS_GMAIL`, con las 2 tareas ya escritas conservadas, sin duplicados.
+
+Al preparar la corrida de CP-39 se detectó y corrigió además un hallazgo adicional (**H-14**, DEC-012): con H-07 activo, un mensaje `ERROR_TEMPORAL` con manifiesto que no se archiva podía reanudarse dos veces por ejecución, duplicando `intentos_gmail`. Corregido antes de instrumentar CP-39 y confirmado en su propia corrida real. **Con esto, la condición de DEC-009 queda completamente resuelta — no queda ningún caso pendiente que condicione el cierre formal de la Fase 8.**
 
 ## Evidencia archivada — limitación reconocida
 
@@ -23,12 +29,15 @@ Ninguno de estos documentos contiene resultados fabricados: cada aprobación cit
 ## Puerta de aprobación
 
 ```text
-APROBACIÓN FASE 8: TÉCNICAMENTE COMPLETA — CONDICIONADA (ver "Alcance de la aprobación" arriba)
+APROBACIÓN FASE 8: APROBADA (ver "Alcance de la aprobación" arriba)
 Los 36 casos que condicionan esta fase (CP-01 a CP-29, CP-31 a CP-37) están Aprobados.
-Condición pendiente de DEC-009: resolución explícita de los Lotes 2/3 (H-07, H-08, H-10, H-11, H-12).
-Responsable:
-Fecha:
-Observaciones:
+Lotes 2/3 (DEC-009): decisión tomada, aplicada y confirmada con corrida real para ambos casos de regresión — CP-38 (H-07) y CP-39 (H-08) — Aprobados el 27/07/2026.
+Hallazgo adicional H-14 (detectado al preparar CP-39): corregido y confirmado en la misma corrida.
+CP-30 permanece diferido a la Fase 10 (DEC-004), sin condicionar esta aprobación.
+Sin condiciones pendientes.
+Responsable: [a completar por Carlos Rubén Bageta]
+Fecha: [a completar por Carlos Rubén Bageta]
+Observaciones: ver "Evidencia archivada — limitación reconocida" — limitación de trazabilidad de capturas, no bloquea esta aprobación.
 ```
 
-> La Fase 9 puede empezar a planificarse, pero no debería iniciar la ventana de corte productiva hasta que: (a) los Lotes 2/3 queden explícitamente aprobados o diferidos por Carlos Rubén Bageta (DEC-009), y (b) esta acta se firme con responsable y fecha una vez resuelto (a).
+> Con la puerta de aprobación resuelta, la Fase 9 (ventana de corte productiva) puede planificarse. Queda como paso administrativo pendiente que esta acta se firme con responsable y fecha.
