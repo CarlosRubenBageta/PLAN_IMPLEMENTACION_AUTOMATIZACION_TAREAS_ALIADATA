@@ -1,5 +1,41 @@
 # Changelog
 
+## [2026-07-26] — CP-09 Aprobado: corrida real completa, instrumentación temporal retirada
+
+### Contexto
+Con la instrumentación agregada en la entrada anterior (ya corregida tras el chequeo local que encontró el `grupo_origen` faltante), la corrida real confirmó exactamente el comportamiento esperado — tras dos intentos previos descartados por una copia desactualizada del archivo en el proyecto de prueba.
+
+```text
+Intentos descartados: dos ejecuciones previas (correos "Blabla" y "blablabla2") fallaron
+con REVISION_MANUAL / "Grupo origen fuera de catálogo en observación 0, tarea 0" —
+el proyecto de prueba tenía copiada la versión de codigo/cliente_openai.gs anterior a la
+corrección del grupo_origen faltante (documentada en la entrada anterior). Ninguno de los
+dos representa el escenario de CP-09; ambos quedaron cerrados y no se reutilizaron.
+
+Correo sintético (tercer intento, con el archivo corregido ya copiado):
+"[PRUEBA-AUTOMATIZACION] Consulta sobre horario de atención"
+
+Log: "1 mensajes elegibles, procesando 1." → consultarIAExtractora() →
+"CP-09: simulando HTTP 503 en el intento 1..." → "CP-09: simulando HTTP 200 en el intento 2..."
+→ sin ninguna línea de error.
+Log Mensajes: intentos=2, estado=PROCESADO, cantidad_observaciones=1, cantidad_tareas=1.
+Registro Tareas: 1 fila nueva. Desarrollo IT: 1 fila nueva. Gmail: etiqueta "Procesado".
+```
+
+### Lección: confirmar la versión copiada tras una corrección en la misma ronda
+Cuando la instrumentación se corrige (por un hallazgo del propio chequeo local, como en este caso) **después** de haber sido diseñada pero **antes** de decirle al usuario que la copie, vale la pena pedir confirmación explícita del contenido exacto copiado (o al menos de la línea corregida) antes de la primera corrida real, en vez de asumir que "la versión más nueva" y "la versión que el usuario tiene" son la misma. Aquí se resolvió pidiendo el contenido completo del archivo y verificando visualmente la presencia de `grupo_origen`.
+
+### Aprobación
+**CP-09 pasa de Pendiente a Aprobado — 26/07/2026.** Confirma en producción real que el bucle de reintentos de `consultarIAExtractora()` maneja correctamente un HTTP 503 (temporal) seguido de un HTTP 200 exitoso: se registran 2 intentos en `Log Mensajes.intentos` y la tarea se genera normalmente en el segundo intento, sin ninguna llamada real a OpenAI durante el diseño de la prueba. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+### Retiro de la instrumentación temporal
+Con CP-09 aprobado, se retira de `codigo/cliente_openai.gs` el gancho `INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-09` agregado en la entrada anterior (`consultarIAExtractora()` vuelve exactamente a su forma previa a esa entrada: el `try { response = UrlFetchApp.fetch(...) } catch (errorRed) { ... }` original, sin el `if/else` de instrumentación). La property `CP09_FORZAR_HTTP_TEMPORAL` queda sin efecto en el código. Verificado antes y después del retiro: `node --check` sobre el archivo y las 5 suites locales (166/60/46/19/17 verificaciones), sin regresiones.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada — es exclusivamente el registro de la corrida real, la aprobación, y el retiro de la instrumentación.
+
+---
+
 ## [2026-07-26] — Instrumentación temporal de prueba para CP-09: error HTTP temporal
 
 ### Contexto
