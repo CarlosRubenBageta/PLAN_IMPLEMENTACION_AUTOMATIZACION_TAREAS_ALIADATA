@@ -1,5 +1,49 @@
 # Changelog
 
+## [2026-07-26] — CP-34 Aprobado: corrida real completa, instrumentación temporal retirada — familia CP-25/26/32/33/34 completa
+
+### Contexto
+Con la instrumentación agregada en la entrada anterior, las tres corridas reales confirmaron exactamente el comportamiento esperado, al primer intento.
+
+```text
+Correo sintético: "[PRUEBA-AUTOMATIZACION] Vencimiento de garantía de equipo" (message_id 19fa107c79d673bb, nuevo)
+2 observaciones / 2 tareas: Desarrollo IT ("Gestionar la renovación de garantía del equipo con el proveedor"),
+Comercial ("Avisar al cliente que el soporte técnico seguirá disponible durante el trámite")
+
+Corrida 1 (CP34_FORZAR_FALLO_GMAIL=true):
+"1 mensajes elegibles, procesando 1." → consultarIAExtractora() →
+"Error procesando mensaje 19fa107c79d673bb: CP-34: falla de Gmail simulada..."
+Log Mensajes: estado=ERROR_TEMPORAL, etapa=ESCRITURA_COMPLETADA, cantidad_tareas=2.
+Registro Tareas: 2 tareas ESCRITA.
+
+Corrida 2 (CP34_FORZAR_FALLO_GMAIL sigue en true, ejecutada de inmediato):
+"1 mensajes elegibles, procesando 1."
+"procesarUnMensaje(): existe manifiesto...; se reanuda sin volver a consultar la IA."
+"reanudarDesdeManifiesto(): todas las tareas... ya estaban ESCRITA; se repite únicamente la actualización de Gmail."
+"Error procesando mensaje 19fa107c79d673bb: CP-34: falla de Gmail simulada..." (segunda falla, capturada)
+Log Mensajes: SIN CAMBIOS (estado=ERROR_TEMPORAL, etapa=ESCRITURA_COMPLETADA) — UNA sola línea de error,
+sin cadena de reintentos.
+
+Corrida 3 (CP34_FORZAR_FALLO_GMAIL=false, ejecutada de inmediato):
+"1 mensajes elegibles, procesando 1."
+"procesarUnMensaje(): existe manifiesto...; se reanuda sin volver a consultar la IA."
+"reanudarDesdeManifiesto(): todas las tareas... ya estaban ESCRITA; se repite únicamente la actualización de Gmail."
+Sin línea de error esta vez — Log Mensajes: estado=PROCESADO. Sin filas duplicadas en las hojas de negocio.
+```
+
+### Aprobación
+**CP-34 pasa de Pendiente a Aprobado — 26/07/2026.** Confirma en producción real que una segunda falla de Gmail durante el intento de recuperación se captura por el mismo camino que la primera (`gestionarErrorMensaje()` detecta el manifiesto, mantiene `ERROR_TEMPORAL` sin cerrarlo, retorna sin recursividad) — sin generar ninguna cadena de reintentos dentro de la misma ejecución — y que un tercer intento posterior recupera el mensaje limpiamente. Detalle completo en `pruebas/CASOS_DE_PRUEBA.md` y `pruebas/resultados/RESULTADOS_FASE_8.md`.
+
+**Con esto queda completa la familia de recuperación desde manifiesto (INC-FASE8-005): CP-12 (ambas variantes, camino inmediato y runtime interrumpido), CP-25 (reproducción del incidente real original), CP-26 (falla en la etapa RESERVADA), CP-32 (recuperación con tareas ya ESCRITA, evidencia propia sobre el mecanismo de CP-25), CP-33 (recuperación con tareas en RESERVADA, evidencia propia sobre el mecanismo de CP-26) y CP-34 (segunda falla durante la recuperación, sin recursión) — las seis variantes del mecanismo de recuperación quedan validadas en producción real, cada una con su propio `message_id` y su propia evidencia.**
+
+### Retiro de la instrumentación temporal
+Con CP-34 aprobado, se retira de `codigo/script_refactorizado.gs` el gancho `INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-34` agregado en la entrada anterior (`aplicarResultadoGmail()` vuelve exactamente a su forma previa a esa entrada). La property `CP34_FORZAR_FALLO_GMAIL` queda sin efecto en el código. Verificado antes y después del retiro: `node --check` sobre el archivo y las 5 suites locales (166/60/46/19/17 verificaciones), sin regresiones.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada — es exclusivamente el registro de la corrida real, la aprobación, y el retiro de la instrumentación.
+
+---
+
 ## [2026-07-26] — Instrumentación temporal de prueba para CP-34: nueva falla de Gmail durante la recuperación (sin recursión)
 
 ### Contexto

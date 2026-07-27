@@ -291,7 +291,7 @@ Igual que **CP-12** (variante A, el camino inmediato corregido por INC-FASE8-005
 
 **Procedimiento:** repetir CP-25, pero instrumentar `aplicarResultadoGmail()` para que falle **también** en el intento de recuperación (segunda invocación para el mismo mensaje).
 **Resultado esperado:** la segunda falla se captura por el mismo camino (`gestionarErrorMensaje()` detecta el manifiesto, marca `ERROR_TEMPORAL`, retorna sin recursividad); **no** se genera una cadena de reintentos dentro de la misma ejecución; el mensaje queda disponible para un tercer intento en la ejecución siguiente.
-**Estado:** Pendiente.
+**Estado:** Aprobado — 26/07/2026. Mismo gancho de CP-12/CP-25/CP-32 en `aplicarResultadoGmail()` (property exclusiva `CP34_FORZAR_FALLO_GMAIL`), mantenida en `true` durante dos corridas consecutivas. Correo sintético "Vencimiento de garantía de equipo" (`message_id 19fa107c79d673bb`, 2 tareas), al primer intento. Corrida 1: `ERROR_TEMPORAL`/`ESCRITURA_COMPLETADA`, 2 tareas `ESCRITA`. Corrida 2 (property sin tocar, sigue en `true`): la recuperación arrancó (`"existe manifiesto...", "todas las tareas... ya estaban ESCRITA..."`), la falla se disparó de nuevo — **una sola** línea `"Error procesando mensaje..."`, sin cadena de reintentos, `Log Mensajes` sin cambios. Corrida 3 (`CP34_FORZAR_FALLO_GMAIL=false`): recuperación limpia, `Log Mensajes` a `PROCESADO`, sin filas duplicadas. Instrumentación ya retirada del código. **Con esto queda completa la familia de recuperación desde manifiesto (INC-FASE8-005): CP-12, CP-25, CP-26, CP-32, CP-33 y CP-34.** Ver detalle completo en `pruebas/resultados/RESULTADOS_FASE_8.md`.
 
 ## CP-35 — Sin filas duplicadas en Indice Idempotencia tras recuperaciones sucesivas
 
