@@ -1,5 +1,33 @@
 # Changelog
 
+## [2026-07-26] — Instrumentación temporal de prueba para CP-34: nueva falla de Gmail durante la recuperación (sin recursión)
+
+### Contexto
+CP-34 repite el escenario de CP-25/CP-12 (excepción capturada en `aplicarResultadoGmail()` tras `escribirFilasPorLote()`), pero exige que la **misma** falla se dispare también en el intento de recuperación (segunda invocación de `aplicarResultadoGmail()` para el mismo mensaje), para confirmar que `gestionarErrorMensaje()` no genera una cadena de reintentos dentro de la misma ejecución. Revisado el código (`gestionarErrorMensaje()`, `codigo/script_refactorizado.gs` línea 1241): la rama `manifiesto.length > 0` solo actualiza `Log Mensajes.estado = ERROR_TEMPORAL` y hace `return` — no existe ningún llamado recursivo a `procesarUnMensaje()` ni a `reanudarDesdeManifiesto()` dentro de esa función, así que la ausencia de recursión está garantizada por construcción; CP-34 la confirma con una corrida real.
+
+### Instrumentación temporal (`codigo/script_refactorizado.gs`)
+**Reutiliza exactamente el mismo gancho de CP-12/CP-25/CP-32** en `aplicarResultadoGmail()` (justo después de la salida por `DRY_RUN`), con property exclusiva `CP34_FORZAR_FALLO_GMAIL`. La novedad de CP-34 no está en el código — es idéntico — sino en el **procedimiento**: la property se mantiene en `'true'` durante dos corridas consecutivas (no una), para que la falla se dispare tanto en el intento original como en el de recuperación.
+
+### Diseño del correo sintético
+Nuevo, con 2 tareas en 2 tableros distintos: "El equipo de la oficina tiene la garantía por vencer este mes, hay que gestionar la renovación con el proveedor. El equipo comercial debe avisarle al cliente que el soporte técnico seguirá disponible durante el trámite."
+
+### Procedimiento (tres corridas)
+1. `CP34_FORZAR_FALLO_GMAIL=true` en Script Properties.
+2. Enviar el correo sintético.
+3. Ejecutar `procesarCorreosDeTareas()` (corrida 1) — se espera `Log Mensajes.estado=ERROR_TEMPORAL`, `etapa=ESCRITURA_COMPLETADA`, 2 tareas `ESCRITA`.
+4. **Sin tocar la property (sigue en `true`)**, ejecutar `procesarCorreosDeTareas()` de nuevo (corrida 2, de inmediato) — se espera: `"procesarUnMensaje(): existe manifiesto...; se reanuda sin volver a consultar la IA"` → `"reanudarDesdeManifiesto(): todas las tareas... ya estaban ESCRITA; se repite únicamente la actualización de Gmail"` → **la falla se dispara de nuevo** → `"Error procesando mensaje ...: CP-34..."` → `Log Mensajes` permanece en `estado=ERROR_TEMPORAL`, `etapa=ESCRITURA_COMPLETADA` (sin cambios) — **una sola** línea de error, sin cadena de reintentos.
+5. `CP34_FORZAR_FALLO_GMAIL=false`.
+6. Ejecutar `procesarCorreosDeTareas()` de nuevo (corrida 3, "tercer intento") — se espera recuperación limpia, `Log Mensajes` a `PROCESADO`, sin duplicar tareas.
+
+### Cambios
+- `codigo/script_refactorizado.gs`: `aplicarResultadoGmail()` gana el gancho condicional (idéntico en forma al de CP-12/CP-25/CP-32).
+- Ningún otro archivo de `codigo/` ni de `pruebas/` cambia en esta entrada.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante este diseño. No se modificó `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-34 en esta entrada — requiere que el usuario ejecute el procedimiento de tres corridas y reporte el resultado.
+
+---
+
 ## [2026-07-26] — CP-33 Aprobado: corrida real completa, instrumentación temporal retirada
 
 ### Contexto
