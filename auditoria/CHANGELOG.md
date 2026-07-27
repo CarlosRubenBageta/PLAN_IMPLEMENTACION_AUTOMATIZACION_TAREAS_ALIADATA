@@ -1,5 +1,33 @@
 # Changelog
 
+## [2026-07-26] — Instrumentación temporal de prueba para CP-08: JSON inválido de la IA
+
+### Contexto
+CP-08 es cualitativamente distinto de la familia CP-12/25/26/32/33/34 recién cerrada: no prueba recuperación tras una interrupción, sino la robustez de `validarRespuestaIA()` (`codigo/esquema_json.gs`) frente a una respuesta de la IA que no es JSON válido. Revisado el código: `validarRespuestaIA()` (línea 97-102) envuelve `JSON.parse(respuestaIA.contenidoCrudo)` en un `try/catch` y devuelve `{ valida: false, motivo: 'La IA no devolvió JSON válido: ...' }` si falla; `procesarUnMensaje()` (línea 635-638) verifica `!validacionIA.valida` y llama a `finalizarMensajeSinTareas(mensajeDescriptor, ESTADOS.REVISION_MANUAL, validacionIA.motivo, cfg, 'RevisionErrorProcesamiento')` — exactamente el resultado esperado por el caso.
+
+### Instrumentación temporal (`codigo/cliente_openai.gs`, no `script_refactorizado.gs`)
+A diferencia de todos los casos anteriores, esta instrumentación va en `consultarIAExtractora()` (`codigo/cliente_openai.gs`), no en `script_refactorizado.gs`. Gancho al inicio mismo de la función, antes de construir el payload o llamar a la API real:
+
+- Se activa **solo** si `cfg.modoPrueba === true` **y** `CP08_FORZAR_JSON_INVALIDO === 'true'`.
+- Devuelve directamente un resultado con forma de éxito (`exito: true`) pero `contenidoCrudo: 'esto no es json'` — **sin llamar a `UrlFetchApp.fetch()`**, es decir, sin gastar ninguna llamada real ni tokens de OpenAI (esta prueba no necesita clasificación real de la IA, solo ejercitar la validación posterior).
+- Marcada "INICIO/FIN INSTRUMENTACIÓN TEMPORAL CP-08", para retirar tras la corrida real.
+
+### Procedimiento (una sola corrida — a diferencia de la familia CP-12/25/26/32/33/34, este caso cierra el mensaje de inmediato, sin manifiesto ni recuperación)
+1. Copiar `codigo/cliente_openai.gs` actualizado al proyecto de prueba (esta vez, no `script_refactorizado.gs`).
+2. `CP08_FORZAR_JSON_INVALIDO=true` en Script Properties.
+3. Enviar un correo sintético nuevo cualquiera (el contenido no importa: la respuesta de la IA se reemplaza antes de llegar a clasificar nada).
+4. Ejecutar `procesarCorreosDeTareas()` — se espera `Log Mensajes.estado=REVISION_MANUAL`, `etapa=FINALIZADO`, sin fila en `Registro Tareas`, `Indice Idempotencia` con una entrada (`task_id` vacío), etiqueta de Gmail `Revisión manual/Error de procesamiento`, sin filas en ninguna hoja de negocio.
+5. `CP08_FORZAR_JSON_INVALIDO=false`.
+
+### Cambios
+- `codigo/cliente_openai.gs`: `consultarIAExtractora()` gana el gancho condicional descrito arriba.
+- Ningún otro archivo de `codigo/` ni de `pruebas/` cambia en esta entrada.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante este diseño. No se modificó `pruebas/CASOS_DE_PRUEBA.md`, `pruebas/resultados/RESULTADOS_FASE_8.md` ni `pruebas/resultados/INCIDENCIAS_FASE_8.md`. No se aprueba CP-08 en esta entrada — requiere que el usuario ejecute el procedimiento y reporte el resultado.
+
+---
+
 ## [2026-07-26] — CP-34 Aprobado: corrida real completa, instrumentación temporal retirada — familia CP-25/26/32/33/34 completa
 
 ### Contexto
