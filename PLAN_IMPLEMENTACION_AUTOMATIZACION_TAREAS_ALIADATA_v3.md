@@ -1341,6 +1341,70 @@ Observaciones: Por DEC-004 (auditoria/DECISIONES.md), esta fase se aprueba con C
 
 ---
 
+## Fase 8.1. Consolidación e incorporación del histórico
+
+### Objetivo
+
+Antes de desplegar la Fase 9, garantizar dos cosas: (a) una vista consolidada de solo lectura de las cinco hojas de negocio (`Resumen Actividades`), y (b) que toda actividad histórica pre-corte todavía no resuelta quede identificada, visible y conciliada — sin reprocesarla desde Gmail ni insertarla en las hojas técnicas del pipeline (`Log Mensajes`, `Registro Tareas`, `Indice Idempotencia`), que representan mensajes y tareas generadas por el proceso automático, no actividad de negocio preexistente.
+
+Diseño completo, alternativas evaluadas, riesgos y casos de prueba: `documentacion/PROPUESTA_CONSOLIDACION_Y_MIGRACION_HISTORICA.md`. Inventario técnico real y decisiones de negocio: `documentacion/INVENTARIO_TECNICO_Y_DECISIONES_FASE_8_1.md`.
+
+### Decisiones aprobadas (28/07/2026)
+
+- El despliegue se mantiene sobre el archivo maestro productivo actual (hoy sin `Log Mensajes`/`Registro Tareas`/`Indice Idempotencia` — esas se crean recién en la Fase 9).
+- `Resumen Actividades` es una vista de solo lectura por fórmulas nativas de Sheets (no macro, no Apps Script salvo que una prueba de rendimiento real lo exija); las cinco hojas operativas siguen siendo la única fuente de verdad.
+- Catálogo real de `Estado` (`Listas!D`, no el tentativo original de la propuesta): abiertos `Pendiente`/`En curso`/`Bloqueada`/`En revisión`; terminal `Completada`; ambiguo cualquier otro valor — regla fail-safe: nunca se excluye un valor no clasificado explícitamente como terminal.
+- Los posibles duplicados de contenido nunca se eliminan automáticamente (van a revisión humana); los IDs históricos válidos y únicos se conservan tal cual, sin reemplazarlos.
+- El origen de cada fila (`Automatización v3` / `Histórico/pre-corte` / `Revisión de origen`) se determina contra `Indice Idempotencia`, no contra `Registro Tareas` — esta última tiene purga de información ampliada a los 6 meses (Fase 10, CP-30); `Indice Idempotencia` tiene retención indefinida.
+- Carlos Rubén Bageta aprueba la conciliación histórica y administra el catálogo de equivalencias de estados.
+
+Registro formal: `auditoria/DECISIONES.md`, DEC-013 a DEC-016.
+
+### Procedimiento
+
+Etapas 0 a 4 — preparación, inventario, catálogos y simulación, todo antes de tocar producción. Detalle completo en `documentacion/PROPUESTA_CONSOLIDACION_Y_MIGRACION_HISTORICA.md`, sección 7.
+
+- [x] Etapa 0 — Confirmar supuestos y designar responsable de la conciliación (28/07/2026, ver "Decisiones aprobadas" arriba).
+- [x] Etapa 1 — Inventario de solo lectura sobre las cinco hojas, sobre una copia aislada del archivo (28/07/2026, ver `documentacion/INVENTARIO_TECNICO_Y_DECISIONES_FASE_8_1.md`): 27 filas activas totales, catálogo real de Estado confirmado, sin IDs vacíos ni duplicados, hallazgo de `Dashboard` (rango fijo `$5:$204`) documentado como riesgo de diseño.
+- [x] Etapa 2 — Matriz de homologación completa aprobada (28/07/2026, ver `documentacion/MATRIZ_HOMOLOGACION_HISTORICA.md`): `Prioridad final` 100% vacía en las cinco hojas (sin homologación posible, se documenta el vacío); `Responsable` coincide exactamente con `Listas!E` sin variantes; formato de ID histórico (`HIST-...`) sin ningún caso real que resolver hoy (0 IDs vacíos/duplicados); reglas de duplicados confirmadas (D4a) con 2 casos reales detectados en `Desarrollo IT`, pendientes de revisión humana en la Etapa 4.
+- [x] Etapa 3 — Simulación completa en una copia aislada del archivo (28/07/2026): `Registro Migración Histórica` y `Resumen Actividades` creadas y validadas; filtros, enlaces, conteos y rendimiento probados sin problemas de fondo. Hallazgo real: un doble clic accidental en la columna `Abrir origen` rompe la fórmula de matriz para toda la vista — mitigado protegiendo la hoja completa como solo lectura (agregado como paso explícito en la Aprobación A de la Fase 9, más abajo). Sin escrituras en producción.
+- [x] Etapa 4, ítems 1-3 — Resolver estados ambiguos (28/07/2026: 0 casos, ningún valor fuera del catálogo de la sección 1 de `documentacion/MATRIZ_HOMOLOGACION_HISTORICA.md`), colisiones de ID (0 casos, ver Etapa 1) y posibles duplicados (28/07/2026: único caso real, `ALI-62176`/`ALI-23135` en Desarrollo IT, decisión `CONSERVAR` ambas — ver `documentacion/MATRIZ_HOMOLOGACION_HISTORICA.md`, sección 5).
+- [x] Etapa 4, ítems 4-5 — Aprobar cada transformación productiva y firmar el reporte de conciliación previo (28/07/2026): conciliación cerrada sin diferencias (27 = 5 terminales + 22 abiertos + 0 ambiguos; 22 incluibles no resueltos = 22 visibles en `Resumen Actividades` + 0 excepciones bloqueantes); las 27 transformaciones simuladas (`accion=CONSERVAR`) aprobadas. **Etapa 4 completa.**
+
+**Las Etapas 5 a 7 (respaldo, ejecución productiva, conciliación real y reversión) se ejecutan dentro de la ventana de corte de la Fase 9 — ver "Aprobación A" en el procedimiento de esa fase.**
+
+### Entregables
+
+- `documentacion/PROPUESTA_CONSOLIDACION_Y_MIGRACION_HISTORICA.md`
+- `documentacion/INVENTARIO_TECNICO_Y_DECISIONES_FASE_8_1.md`
+- `documentacion/MATRIZ_HOMOLOGACION_HISTORICA.md`
+- `documentacion/DISENO_RESUMEN_ACTIVIDADES.md`
+- `pruebas/CASOS_CONSOLIDACION_HISTORICA.md`
+- `pruebas/resultados/RESULTADOS_CONSOLIDACION_HISTORICA.md`
+- `auditoria/ACTA_APROBACION_FASE_8_1.md`
+- Reporte de simulación y conciliación (Etapas 3-4, sobre copia aislada)
+
+### Criterios de aceptación
+
+- [x] Todos los históricos abiertos o ambiguos aparecen en `Resumen Actividades` (conciliación Etapa 4: 22 ABIERTO + 0 AMBIGUO = 22 incluibles no resueltos = 22 visibles en `Resumen Actividades` + 0 excepciones bloqueantes).
+- [x] Los conteos concilian con la suma de las cinco hojas de negocio (Etapa 4: 27 = 5 terminales + 22 abiertos + 0 ambiguos, sin diferencias).
+- [x] No se copió ninguna fila que ya estuviera en el archivo maestro (por diseño, `Resumen Actividades` y `Registro Migración Histórica` se recalculan en vivo desde las cinco hojas mediante una única fórmula de matriz, sin copiado/inserción manual; confirmado además por la prueba de reversión del 28/07/2026, sin cambios en las hojas fuente).
+- [x] Ningún registro histórico ingresó en `Log Mensajes`, `Registro Tareas` ni `Indice Idempotencia` (las dos primeras no existen ni en la copia ni en el archivo productivo actual — D1 —; el stand-in de `Indice Idempotencia` usado para probar `Origen del registro` quedó con 0 filas de datos, solo encabezados).
+- [x] `Resumen Actividades` distingue correctamente `Automatización v3` de `Histórico/pre-corte`, y clasifica como `Revisión de origen` lo que no coincide con ninguno (28/07/2026: columna `V`, 27/27 filas `Histórico/pre-corte`, 0 `Automatización v3` (stand-in `Indice Idempotencia` vacío, esperable), 0 `Revisión de origen` — ver `auditoria/CHANGELOG.md`).
+- [x] La reversión de las normalizaciones fue probada en la copia aislada (28/07/2026: eliminadas y restauradas las 3 hojas nuevas con `Ctrl+Z`, sin impacto en las cinco hojas de negocio — ver `auditoria/CHANGELOG.md`).
+- [x] `Dashboard` y `Listas` no sufrieron regresiones (28/07/2026: mismo total/desglose 27-22-5 y mismo catálogo antes y después de la prueba de reversión; `Dashboard` depende de rangos fijos `$5:$204` en las cinco hojas — ver hallazgo de la Etapa 1).
+
+### Puerta de aprobación
+
+```text
+APROBACIÓN FASE 8.1: APROBADA
+Responsable:
+Fecha:
+Observaciones: Etapas 0 a 4 completas (28/07/2026) con datos reales y simulación validada en copia aislada — ver documentacion/INVENTARIO_TECNICO_Y_DECISIONES_FASE_8_1.md, documentacion/MATRIZ_HOMOLOGACION_HISTORICA.md, y esta sección para el detalle de las Etapas 3 y 4. Reporte de conciliación cerrado sin diferencias (27 = 5 terminales + 22 abiertos + 0 ambiguos) y las 27 transformaciones simuladas (accion=CONSERVAR) aprobadas. Los 7 criterios de aceptación de la fase completa están satisfechos con evidencia real (28/07/2026): columna `Origen del registro` construida y probada (27/27 Histórico/pre-corte), prueba de reversión ejecutada sin impacto en las cinco hojas de negocio, y `Dashboard`/`Listas` reconfirmados sin regresión — ver auditoria/CHANGELOG.md. Aprobada por Carlos Rubén Bageta (28/07/2026, confirmación registrada en esta sesión); ninguna condición técnica pendiente — solo falta firmar (Responsable y Fecha arriba). Las Etapas 5 a 7 se ejecutan dentro de la ventana de corte de la Fase 9.
+```
+
+---
+
 ## Fase 9. Despliegue controlado
 
 ### Objetivo
@@ -1349,22 +1413,37 @@ Instalar la nueva versión en producción de forma reversible, sin perder correo
 
 ### Procedimiento
 
+Incorpora las operaciones de la Fase 8.1 (Etapas 5 a 7) intercaladas con el despliegue del pipeline. **Dos aprobaciones humanas distintas y no intercambiables** — la primera cierra el lote histórico antes de que el código nuevo exista en el archivo; la segunda es la activación final.
+
+**Aprobación A — cierre del lote histórico (antes de tocar el código nuevo):**
+
 - [ ] Confirmar respaldo final.
 - [ ] Abrir la **ventana de corte**: registrar `FECHA_INICIO_CORTE`.
 - [ ] Verificar la última ejecución de la versión antigua y desactivar su activador.
+- [ ] Crear las hojas técnicas del pipeline: `Log Mensajes`, `Registro Tareas`, `Indice Idempotencia`.
+- [ ] Crear `Registro Migración Histórica` (Fase 8.1).
+- [ ] Aplicar únicamente las normalizaciones históricas ya aprobadas en la Fase 8.1 (Etapas 2-4).
+- [ ] Crear `Resumen Actividades` (Fase 8.1).
+- [ ] Proteger la hoja `Resumen Actividades` completa (`Datos → Hojas y rangos protegidos`, restringir edición a los administradores) — es de solo lectura por diseño (D3); validado en la Etapa 3 que sin esto, un doble clic accidental en la columna `Abrir origen` rompe la fórmula de matriz para todos los usuarios.
+- [ ] Ejecutar la conciliación histórico/resumen.
+- [ ] Detenerse ante cualquier diferencia no explicada.
+- [ ] **Aprobación A: aprobación humana del lote histórico y su conciliación** — condición para continuar con el despliegue del código. No debe confundirse con la Aprobación B: esta cierra específicamente el trabajo de datos, antes de que el pipeline nuevo exista en el archivo.
+
+**Continúa el despliegue del pipeline:**
+
 - [ ] Copiar el código aprobado a Apps Script.
 - [ ] Habilitar el servicio avanzado de Gmail y verificar `appsscript.json` (servicio y alcances OAuth).
 - [ ] Configurar propiedades del script (incluido `MODO_PRUEBA=false` y `DRY_RUN=false`).
 - [ ] Crear etiquetas y registrar sus IDs internos.
-- [ ] Crear las hojas técnicas `Log Mensajes`, `Registro Tareas` e `Indice Idempotencia`.
 - [ ] Verificar nombres de hojas.
 - [ ] Autorizar permisos (incluidos los alcances de Gmail API).
 - [ ] Ejecutar `validarConfiguracion()`.
 - [ ] Ejecutar una prueba manual.
 - [ ] Procesar uno o dos correos controlados.
 - [ ] Verificar filas, log, etiquetado y archivado **por mensaje**.
-- [ ] Ejecutar el saneamiento histórico: respaldar las hojas, identificar las filas generadas por correos automáticos (`noreply-apps-scripts-notifications@google.com`, Google Workspace, NotebookLM), moverlas a `Registros descartados` sin eliminarlas y registrar la decisión (v3).
+- [ ] Ejecutar por separado el saneamiento de correos automáticos: identificar las filas generadas por correos automáticos (`noreply-apps-scripts-notifications@google.com`, Google Workspace, NotebookLM), moverlas a `Registros descartados` sin eliminarlas y registrar la decisión (v3) — distinto de la incorporación histórica de la Fase 8.1 (ver RH-14, `documentacion/PROPUESTA_CONSOLIDACION_Y_MIGRACION_HISTORICA.md`).
 - [ ] Configurar las alertas hacia la cuenta técnica externa.
+- [ ] **Aprobación B: aprobación final de despliegue** — confirmando además que ninguna diferencia detectada antes de la Aprobación A quedó sin explicar.
 - [ ] Reactivar el activador (versión nueva) y verificar su primera ejecución.
 - [ ] Confirmar que se procesó todo correo posterior a `FECHA_INICIO_CORTE`.
 - [ ] Supervisar las primeras ejecuciones.
@@ -1388,6 +1467,9 @@ Cuenta de alertas: cuenta técnica externa (nunca tareas@alia-data.com)
 - `documentacion/PROCEDIMIENTO_DESPLIEGUE.md`
 - `documentacion/PROCEDIMIENTO_REVERSION.md`
 - `auditoria/ACTA_DESPLIEGUE.md`
+- Reporte de conciliación histórico/resumen de la corrida real (Fase 8.1, distinto del reporte de simulación)
+- Procedimiento de creación y restauración de `Resumen Actividades` en el archivo productivo
+- Registro del lote histórico efectivamente aplicado (`batch_id`, fecha, responsable, conteos reales)
 
 ### Criterios de aceptación
 
@@ -1399,6 +1481,16 @@ Cuenta de alertas: cuenta técnica externa (nunca tareas@alia-data.com)
 - [ ] La ventana de corte no dejó correos sin procesar.
 - [ ] No aparecen duplicados.
 - [ ] Existe un procedimiento de reversión probado.
+
+**Adicionales, propios de la incorporación histórica (Fase 8.1, Aprobación A):**
+
+- [ ] Todos los históricos abiertos o ambiguos aparecen en `Resumen Actividades`.
+- [ ] Los conteos concilian con las cinco hojas de negocio.
+- [ ] No se copiaron filas que ya estaban en el archivo maestro.
+- [ ] Ningún histórico ingresó en las hojas técnicas del pipeline.
+- [ ] La vista muestra correctamente las tareas nuevas y las históricas.
+- [ ] La reversión de normalizaciones fue probada.
+- [ ] `Dashboard` y `Listas` no sufrieron regresiones.
 
 ### Puerta de aprobación
 

@@ -36,11 +36,16 @@ Esta carpeta seleccionada actúa como raíz del proyecto (equivale a `Automatiza
 | 6. Filtros determinísticos | **APROBADA** (20/07/2026, acta firmada) |
 | 7. Escritura en Sheets | **APROBADA** (20/07/2026, acta firmada) |
 | 8. Pruebas | **APROBADA** (27/07/2026) — 36/36 casos condicionantes + CP-38/CP-39 (Lotes 2/3, H-07/H-08), todos con corrida real; ver acta |
+| 8.1. Consolidación e incorporación del histórico | **APROBADA** (28/07/2026) — Etapas 0 a 4 completas con datos reales y simulación validada en copia aislada; los 7 criterios de aceptación satisfechos (ver `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`, sección "Fase 8.1"). Nueva fase, no contemplada en el plan original — ver `documentacion/PROPUESTA_CONSOLIDACION_Y_MIGRACION_HISTORICA.md` y DEC-013 a DEC-016 |
 | 9 a 10 | Pendientes |
 
 **Para retomar el proyecto en una sesión nueva:** indicar a Cowork que lea este README y `entregables/FASE_8/ACTA_APROBACION_FASE_8.md`.
 
-**Acción pendiente de Rubén para cerrar formalmente la Fase 8:** ninguna condición técnica pendiente — solo falta firmar el acta (responsable y fecha) en `entregables/FASE_8/ACTA_APROBACION_FASE_8.md`. Con eso, puede planificarse la Fase 9 (ventana de corte productiva).
+**Acción pendiente de Rubén para cerrar formalmente la Fase 8:** ninguna condición técnica pendiente — solo falta firmar el acta (responsable y fecha) en `entregables/FASE_8/ACTA_APROBACION_FASE_8.md`.
+
+**Acción pendiente de Rubén para cerrar formalmente la Fase 8.1:** ninguna condición técnica pendiente — solo falta firmar (responsable y fecha) en la puerta de aprobación de `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`, sección "Fase 8.1".
+
+**Acción pendiente para planificar la Fase 9:** con las Fases 8 y 8.1 aprobadas, puede planificarse la ventana de corte de la Fase 9 (que incorpora también la ejecución productiva del histórico, con dos aprobaciones separadas — ver "Fase 9" en el plan v3).
 
 ## Reglas de seguridad esenciales
 

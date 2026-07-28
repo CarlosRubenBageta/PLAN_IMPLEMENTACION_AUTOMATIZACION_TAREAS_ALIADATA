@@ -1,5 +1,242 @@
 # Changelog
 
+## [2026-07-28] — Fase 8.1 APROBADA
+
+### Decisión (Carlos Rubén Bageta, 28/07/2026)
+
+Con los 7 criterios de aceptación satisfechos con evidencia real (Etapas 0-4, columna `Origen del registro`, prueba de reversión, reconfirmación de `Dashboard`/`Listas` — ver entradas anteriores de este changelog), Carlos Rubén Bageta confirma el cierre de la fase: **"Sí, confirmo, marcala APROBADA."**
+
+### Estado
+
+`PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md` (puerta de aprobación de la Fase 8.1) y `README.md` (tabla de estado de fases) actualizados a `APROBADA`. Sin condición técnica pendiente; solo falta la firma (Responsable y Fecha) en la puerta de aprobación, igual que con la Fase 8. Con las Fases 8 y 8.1 aprobadas, puede planificarse la ventana de corte de la Fase 9 (dos aprobaciones separadas, ya documentadas en esa sección del plan v3).
+
+### No accedido
+
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada.
+
+---
+
+## [2026-07-28] — Prueba de reversión y reconfirmación de `Dashboard`/`Listas`: Fase 8.1 con los 7 criterios de aceptación satisfechos
+
+### Corrida real (Carlos Rubén Bageta, sobre la copia aislada)
+
+Testigo antes de la prueba: `Desarrollo IT!A5`=`ALI-60555`, `A22`=`ALI-47022` (18 filas activas); `Dashboard` en 27 total / 22 Pendiente / 5 Completada; `Listas` con su catálogo intacto.
+
+Eliminadas las 3 hojas de la Fase 8.1 (`Resumen Actividades`, `Registro Migración Histórica`, `Indice Idempotencia` stand-in). Confirmado: las cinco hojas de negocio, `Dashboard` y `Listas` quedaron exactamente iguales al testigo — cero impacto, ninguna fila de más o de menos.
+
+Restauradas las 3 hojas con `Ctrl+Z` (una vez por hoja, en orden inverso al borrado). **Hallazgo esperado, no un problema:** `Registro Migración Histórica` mostró `#REF!` transitoriamente entre la restauración de `Indice Idempotencia` y la de `Resumen Actividades` (de la que depende) — se resolvió solo al reaparecer esta última, sin intervención manual. Confirmado el contenido final: 27 filas y 17 columnas intactas en ambas hojas, incluida la columna `Origen del registro`.
+
+### Estado
+
+Con esto, los 3 puntos pendientes tras el cierre de la Etapa 4 quedan completos. **Los 7 criterios de aceptación de la Fase 8.1 están satisfechos con evidencia real** (detalle en `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`, sección "Fase 8.1" → "Criterios de aceptación"). Queda pendiente únicamente la aprobación formal de Carlos Rubén Bageta para cerrar la puerta de la fase.
+
+### No accedido
+
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada.
+
+---
+
+## [2026-07-28] — Columna "Origen del registro" construida y validada en `Resumen Actividades`
+
+### Corrida real (Carlos Rubén Bageta, sobre la copia aislada)
+
+Creada la hoja stand-in `Indice Idempotencia` (solo encabezados `message_id`/`task_id`/`estado_final`/`fecha`, sin datos — simula el estado real en el momento en que se arma `Resumen Actividades` en la Fase 9/Aprobación A, antes de que el pipeline v3 procese ninguna tarea) y la columna `V` (`Origen del registro`) en `Resumen Actividades`, con la regla de 3 niveles de DEC-014 (`Indice Idempotencia` → `Registro Migración Histórica` → `Revisión de origen`).
+
+**Hallazgo real (error propio, no de datos):** la primera versión de la fórmula comparaba `Resumen Actividades!A2:A` contra los `ID` — pero la columna `A` de `Resumen Actividades` es `Hoja origen` (etiqueta de texto, ej. "Finanzas"), no el `ID`; el `ID` real está en la columna `C`, porque la fórmula de la Etapa 3 antepone `Hoja origen` y `Fila origen` antes de las 17 columnas del tablero de negocio, corriendo el `ID` de la posición 1 (en el tablero de origen) a la posición 3 (en `Resumen Actividades`). Con la columna equivocada, las 27 filas caían en `Revisión de origen`. Corregido (columna `C` en vez de `A` para la comparación), reconfirmado el encabezado `legacy_id_original` en `Registro Migración Histórica!C1` antes de aplicar el cambio.
+
+### Resultado
+
+Las 27 filas muestran `Histórico/pre-corte` (0 en `Automatización v3`, esperable porque el stand-in de `Indice Idempotencia` está vacío; 0 en `Revisión de origen`, confirma que las 27 `ID` de `Resumen Actividades` coinciden exactamente con las 27 `legacy_id_original` de `Registro Migración Histórica`).
+
+### Estado
+
+Primero de los 3 criterios de aceptación pendientes de la Fase 8.1 completo. Siguen: prueba de reversión y reconfirmación de `Dashboard`/`Listas`.
+
+### No accedido
+
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada.
+
+---
+
+## [2026-07-28] — Etapa 4 de Fase 8.1 completa: reporte de conciliación firmado (ítems 4-5)
+
+### Reporte de conciliación (sobre los 27 registros reales de la copia aislada, Etapa 3)
+
+```text
+TOTAL_FUENTE = TERMINALES + ABIERTOS + AMBIGUOS
+            27 =        5 +       22 +        0   ✓
+
+INCLUIBLES_NO_RESUELTOS = ABIERTOS + AMBIGUOS
+                      22 =       22 +        0
+
+INCLUIBLES_NO_RESUELTOS = VISIBLES_EN_RESUMEN + EXCEPCIONES_BLOQUEANTES
+                      22 =                  22 +                    0   ✓
+```
+
+Cierra sin diferencias: las 27 filas activas de las cinco hojas de negocio están contempladas, sin ninguna excepción bloqueante (0 filas excluidas de `Resumen Actividades` por causas de conciliación).
+
+### Ítem 4 — Aprobar cada transformación productiva
+
+Trivial dado el resultado de la Etapa 3: las 27 filas simuladas en `Registro Migración Histórica` tienen `accion=CONSERVAR`, sin ninguna transformación destructiva (ni fusión, ni eliminación, ni reescritura de valores). `motivo_excepcion` documentado únicamente en los 2 casos de posible duplicado (`ALI-62176`/`ALI-23135`, decisión `CONSERVAR` ambas — ver Etapa 4, entrada anterior de este changelog).
+
+### Decisión (Carlos Rubén Bageta, 28/07/2026)
+
+**Aprobado.** Con el reporte de conciliación cerrado y las 27 transformaciones (todas `CONSERVAR`) aprobadas, los ítems 4 y 5 de la Etapa 4 quedan completos. **Etapa 4 completa en su totalidad** (ítems 1-5).
+
+### Estado
+
+Restan, para la puerta de aprobación completa de la Fase 8.1, tres criterios de aceptación aún no probados (no forman parte de la Etapa 4, son criterios de fase completa): la columna `Origen del registro` en `Resumen Actividades` (`Automatización v3` / `Histórico/pre-corte` / `Revisión de origen`), la prueba de reversión en la copia aislada, y la reconfirmación explícita de que `Dashboard` y `Listas` no sufrieron regresión. Carlos Rubén Bageta autorizó continuar con los tres.
+
+### No accedido
+
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada.
+
+---
+
+## [2026-07-28] — Etapa 3 de Fase 8.1: `Resumen Actividades` y `Registro Migración Histórica` construidas y validadas en copia aislada; hallazgo real de fragilidad en la columna de enlaces
+
+### Corrida real (Carlos Rubén Bageta, sobre la copia aislada del archivo)
+Creadas y verificadas ambas hojas de la Etapa 3, con los prerrequisitos que la propuesta pedía (última fila real, `gid` de cada hoja, configuración regional, catálogo de estados) ya disponibles de las Etapas 1-2:
+
+- **`Resumen Actividades`**: fórmula única (`LET`+`VSTACK`+`HSTACK`+`FILTER`, adaptada a `;`/nombres de función en español) que consolida las 27 filas reales de las cinco hojas, con `Hoja origen` y `Fila origen` derivadas. Verificado contra los hallazgos de las Etapas 1-2, sin discrepancias — incluidas las dos filas `ALI-62176`/`ALI-23135` apareciendo distintas, sin fusionar. Columna `Estado normalizado` (ABIERTO/TERMINAL/AMBIGUO) agregada y verificada (22 ABIERTO, 5 TERMINAL). Sin demoras de apertura o recálculo reportadas.
+- **`Registro Migración Histórica`**: las 17 columnas pobladas por fórmula desde `Resumen Actividades` (sin necesidad de releer las cinco hojas de negocio). `accion=CONSERVAR` en las 27 filas; `motivo_excepcion` completo únicamente en `ALI-62176`/`ALI-23135`, documentando la decisión de Etapa 4. `historical_record_id=legacy_id_original=canonical_task_id` en todos los casos (ningún `HIST-XXX` necesario). **Nota de proceso:** la primera versión de la fila de encabezados quedó corrida una columna (faltaba `batch_id`), detectado y corregido antes de dar por válida la hoja — la fórmula de datos nunca estuvo mal, solo los títulos.
+- **Filtros:** probado `Datos → Vistas de filtro` sobre `Resumen Actividades` — funciona sin problemas sobre el resultado de la fórmula de matriz.
+- **Enlaces ("Abrir origen"):** columna con `HYPERLINK` + `gid` real de cada hoja, verificada funcional. **Hallazgo real de fragilidad:** un doble clic accidental sobre una celda de esta columna entra en modo edición y pega un valor fijo, lo que bloquea la expansión de la fórmula de matriz (`#REF!`) para las 27 filas, no solo la celda tocada — con eso, cualquier usuario que haga doble clic ahí rompe la vista para todos.
+
+### Decisión (Carlos Rubén Bageta, 28/07/2026)
+Mantener la columna `Abrir origen` (no eliminarla) y **proteger toda la hoja `Resumen Actividades`** como solo lectura (`Datos → Hojas y rangos protegidos`, edición restringida a administradores) — ya prevista en la propuesta (RH-06, sección 5.6) y consistente con D3 (la vista es de solo lectura por diseño, no solo esa columna). Se agrega como paso explícito en el procedimiento de Fase 9 (Aprobación A, `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`), para que se repita en el archivo productivo real — proteger la copia de prueba no protege el archivo real, son planillas distintas.
+
+### Estado
+**Etapa 3 completa:** ambas hojas creadas, filtros/enlaces/conteos/rendimiento probados. Sigue pendiente la confirmación final de que la protección quedó aplicada correctamente en la copia (Carlos Rubén Bageta verificando que el doble clic ahora bloquea en vez de romper).
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada.
+
+---
+
+## [2026-07-28] — Etapa 4 de Fase 8.1: revisados los 2 posibles duplicados de Desarrollo IT
+
+### Investigación real (Carlos Rubén Bageta, sobre la copia de relevamiento)
+El conteo de "posibles duplicados de contenido" de Desarrollo IT (2, ver Etapa 2) se identificó primero de forma imprecisa: la fórmula `FILTER` que devuelve el número de fila (basada en `ROW()`) señaló las filas 13 y 14, pero la fila 14 real de `Desarrollo IT` (`ALI-99835`, `Gestión General`, sobre NotebookLM) no podía compartir huella con la fila 13 (`ALI-34627`, `Desarrollo IT`, sobre una falla de script) — contenido completamente distinto. Se resolvió la ambigüedad verificando manualmente, texto por texto, cuáles filas de `Resumen de tarea` eran realmente idénticas letra por letra: cuatro candidatas (`ALI-71447`, `ALI-13077`, `ALI-62176`, `ALI-23135`) compartían el mismo texto, pero solo dos coincidían también en `Fecha límite` (el campo que las cuatro anteriores no habían comparado con suficiente precisión visual).
+
+**Par real identificado:** `ALI-62176` (`Fecha de entrada` 12/07/2026) y `ALI-23135` (`Fecha de entrada` 14/07/2026) — mismo `Grupo origen` (Desarrollo IT), mismo `Resumen de tarea` exacto, mismo `Responsable` (Responsable Técnico), misma `Fecha límite` (vacía en ambas). `ID` distinto en cada una. Las otras dos candidatas (`ALI-71447` con `Fecha límite` 07/06/2026, `ALI-13077` con `Fecha límite` 10/07/2026) tienen el mismo resumen pero fechas límite distintas entre sí — no son el par que detectó la huella.
+
+**Interpretación:** ambas corresponden a notificaciones automáticas de falla de Apps Script (remitente `noreply-apps-scripts-notifications@google.com`) sobre el mismo problema recurrente, recibidas en fechas distintas (2 días de diferencia) — no una misma actividad cargada dos veces por error.
+
+### Decisión (Carlos Rubén Bageta, 28/07/2026)
+**`CONSERVAR` ambas.** No se elimina ni se fusiona ninguna — quedan como dos filas independientes en `Resumen Actividades`, consistente con D4a (nunca se elimina un posible duplicado automáticamente).
+
+### Estado
+Con esto, los ítems 1 a 3 de la Etapa 4 (resolver estados ambiguos, colisiones de ID, posibles duplicados) quedan resueltos: 0 estados ambiguos y 0 colisiones de ID reales encontrados en el inventario (Etapa 1), y el único caso real de posible duplicado queda resuelto como se describe arriba. **Los ítems 4 y 5 de la Etapa 4** (aprobar cada transformación productiva; firmar el reporte de conciliación previo) siguen pendientes — dependen de que la Etapa 3 (simulación completa en copia aislada) se ejecute primero.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada.
+
+---
+
+## [2026-07-28] — Etapa 2 de Fase 8.1 (matriz de homologación) cerrada con datos reales
+
+### Corrida real (Carlos Rubén Bageta, sobre la copia de relevamiento)
+Completó los últimos datos pendientes de la Parte 1 (fórmulas de `Responsable` y `Prioridad final` de 1.5, y el conteo de "posibles duplicados de contenido" de 1.6) para las cinco hojas. Hallazgos:
+
+- **`Prioridad final`: 100% vacía en las cinco hojas** (1/1, 3/3, 3/3, 18/18, 2/2 — 27 de 27 filas activas). No hay valores que homologar: el histórico completo nunca tuvo prioridad asignada. Se documenta como vacío total, no como variantes a corregir.
+- **`Responsable`: coincide exactamente con el catálogo oficial de `Listas!E`, sin ningún typo ni variante** — Finanzas: `Socio Administración`(1); Comercial: `Socio Comercial`(3); Soporte: `Responsable Soporte`(3); Desarrollo IT: `Responsable Técnico`(15) + `Sin asignar`(2) + `Socio Dirección`(1); Gestión General: `Socio Dirección`(1) + 1 vacío. Los subtotales cierran contra el total de filas de cada hoja.
+- **Posibles duplicados de contenido: 2 casos reales, únicamente en Desarrollo IT** (0 en el resto). Quedan marcados para revisión humana en una etapa posterior (D4a: nunca se eliminan automáticamente), no se resuelven ahora.
+
+### Estado
+**Las 5 partes de la Etapa 2 (catálogo de estados, mapeos de prioridad y responsable, formato de ID histórico, reglas de duplicados, criterios de inclusión) quedan resueltas con datos reales.** Nuevo entregable: `documentacion/MATRIZ_HOMOLOGACION_HISTORICA.md`. Actualizados `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md` (checklist de la Fase 8.1) y `documentacion/INVENTARIO_TECNICO_Y_DECISIONES_FASE_8_1.md`. Sigue pendiente la Etapa 3 (simulación completa en copia aislada) y la Etapa 4 (revisión humana).
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada — los datos fueron relevados por Carlos Rubén Bageta fuera de esta sesión, sobre la copia de relevamiento; aquí solo se registran y consolidan.
+
+---
+
+## [2026-07-28] — D2 cerrada con datos reales; Parte 1 del inventario técnico completa
+
+### Corrida real (Carlos Rubén Bageta, sobre una copia del archivo productivo)
+Completó la Parte 1 del inventario (`documentacion/INVENTARIO_TECNICO_Y_DECISIONES_FASE_8_1.md`) sobre una copia aislada del archivo maestro, sin escribir en producción. Resultados:
+
+- **Volumen y Estado real por hoja:** 27 filas activas en total (Finanzas 1, Comercial 3, Soporte 3, Desarrollo IT 18, Gestión General 2); `Pendiente`=22, `Completada`=5. Coincide exactamente con la fila `TOTAL` del `Dashboard` productivo existente — confirmado por tres fuentes independientes (fórmulas del inventario, `Dashboard`, desglose por hoja).
+- **Hallazgo real sobre `Dashboard`:** sus fórmulas leen `Finanzas!$J$5:$J$204` — los datos de las cinco hojas arrancan en la fila 5 (no la 2), con un tope fijo en la fila 204 (200 filas de margen; Desarrollo IT ya tiene 18). No afectó los resultados ya obtenidos (las filas 2-4 están vacías en las cinco hojas), pero es un riesgo real de diseño a considerar para `Resumen Actividades` (rango fijo que podría empezar a excluir filas silenciosamente si algún tablero crece más allá de la fila 204).
+- **`Listas` ya contiene los catálogos oficiales reales** (`Estado`, `Prioridad`, `Responsable`, `Grupo origen`, `Fuente`) sin fórmulas — reutilizable directamente para la homologación de la Fase 8.1.
+- **D2 (catálogo de estados) confirmada** con el catálogo oficial real de `Listas!D`, no el tentativo de la propuesta: abiertos `Pendiente`/`En curso`/`Bloqueada`/`En revisión`; terminal `Completada`; ambiguo cualquier otro valor. Difiere del tentativo en dos puntos — `Cancelada` no es un valor real (se descarta), `En revisión` sí existe y no estaba contemplado (confirmado como abierto por Carlos Rubén Bageta). Ningún valor fuera de este catálogo apareció en los datos reales.
+
+### Estado
+**Las 7 decisiones (D1, D2, D3, D4a, D4b, D5a, D5b) están cerradas y la Parte 1 del inventario está completa.** Siguiente paso: redactar formalmente la Fase 8.1 en `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`, con estos datos reales en vez de supuestos, e incorporar el procedimiento de Fase 9 con los dos gates ya diseñado en la propuesta corregida.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada — la corrida del inventario fue ejecutada por Carlos Rubén Bageta fuera de esta sesión, sobre una copia aislada; aquí solo se registra y consolida su resultado.
+
+---
+
+## [2026-07-27] — Carlos Rubén Bageta confirma columnas y 6 de las 7 decisiones de Fase 8.1
+
+### Confirmaciones registradas
+- **Columnas:** el orden real de las cinco hojas operativas coincide exactamente con `documentacion/MAPA_COLUMNAS.md` — las fórmulas de `INVENTARIO_TECNICO_Y_DECISIONES_FASE_8_1.md` se usan sin ajustar letras.
+- **D1:** el despliegue va sobre la planilla productiva actual, que hoy solo tiene las cinco hojas de negocio, `Dashboard` y `Listas` — sin `Log Mensajes`/`Registro Tareas`/`Indice Idempotencia`, que se crean recién durante la Fase 9 (ya contemplado en el procedimiento existente, sin cambios necesarios).
+- **D3:** confirmado solo lectura — sin edición desde `Resumen Actividades`, ni ahora ni en el corto plazo.
+- **D4a, D4b, D5a, D5b:** confirmados según el default de la propuesta (duplicados nunca se borran solos; IDs históricos válidos se conservan; Carlos Rubén Bageta aprueba la conciliación y administra el catálogo de estados).
+
+**D2 queda pendiente** — depende de los valores reales de Estado que salgan de la Parte 1.2 del inventario, todavía sin correr.
+
+### Estado
+Documento actualizado con las confirmaciones. Falta únicamente que Carlos Rubén Bageta complete la Parte 1 del inventario (sobre una copia del archivo) y responda D2 con esos datos reales. Recién después se redacta formalmente la Fase 8.1 en el plan v3.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada.
+
+---
+
+## [2026-07-27] — Segunda revisión: `INVENTARIO_TECNICO_Y_DECISIONES_FASE_8_1.md` tenía fórmulas rotas
+
+### Contexto
+Una segunda auditoría externa sobre el inventario técnico creado en la entrada anterior encontró 9 problemas concretos en las fórmulas de Sheets propuestas, más una mejora de estructura en las decisiones D4/D5. Se verificó cada uno contra el archivo real antes de corregir — los 9 son defectos reales, no observaciones de estilo:
+
+1. **IDs vacíos siempre da cero:** `COUNTA(A2:A) - COUNTA(FILTER(A2:A, A2:A<>""))` resta el mismo conjunto no vacío de sí mismo (`FILTER` con esa condición devuelve exactamente las celdas que `COUNTA` ya contaba).
+2. **El volumen (`COUNTA(A2:A)`) subcuenta filas con ID vacío** — usa la propia columna que se quiere auditar como ancla de "esta fila tiene datos", así que una fila con actividad real pero ID vacío queda invisible en el conteo.
+3. **Los `COUNTBLANK` sin acotar** (`COUNTBLANK(K2:K)`, `COUNTBLANK(G2:G)`) cuentan todas las celdas vacías de la hoja completa por debajo de los datos reales, no solo las filas con actividad.
+4. **El `QUERY` de Estado excluye valores vacíos** (`where J is not null`) mientras el texto prometía relevar también los vacíos.
+5. **La fórmula de fechas "inválida o vacía"** (`COUNTA(B2:B) - COUNT(B2:B)`) solo detecta texto no numérico; nunca cuenta celdas realmente vacías.
+6. **Dos verificaciones quedaron como instrucciones conceptuales**, no fórmulas cerradas: IDs duplicados entre hojas, y duplicados de contenido.
+7. **Faltaba la nota de configuración regional:** `;` en vez de `,` como separador de argumentos, y comillas simples obligatorias para hojas con espacio en el nombre (`'Desarrollo IT'`).
+8. **Rangos sin acotar** (`A2:A` abierto) — riesgo de lentitud en hojas grandes.
+9. **Contradicción entre "alcance: solo lectura" y la sugerencia de crear una hoja nueva dentro del mismo archivo** — crear una pestaña sí modifica el archivo productivo, aunque no toque las hojas de negocio.
+
+### Corrección aplicada
+Rediseño de la Parte 1 alrededor de una columna auxiliar única "fila activa" (marca 1 si `ID`, `Fecha de entrada`, `Asunto original` o `Resumen de tarea` tiene contenido — evita que cualquier chequeo dependa de una sola columna, incluida la que se está auditando), con fórmulas cerradas y acotadas para todos los puntos, incluidos los dos que quedaban conceptuales. Se agregó la nota de `;`/comillas simples. Se eliminó la opción de crear una hoja dentro del archivo original: el documento ahora exige trabajar exclusivamente sobre una copia, sin excepción, resolviendo la contradicción.
+
+En Parte 2: D4 se separa en D4a (tratamiento de duplicados) y D4b (conservación de IDs históricos); D5 se separa en D5a (quién aprueba la conciliación) y D5b (quién administra el catálogo de estados) — pueden tener responsables distintos.
+
+### Estado
+Corregido en esta misma entrada. Sigue sin commitear — ver nota de git state en memoria del proyecto.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada.
+
+---
+
+## [2026-07-27] — Revisión de `PROPUESTA_CONSOLIDACION_Y_MIGRACION_HISTORICA.md`: tres correcciones antes de integrarla a la Fase 9
+
+### Contexto
+Con la Fase 8 ya cerrada, Carlos Rubén Bageta pidió analizar el documento `documentacion/PROPUESTA_CONSOLIDACION_Y_MIGRACION_HISTORICA.md` (propuesta externa, sin autoría de esta sesión, presente en el árbol de trabajo desde antes) junto con un análisis de compatibilidad con la Fase 9 hecho por otro agente. Se leyó la propuesta completa (977 líneas) y el procedimiento real vigente de Fase 9 (`PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`, líneas 1344-1413) antes de aceptar cualquier afirmación del análisis externo — mismo criterio aplicado a las auditorías externas de la propia Fase 8.
+
+Las citas y afirmaciones centrales del análisis externo se verificaron como correctas (en particular, que la Fase 9 vigente en la línea 1366 solo cubre el saneamiento de correos automáticos, no la incorporación de histórico no resuelto — son procesos distintos). Se encontraron, sin embargo, tres puntos a corregir antes de considerar la propuesta lista para integrarse formalmente:
+
+1. **Orden de aprobaciones:** el listado combinado de 15 pasos que proponía el análisis externo ubicaba la aprobación humana del lote histórico después de "ejecutar los correos controlados", cuando la propia propuesta (sección 7, Etapa 5) exige detenerse y aprobar la conciliación histórica antes de continuar con el despliegue del código. Son dos aprobaciones distintas y no intercambiables.
+2. **Entregables mezclados:** la recomendación de "actualizar entregables de despliegue" del análisis externo mezclaba entregables que ya son propios de la Fase 8.1 (matriz de homologación, informe de inventario, acta de Fase 8.1 — ya listados en la sección 12 de la propuesta) con entregables genuinamente nuevos de la Fase 9 (reporte de conciliación de la corrida real, procedimiento de creación/restauración del resumen, registro del lote histórico aplicado).
+3. **Hallazgo propio, no señalado por ninguno de los dos documentos:** la sección 5.3 de la propuesta ("Determinación de origen") identifica una fila como `Automatización v3` verificando su `ID` contra `task_id` en `Registro Tareas`. Pero `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md` (línea 760) establece que `Registro Tareas` está sujeto a purga de información ampliada a los 6 meses (Fase 10, CP-30) — solo `Indice Idempotencia` tiene retención indefinida. Con el tiempo, una fila purgada dejaría de reconocerse como `Automatización v3`. Corrección: usar `Indice Idempotencia` en su lugar (razonamiento: toda fila ya visible en una hoja de negocio pasó necesariamente por una escritura real, así que la sola presencia de su `ID` como `task_id` en `Indice Idempotencia` — sin necesidad de revisar `estado_escritura` — basta para confirmar el origen).
+
+### Decisión (Carlos Rubén Bageta, 27/07/2026)
+Corregir los tres puntos en la propuesta antes de avanzar. Luego preparar un inventario técnico (datos descubribles sin decisión de negocio) y una lista reducida de decisiones que sí requieren su aprobación. Recién con eso cerrado se redacta formalmente la Fase 8.1 en el plan v3.
+
+### Estado
+Correcciones aplicadas a `documentacion/PROPUESTA_CONSOLIDACION_Y_MIGRACION_HISTORICA.md` en esta misma entrada de sesión. Nuevo documento `documentacion/INVENTARIO_TECNICO_Y_DECISIONES_FASE_8_1.md` creado con la clasificación pedida. **No se modificó `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md` ni ningún archivo `.gs`** — la propuesta sigue siendo, por su propio alcance declarado, análisis y diseño, no una autorización de cambios productivos.
+
+### No accedido
+No se accedió a Gmail, Sheets, Drive ni OpenAI real durante esta entrada.
+
+---
+
 ## [2026-07-27] — CP-39 aprobado: límite de reintentos de Gmail y cierre ERROR_DEFINITIVO (H-08); Lotes 2/3 completamente cerrados
 
 ### Corrida real
