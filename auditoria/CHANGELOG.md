@@ -1,5 +1,88 @@
 # Changelog
 
+## [2026-07-28] — Auditoría externa de los procedimientos de Fase 9: NO-GO condicionado, 7 bloqueantes verificados y corregidos
+
+### Auditoría recibida
+
+Carlos Rubén Bageta encargó una auditoría externa (ChatGPT) de `documentacion/PROCEDIMIENTO_DESPLIEGUE.md` y `documentacion/PROCEDIMIENTO_REVERSION.md`, guardada en `auditoria/AUDITORIA_PROCEDIMIENTOS_DESPLIEGUE_REVERSION_FASE_9.md`. Veredicto: **NO-GO condicionado**, 7 bloqueantes y 16 hallazgos de prioridad alta.
+
+### Verificación independiente (antes de aceptar ningún cambio)
+
+Cada bloqueante se verificó contra el código real, no se aceptó por la autoridad del informe:
+
+- **Confirmado con código real** (`codigo/script_actual.gs`, `codigo/script_refactorizado.gs`): el script viejo busca por `label:inbox -label:Procesado`, sin ningún conocimiento de `Indice Idempotencia` — un mensaje procesado parcialmente por v3 y todavía en `INBOX` sería retomado por el script viejo si se reactivara sin cuarentena previa (BLQ-03, real).
+- **Confirmado con código real:** `FECHA_INICIO_CORTE` es opcional en `validarConfiguracion()` (el propio comentario del código dice "no es un error de configuración en esta fase de borrador") y, cuando excluye un mensaje, solo hace `Logger.log(...)` sin fila auditable (BLQ-04, real).
+- **Confirmado contra documentación oficial de Google** ([Installable Triggers](https://developers.google.com/apps-script/guides/triggers/installable), vía WebFetch): *"Installable triggers always run under the account of the person who created them"* y *"A given account can't see triggers installed from a second account"* — la mitigación de DEC-017 (notificación nativa hacia `carlosrubenbageta@alia-data.com`) no funciona, porque el activador productivo debe crearse como `tareas@alia-data.com` (BLQ-05, real — invalida DEC-017).
+- **Confirmado contra `documentacion/DISENO_HOJAS_TECNICAS.md`:** `Log Mensajes` 27 columnas (`intentos_gmail` es la columna 27 de esa hoja, no de `Registro Tareas`), `Registro Tareas` 16, `Indice Idempotencia` 4 — el paso A.4 original atribuía `intentos_gmail` a la hoja equivocada (ALT-16, real).
+- **Confirmado por lógica propia, sin necesidad del informe:** el orden original creaba `Registro Migración Histórica` (A.5) antes que `Resumen Actividades` (A.7), de la que depende — el mismo `#REF!` transitorio que ya se había documentado durante la prueba de reversión de la Fase 8.1 (BLQ-01, parcial — el resto del bloqueante, fórmulas no versionadas, también confirmado: nunca se guardó el texto literal completo en el repositorio).
+- **Confirmado por aritmética simple:** B.3 + B.4 listaban 18 + 4 = 22 propiedades, el texto decía "20" (ALT-04, real).
+- Resto de los bloqueantes (BLQ-02, BLQ-06, BLQ-07) verificados por lectura directa de los procedimientos propios — todos reales.
+
+### Correcciones aplicadas
+
+- `documentacion/PROCEDIMIENTO_DESPLIEGUE.md` reescrito: orden A.4 (hojas técnicas, incl. protección de `Indice Idempotencia`) → A.5 (`Resumen Actividades`) → A.6 (`Registro Migración Histórica`); saneamiento de correos automáticos relocado de B.11 a A.4 (antes de cualquier escritura v3, con el runbook detallado de la auditoría incorporado); autorización de permisos reordenada antes de listar etiquetas; conteo de propiedades corregido a 22; atribución de `intentos_gmail` corregida a `Log Mensajes`; advertencias explícitas agregadas en cada paso que ahora depende de una decisión o código nuevo aún no resuelto (release reproducible, materialización de `Registro Migración Histórica`, `FECHA_INICIO_CORTE` obligatoria, ruta real de alertas, conciliación por `message_id`).
+- `documentacion/PROCEDIMIENTO_REVERSION.md` reescrito: los tres escenarios ahora restauran el código **antes** de tocar cualquier activador (BLQ-02), y ponen en cuarentena por `message_id` los mensajes parcialmente procesados por v3 **antes** de reactivar la versión anterior (BLQ-03) — la versión original invertía ambos órdenes.
+- **DEC-017 corregida** (no reemplazada — se agregó una nota de corrección fechada, preservando la decisión original y por qué resultó incorrecta): sin ruta de alertas elegida todavía; tres opciones reales quedaron documentadas en `PROCEDIMIENTO_DESPLIEGUE.md`, paso B.11, pendientes de decisión de Carlos Rubén Bageta.
+- Nuevo `documentacion/FORMULAS_FASE_8_1_PRODUCCION.md`: incluye verbatim la única fórmula que Carlos Rubén Bageta pegó textualmente en el chat (`Resumen Actividades!A2`); las demás (`Estado normalizado`, `Abrir origen`, `Origen del registro`, y la fórmula completa de `Registro Migración Histórica`) quedan marcadas explícitamente como no verbatim o directamente faltantes — no se reconstruyeron de memoria para no hacer pasar una reconstrucción por el texto real.
+
+### Pendiente, no resuelto en esta entrada (requiere código nuevo o una decisión de Carlos Rubén Bageta, no una corrección documental)
+
+`FECHA_INICIO_CORTE` obligatoria en código con registro auditable de exclusiones; conciliación por `message_id` (no solo numérica); `preflightDespliegue()`; canary aislado por `message_id`; ruta real de alertas (B.11); release reproducible con hashes; decisión sobre materializar `Registro Migración Histórica` como valores fijos; runbook de saneamiento (A.4) sin ensayar todavía; rollback completo sin ensayar todavía (BLQ-07); `auditoria/ACTA_DESPLIEGUE.md` sin crear.
+
+### Estado
+
+Nada de esto se commiteó ni se pusheó todavía — Carlos Rubén Bageta pidió explícitamente ser informado antes de cualquiera de las dos acciones.
+
+### No accedido
+
+No se accedió a Gmail, Sheets, Drive ni Apps Script real durante esta entrada. Sí se consultó, vía `WebFetch`, la documentación pública de Google Apps Script (no un recurso de la cuenta de Aliadata).
+
+---
+
+## [2026-07-28] — Redactados `PROCEDIMIENTO_DESPLIEGUE.md` y `PROCEDIMIENTO_REVERSION.md` (Fase 9)
+
+### Trabajo de planificación (sin acceso a producción real)
+
+Dos entregables de la Fase 9 redactados, traduciendo el checklist de 19 pasos del plan v3 en instrucciones operativas concretas, con los identificadores reales confirmados (archivo maestro, proyecto Apps Script, propiedades de configuración con los valores de DEC-007/DEC-017):
+
+- **`documentacion/PROCEDIMIENTO_DESPLIEGUE.md`:** Aprobación A (cierre del lote histórico, 11 pasos) + despliegue del pipeline (16 pasos) + Aprobación B, con los 9 archivos `.gs` a copiar, las 20 propiedades del script con sus valores confirmados, y la creación/registro de las 4 etiquetas de Gmail reales. **Advertencia explícita incluida:** los `gid` de cada hoja usados en la copia de prueba no son necesariamente los mismos en el archivo maestro real — hay que releerlos ahí antes de reconstruir `Resumen Actividades` en producción, no reutilizar los de la Fase 8.1.
+- **`documentacion/PROCEDIMIENTO_REVERSION.md`:** tres escenarios distintos según en qué punto del despliegue ocurra la falla (durante la Aprobación A, durante el despliegue del pipeline antes de la Aprobación B, o ya en producción tras la Aprobación B) — el protocolo genérico de la sección 8 del plan v3 solo cubría el tercero.
+
+**Dos brechas quedaron explícitamente documentadas, no resueltas:** el saneamiento de correos automáticos (paso B.11 del procedimiento de despliegue) no tiene todavía el mismo nivel de detalle que el resto, porque mueve filas reales de las cinco hojas de negocio; y el procedimiento de reversión no fue ensayado (a diferencia de la reversión de la Fase 8.1, que sí se probó en la copia aislada).
+
+### Estado
+
+Con esto, dos de los seis entregables de la Fase 9 están redactados. Sigue pendiente fijar `FECHA_INICIO_CORTE` (Carlos Rubén Bageta eligió resolverlo después de tener el procedimiento armado).
+
+### No accedido
+
+No se accedió a Gmail, Sheets, Drive ni Apps Script real durante esta entrada — trabajo puramente documental.
+
+---
+
+## [2026-07-28] — Arranca la planificación de la Fase 9: entorno real confirmado, dos decisiones cerradas (DEC-007, DEC-017)
+
+### Verificación real (Carlos Rubén Bageta, sobre el proyecto productivo real)
+
+Confirmado en Apps Script → Activadores, dentro del archivo maestro real (`1BS9CpCWWxdYQZYHMzvaiK-yFEoWR6ViVSWdK3Sb6N5g`): el activador de la versión antigua sigue **ACTIVO**, sin cambios respecto al relevamiento de la Fase 0 (20/07/2026, `entregables/FASE_0/REGISTRO_ACTIVADOR.md`).
+
+### Cruce de parámetros contra el código real
+
+Antes de redactar el procedimiento de despliegue, se cruzaron los parámetros ya aprobados (`configuracion/PARAMETROS_EJEMPLO.md`, `auditoria/DECISIONES.md`) contra `codigo/script_refactorizado.gs`. La mayoría está sólidamente confirmada sin cambios. Dos hallazgos reales:
+
+- **`LIMITE_REINTENTOS_GMAIL`:** DEC-007 nunca actualizó su "valor propuesto: 5" tras aprobarse; el único valor con corrida real (CP-39) fue `6`. **Decisión (Carlos Rubén Bageta, 28/07/2026): `6`.** DEC-007 y `configuracion/PARAMETROS_EJEMPLO.md` actualizados.
+- **Alertas automáticas:** no existe en `codigo/*.gs` ningún `MailApp`, `GmailApp.sendEmail()` ni función propia de envío de alertas — `CUENTA_ALERTAS` está documentada pero no conectada a ningún código. Brecha real entre el plan y el código, sin registro previo de haberse construido o diferido conscientemente. **Decisión (DEC-017, Carlos Rubén Bageta, 28/07/2026):** para la Fase 9, activar solo la notificación nativa de fallas de Apps Script hacia `carlosrubenbageta@alia-data.com` (cuenta técnica externa "por ahora"), sin código nuevo. Cubre únicamente "runtime terminado inesperadamente"; los otros 7 eventos de alerta de la Fase 10 quedan como brecha explícita, no resuelta por la Fase 9 — mitigada mientras tanto por la revisión manual diaria/dos veces al día ya prevista en esa fase.
+
+### Estado
+
+Plan v3 (checklist de Aprobación A y criterio de aceptación de alertas de la Fase 10) y `configuracion/PARAMETROS_EJEMPLO.md` actualizados. Carlos Rubén Bageta eligió armar primero el procedimiento detallado de despliegue y fijar la fecha/franja de la ventana de corte (`FECHA_INICIO_CORTE`) después.
+
+### No accedido
+
+No se accedió a Gmail, Sheets ni OpenAI real durante esta entrada; solo se verificó el estado del activador (lectura, sin cambios) en Apps Script.
+
+---
+
 ## [2026-07-28] — Fase 8.1 APROBADA
 
 ### Decisión (Carlos Rubén Bageta, 28/07/2026)

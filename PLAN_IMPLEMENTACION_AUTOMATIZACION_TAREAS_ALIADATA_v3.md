@@ -1442,7 +1442,7 @@ Incorpora las operaciones de la Fase 8.1 (Etapas 5 a 7) intercaladas con el desp
 - [ ] Procesar uno o dos correos controlados.
 - [ ] Verificar filas, log, etiquetado y archivado **por mensaje**.
 - [ ] Ejecutar por separado el saneamiento de correos automáticos: identificar las filas generadas por correos automáticos (`noreply-apps-scripts-notifications@google.com`, Google Workspace, NotebookLM), moverlas a `Registros descartados` sin eliminarlas y registrar la decisión (v3) — distinto de la incorporación histórica de la Fase 8.1 (ver RH-14, `documentacion/PROPUESTA_CONSOLIDACION_Y_MIGRACION_HISTORICA.md`).
-- [ ] Configurar las alertas hacia la cuenta técnica externa.
+- [ ] Configurar las alertas hacia la cuenta técnica externa — **⚠ DEC-017 corregida (28/07/2026, auditoría BLQ-05):** la notificación nativa de Apps Script NO llega a `carlosrubenbageta@alia-data.com` (un activador creado por `tareas@alia-data.com` notifica solo a esa cuenta). Sin ruta real elegida todavía — ver `documentacion/PROCEDIMIENTO_DESPLIEGUE.md`, paso B.11, para las tres opciones pendientes de decidir.
 - [ ] **Aprobación B: aprobación final de despliegue** — confirmando además que ninguna diferencia detectada antes de la Aprobación A quedó sin explicar.
 - [ ] Reactivar el activador (versión nueva) y verificar su primera ejecución.
 - [ ] Confirmar que se procesó todo correo posterior a `FECHA_INICIO_CORTE`.
@@ -1558,7 +1558,7 @@ Eventos a notificar:
 - [ ] No se procesan correos automáticos como tareas.
 - [ ] Los mensajes con error llegan a revisión manual.
 - [ ] Las tareas se distribuyen correctamente.
-- [ ] Las alertas llegan a la cuenta técnica externa.
+- [ ] Las alertas llegan a la cuenta técnica externa (DEC-017: pendiente construir la lógica propia para 7 de los 8 eventos listados arriba — la Fase 9 solo dejó activa la notificación nativa de fallas de Apps Script).
 - [ ] El volumen de revisión manual es razonable.
 - [ ] El sistema permanece estable durante siete días.
 

@@ -18,9 +18,9 @@
 | `UMBRAL_ABANDONO_MIN` | `20` | Minutos para considerar abandonado un registro `EN_PROCESO`. |
 | `FECHA_INICIO_CORTE` | `(se completa en Fase 9)` | Inicio de la ventana de corte del despliegue. |
 | `VERSION_SCRIPT` | `3.0.0` | Registrada en cada fila de `Log Mensajes`. |
-| `CUENTA_ALERTAS` | `alertas-tecnicas@ejemplo.com` | Cuenta técnica externa. Nunca `tareas@alia-data.com`. |
+| `CUENTA_ALERTAS` | `carlosrubenbageta@alia-data.com` | **Confirmado (DEC-017, 28/07/2026):** cuenta técnica externa, uso temporal ("por ahora"). Nunca `tareas@alia-data.com`. Nota: hoy no hay código que lea esta propiedad ni envíe alertas — ver DEC-017, solo la notificación nativa de fallas de Apps Script está activa para la Fase 9. |
 | `CUENTA_OPERATIVA` | `tareas@alia-data.com` | **Implementada (DEC-008, Lote 1, 21/07/2026):** obligatoria, leída en `validarConfiguracion()` → `cfg.cuentaOperativa`. La constante `var CUENTA_OPERATIVA` fue eliminada de `codigo/escritura_sheets.gs`. En entorno de prueba: usar la cuenta propietaria del proyecto de Apps Script de prueba. |
-| `LIMITE_REINTENTOS_GMAIL` | `5` | **Propuesta (DEC-007, no aplicada todavía):** cantidad máxima de intentos de recuperación de Gmail por mensaje (columna nueva propuesta `Log Mensajes.intentos_gmail`) antes de cerrar el mensaje como `ERROR_DEFINITIVO` definitivo. Ver `documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 9. |
+| `LIMITE_REINTENTOS_GMAIL` | `6` | **Aplicada y confirmada para producción (DEC-007, 28/07/2026):** cantidad máxima de intentos de recuperación de Gmail por mensaje (columna `Log Mensajes.intentos_gmail`) antes de cerrar el mensaje como `ERROR_DEFINITIVO`. Valor `6` elegido por ser el que corrió realmente en CP-39 (27/07/2026), no el `5` original de la propuesta. Ver `documentacion/RECUPERACION_INTERRUPCIONES.md`, sección 9. |
 
 ## Modo de prueba aislado
 
