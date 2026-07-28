@@ -1,5 +1,70 @@
 # Changelog
 
+## [2026-07-28] — Ensayo del swap de código de reversión, sobre el proyecto Apps Script de prueba de la Fase 8
+
+### Corrida real (Carlos Rubén Bageta, proyecto "PRUEBA - Automatización de tareas Aliadata - Fase 8")
+
+Reemplazado el contenido de `script_refactorizado.gs` por `codigo/script_actual.gs` (paso central del Escenario 2/3 de `PROCEDIMIENTO_REVERSION.md`), confirmado que carga sin error de sintaxis, y luego restaurado el código v3 real desde el repo.
+
+**Confusión real durante el ensayo, aclarada antes de seguir:** al ver que el archivo tenía el código viejo, se investigó como si fuera un hallazgo externo preocupante (se descartó colisión de nombres de función, se verificó con un log real del 26/07 que v3 efectivamente había corrido ahí) — hasta que Carlos Rubén Bageta aclaró que era simplemente el resultado esperado del propio paso 3 del ensayo, que él ya había ejecutado. La instrucción de Claude no anticipó que este proyecto, a diferencia del repo, nunca tuvo el código dividido en 9 archivos — todo v3 vivía concatenado en `script_refactorizado.gs`. Lección: confirmar con una pregunta directa si una acción ya se ejecutó, antes de investigar explicaciones alternativas más complejas.
+
+**Restauración de v3:** sin versiones guardadas en el historial del proyecto de Apps Script (no hubo forma de "deshacer"), se reconstruyeron los 9 archivos pegando manualmente desde `codigo/*.gs` del repo — de paso, dejando el proyecto de prueba con la misma estructura de 9 archivos que describe `PROCEDIMIENTO_DESPLIEGUE.md` para el despliegue real, en vez de todo concatenado. Confirmado con `procesarCorreosDeTareas(): 0 mensajes elegibles, procesando 0` — mismo patrón de log real visto en toda la Fase 8 — que v3 quedó funcionando de nuevo.
+
+**Hallazgo real, incorporado a `PROCEDIMIENTO_REVERSION.md`:** el primer intento con `script_actual.gs` restaurado falló (`Exception: Sheet 704188870 not found`) — el script viejo no corre garantizado limpio contra una planilla que cambió de estructura desde la última vez que corrió ahí. Confirma por qué el Escenario 3 exige una prueba manual real después de restaurar el código, no solo confiar en que "restaurar el código" alcanza.
+
+### Estado
+
+Con esto, los 3 puntos de la priorización acordada tras la auditoría externa quedan completos (fórmulas, alertas, ensayo de rollback). Sigue pendiente el simulacro completo (cuarentena simulada, activador con la cuenta correcta, medición de tiempo) antes de que `PROCEDIMIENTO_REVERSION.md` pueda considerarse totalmente probado (BLQ-07).
+
+### No accedido
+
+Se accedió al proyecto Apps Script de prueba de la Fase 8 (no productivo) para este ensayo — sin tocar Gmail ni Sheets reales de producción.
+
+---
+
+## [2026-07-28] — Ruta de alertas (B.11) resuelta y probada con una falla real: DEC-017 cerrada
+
+### Corrida real (Carlos Rubén Bageta, cuenta productiva `tareas@alia-data.com`)
+
+Verificada la opción 1 de `PROCEDIMIENTO_DESPLIEGUE.md` (filtro de reenvío), no solo configurada:
+
+1. Verificada `carlosrubenbageta@alia-data.com` como dirección de reenvío en `tareas@alia-data.com` (ya estaba verificada de antes, sin necesitar código nuevo). **Hallazgo intermedio:** activar el reenvío directo activa el reenvío de *todo* el correo entrante, no solo lo que interesa — revertido a "Inhabilitar el reenvío" apenas se confirmó que la dirección funcionaba, antes de armar el filtro específico.
+2. Proyecto Apps Script descartable, creado como `tareas@alia-data.com`, con una función que lanza una excepción real bajo un activador propio. **Primer intento sin resultado:** 4 fallos reales sin ningún correo de notificación — causa real: el activador se creó sin especificar la frecuencia de notificación de fallos en "Inmediatamente" (quedó en un valor por defecto no inmediato). Corregido ese campo, confirmado el correo en el siguiente fallo.
+3. Datos reales de la notificación nativa: remitente `noreply-apps-scripts-notifications@google.com`, asunto `Summary of failures for Google Apps Script: [nombre del proyecto]` — mismo remitente que genera las filas de "posible duplicado" que el saneamiento de A.4 ya preveía excluir de las hojas de negocio.
+4. Filtro creado en `tareas@alia-data.com` (`from:noreply-apps-scripts-notifications@google.com` → reenviar a `carlosrubenbageta@alia-data.com`). Confirmado con un segundo fallo real: el correo llegó reenviado.
+
+### Estado
+
+DEC-017 cerrada (con su nota de corrección del hallazgo BLQ-05 y esta resolución final). `PROCEDIMIENTO_DESPLIEGUE.md` (paso B.11 y checklist de salida) y `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md` (checklist de la Fase 9) actualizados. **Alcance real, no ampliar sin código nuevo:** cubre solo "runtime terminado inesperadamente" — los otros 7 eventos de alerta de la Fase 10 siguen sin resolver. Segundo de los 3 puntos de la priorización acordada tras la auditoría — sigue el ensayo de rollback.
+
+### No accedido
+
+No se accedió a Sheets ni OpenAI real durante esta entrada. Sí se accedió a Gmail real (`tareas@alia-data.com`, cuenta productiva) para esta prueba — un proyecto Apps Script descartable con una función que lanza una excepción controlada, sin tocar el proyecto productivo real ni ningún correo de negocio; eliminado al terminar.
+
+---
+
+## [2026-07-28] — `FORMULAS_FASE_8_1_PRODUCCION.md` completo: las 4 fórmulas confirmadas verbatim
+
+### Corrida real (Carlos Rubén Bageta, copia de prueba)
+
+Pegadas en el chat las 3 fórmulas que faltaban (`Estado normalizado`, `Abrir origen`, `Origen del registro` de `Resumen Actividades`, y la fórmula completa de `Registro Migración Histórica!A2`). Las 4 quedan verbatim en `documentacion/FORMULAS_FASE_8_1_PRODUCCION.md` — ya no hay ninguna reconstruida de memoria.
+
+**Falso positivo descartado antes de avisar nada:** las columnas 8-9 (`estado_original`/`estado_normalizado`) de `Registro Migración Histórica` parecían "cruzadas" con la 10 (`clasificacion`) al leerlas rápido. Verificado contra la definición original (`documentacion/PROPUESTA_CONSOLIDACION_Y_MIGRACION_HISTORICA.md`, sección 6.5) antes de reportarlo como bug: `estado_normalizado` ahí significa "categoría homologada" (coincide con el original porque no hubo variantes que homologar), y `clasificacion` es la que trae el balde `ABIERTO`/`TERMINAL`/`AMBIGUO` — la fórmula está correcta, es una colisión de nombres entre hojas, no un error.
+
+**De paso, resuelve la observación pendiente sobre `Grupo origen` vs `Hoja origen`** (dejada abierta el 28/07/2026 durante la prueba de reversión): confirmado que `hash_contenido` usa `Grupo origen|Resumen de tarea|Responsable|Fecha límite` — coincide con la huella de `MATRIZ_HOMOLOGACION_HISTORICA.md`. Las filas de Desarrollo IT con "Gestión General|..." no son un error: son dos campos legítimamente distintos.
+
+**Hallazgo para producción, no un bug:** la fórmula de `Registro Migración Histórica` usa `batch_id="SIM-20260728"`, un identificador de simulación — señalado en el documento para no copiarlo tal cual al archivo real.
+
+### Estado
+
+`documentacion/FORMULAS_FASE_8_1_PRODUCCION.md` completo. Primero de los 3 puntos de la priorización acordada tras la auditoría (ver entrada anterior) — siguen el filtro de reenvío de alertas y el ensayo de rollback.
+
+### No accedido
+
+No se accedió a Gmail, Sheets, Drive ni Apps Script real durante esta entrada.
+
+---
+
 ## [2026-07-28] — Auditoría externa de los procedimientos de Fase 9: NO-GO condicionado, 7 bloqueantes verificados y corregidos
 
 ### Auditoría recibida

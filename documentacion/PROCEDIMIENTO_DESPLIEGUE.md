@@ -212,7 +212,7 @@ TIEMPO_INTERNO_MAX_MS         = 240000
 UMBRAL_ABANDONO_MIN           = 20
 LIMITE_REINTENTOS_GMAIL       = 6
 VERSION_SCRIPT                 = 3.0.0
-CUENTA_ALERTAS                 = carlosrubenbageta@alia-data.com (ver B.12 — ⚠ no implica que efectivamente reciba alertas)
+CUENTA_ALERTAS                 = carlosrubenbageta@alia-data.com (informativa — la ruta real de alertas es el filtro de Gmail de B.11, no esta propiedad; el código no la lee)
 CUENTA_OPERATIVA               = tareas@alia-data.com
 FECHA_INICIO_CORTE             = (la registrada en el paso A.2, formato RFC 3339 con offset)
 MODO_PRUEBA                    = false
@@ -257,19 +257,25 @@ Para cada correo controlado del paso B.9, verificar **por `message_id` exacto** 
 
 **Prueba de idempotencia (recomendado, no requiere código nuevo — solo repetir el paso a mano):** ejecutar `procesarCorreosDeTareas()` una segunda vez sin que llegue correo nuevo, y confirmar que el mismo `message_id` no generó ninguna fila adicional en ninguna hoja.
 
-### B.11 — Configurar las alertas — ⚠ REQUIERE DECISIÓN (corrige DEC-017)
+### B.11 — Configurar las alertas — ✅ resuelto (corrige DEC-017), probado de punta a punta
 
-**DEC-017 (28/07/2026) queda invalidada por un hallazgo real de la auditoría, verificado independientemente contra documentación oficial de Google:** el activador productivo debe ejecutarse como `tareas@alia-data.com` (es la única forma de que opere sobre su Gmail), y los activadores instalables **siempre corren y notifican bajo la cuenta que los creó** — otra cuenta no puede ver ese activador como propio ni recibir su notificación nativa de fallas, ni siquiera siendo editora del proyecto. La instrucción anterior de este documento ("loguearse como `carlosrubenbageta@alia-data.com` y activar la notificación nativa") **no logra que Carlos reciba nada** — la notificación, si se activa, queda en `tareas@alia-data.com`, la cuenta que este mismo proyecto decidió excluir explícitamente desde el principio para evitar que una alerta reingrese al flujo como si fuera una tarea.
+**DEC-017 (28/07/2026) quedó invalidada por un hallazgo real de la auditoría** (activador siempre ejecuta y notifica bajo la cuenta que lo creó — `tareas@alia-data.com` para el productivo, no `carlosrubenbageta@alia-data.com`). **Elegida y probada la opción 1 (filtro/reenvío), 28/07/2026, con una falla real controlada** — no una configuración "que debería andar": se creó un proyecto Apps Script descartable, se forzó una excepción real con un activador propio, y se confirmó que el correo de notificación llegó tanto a `tareas@alia-data.com` como, reenviado, a `carlosrubenbageta@alia-data.com`.
 
-Tampoco hay código propio: `CUENTA_ALERTAS` no está conectada a ningún `MailApp`/`GmailApp.sendEmail()` en `codigo/*.gs` (confirmado, ver DEC-017 original).
+**Datos reales confirmados de la notificación nativa de fallas de Apps Script:**
+```text
+Remitente: noreply-apps-scripts-notifications@google.com
+Asunto:    Summary of failures for Google Apps Script: [nombre del proyecto]
+```
+(Es el mismo remitente que genera las filas de "posible duplicado" que el saneamiento de A.4 excluye de las hojas de negocio — mismo canal automático, dos usos distintos: acá se aprovecha a propósito para alertar.)
 
-**Opciones reales, a elegir con Carlos Rubén Bageta antes del corte (no elegida todavía):**
+**Prerrequisito, ya resuelto:** la dirección de reenvío `carlosrubenbageta@alia-data.com` necesita estar verificada en `tareas@alia-data.com → Configuración → Reenvío y correo POP/IMAP` antes de poder usarse en un filtro. Ya estaba verificada (confirmado 28/07/2026 sin necesitar un código nuevo).
 
-1. **Filtro/reenvío desde `tareas@alia-data.com`:** crear un filtro de Gmail en esa cuenta que reenvíe a `carlosrubenbageta@alia-data.com` los correos de notificación de fallas de Apps Script (remitente/asunto característico). Rápido de armar, sin código nuevo, pero depende de que Apps Script efectivamente mande ese correo a `tareas@alia-data.com` — hay que provocar una falla controlada y confirmarlo antes de confiar en esta ruta.
-2. **Código propio mínimo:** un `try/catch` en el punto de entrada de `procesarCorreosDeTareas()` que, ante una excepción no controlada, llame `MailApp.sendEmail()` explícitamente a `carlosrubenbageta@alia-data.com` — como la función ya ejecuta como `tareas@alia-data.com`, el envío sale de esa cuenta pero puede dirigirse a cualquier destinatario. Alcance acotado (mucho menor que construir los 8 eventos de la Fase 10), pero es código nuevo, no probado, y modifica el punto de entrada del pipeline.
-3. **Postergar cualquier alerta automática a la Fase 10**, apoyándose en la revisión manual diaria/dos veces al día ya prevista ahí — vuelve a la opción "Postergar todo a Fase 10" que ya se había descartado en DEC-017, ahora con más motivo dado que la alternativa "gratis" (notificación nativa) resultó no funcionar.
+**Configurar en el archivo/proyecto real, antes del corte (repetir lo ya hecho en la cuenta real si no se hizo directamente ahí):**
+1. En Gmail de `tareas@alia-data.com`, buscar `from:noreply-apps-scripts-notifications@google.com` → ícono de filtro → Crear filtro.
+2. Acción: **Reenviarlo a** `carlosrubenbageta@alia-data.com`, y opcionalmente **Aplicarle la etiqueta** `Alertas Apps Script`.
+3. **También activar, en el proyecto Apps Script real, la notificación de fallas en modo "Inmediatamente"** al crear el activador productivo (B.13) — sin esto, aunque el filtro esté bien armado, Apps Script podría no mandar el correo hasta un resumen diario/semanal (esto fue lo que retrasó la primera prueba: el activador de prueba no tenía la frecuencia en inmediato).
 
-Sea cual sea la opción, **probarla de punta a punta con una falla real controlada antes de confiar en ella** — no darla por buena solo porque la configuración "parece correcta".
+**Alcance real de esta solución — no confundir con cobertura completa:** cubre "runtime terminado inesperadamente" (cualquier excepción no controlada en una ejecución del activador). Los otros 7 eventos de alerta de la Fase 10 (aumento anormal de revisión manual, clave API ausente, etc.) siguen sin código propio — brecha documentada, no resuelta por este paso.
 
 ### B.12 — Aprobación B
 
@@ -291,10 +297,10 @@ Entra en la cadencia de revisión de la Fase 10 (día 1: todas las ejecuciones).
 
 ## Pendiente antes de fijar `FECHA_INICIO_CORTE` real (checklist de salida, adaptado de la auditoría)
 
-- [ ] `documentacion/FORMULAS_FASE_8_1_PRODUCCION.md` completo con el texto exacto de cada fórmula (hoy solo tiene lo que se pudo recuperar verbatim — ver ese documento).
+- [x] `documentacion/FORMULAS_FASE_8_1_PRODUCCION.md` completo con el texto exacto de cada fórmula (28/07/2026 — las 4 confirmadas verbatim contra la copia de prueba).
 - [ ] Decidir con Carlos Rubén Bageta si `Registro Migración Histórica` se materializa como valores fijos tras la conciliación (A.7, ⚠ REQUIERE DECISIÓN).
 - [ ] Runbook de saneamiento (A.4) revisado con Carlos Rubén Bageta y ensayado al menos una vez antes de la primera ejecución real.
-- [ ] Decidir la ruta real de alertas (B.11, ⚠ REQUIERE DECISIÓN) y probarla de punta a punta.
+- [x] Decidir la ruta real de alertas (B.11) y probarla de punta a punta — resuelto y probado con una falla real, 28/07/2026 (filtro de Gmail, ver B.11).
 - [ ] Decidir si se exige `FECHA_INICIO_CORTE` en código (B.5, ⚠ REQUIERE CÓDIGO NUEVO) o si se acepta el control manual descrito ahí como mitigación suficiente.
 - [ ] Decidir el alcance del release reproducible (sección 1, ⚠ REQUIERE DECISIÓN).
 - [ ] `documentacion/PROCEDIMIENTO_REVERSION.md` ensayado al menos una vez sobre una copia (sigue pendiente, ver ese documento).

@@ -2,7 +2,7 @@
 
 **Redactado:** 28/07/2026, en respuesta al hallazgo BLQ-01 de `auditoria/AUDITORIA_PROCEDIMIENTOS_DESPLIEGUE_REVERSION_FASE_9.md`: las fórmulas de `Resumen Actividades` y `Registro Migración Histórica` estaban descritas en prosa (`auditoria/CHANGELOG.md`) pero nunca capturadas textualmente en ningún archivo del repositorio.
 
-**Estado honesto de este documento — léase antes de usarlo:** Claude no tiene acceso directo a Google Sheets. Todo lo que sigue es o bien texto que Carlos Rubén Bageta pegó literalmente en el chat (marcado **VERBATIM**), o bien la última versión que Claude propuso y Carlos confirmó que *funciona* semánticamente, pero cuyo texto final exacto no fue vuelto a pegar tal como quedó en la celda real, porque en el camino hizo falta "cambiar ligeramente algunas sintaxis" (marcado **NO VERBATIM — confirmar contra la celda real**). No completar el despliegue productivo sin antes reemplazar cada fórmula marcada así por el texto real, copiado directamente de la barra de fórmulas de la copia de prueba.
+**Estado (actualizado 28/07/2026):** las 4 fórmulas de las secciones 1-4 son ahora **VERBATIM** — Carlos Rubén Bageta las pegó todas, tal como están en la copia de prueba. Ya no queda ninguna reconstruida ni propuesta sin confirmar.
 
 ---
 
@@ -33,48 +33,32 @@ Pegado por Carlos Rubén Bageta en el chat el 28/07/2026, confirmado como el tex
 
 ---
 
-## 2. `Resumen Actividades`, columnas `Estado normalizado` (T) y `Abrir origen` (U) — **NO VERBATIM, confirmar contra la celda real**
+## 2. `Resumen Actividades`, columnas `Estado normalizado` (T) y `Abrir origen` (U) — **VERBATIM**
 
-Estas dos columnas fueron diseñadas y confirmadas funcionando (Etapa 3, Fase 8.1), pero el texto que sigue es la última versión que Claude propuso — Carlos ajustó sintaxis sobre la marcha y el resultado final tal como quedó en la celda **no fue vuelto a pegar en el chat**.
+Pegadas por Carlos Rubén Bageta el 28/07/2026, texto real de la copia de prueba.
 
-**Antes de usar esta sección en producción:** en la copia de prueba, hacer clic en `Resumen Actividades!T2` y `!U2`, copiar el contenido exacto de la barra de fórmulas, y reemplazar lo de abajo.
-
-Estado normalizado (propuesta, columna T2), clasifica `Estado` — columna L de la sección 1 — contra el catálogo real (DEC-015):
+Estado normalizado, celda T2 — usa `REGEXMATCH` en vez de una cadena de `O(...)`, mismo resultado (catálogo real, DEC-015):
 
 ```text
-=ARRAYFORMULA(SI(A2:A="";"";
-  SI(L2:L="Completada";"TERMINAL";
-  SI(O(L2:L="Pendiente";L2:L="En curso";L2:L="Bloqueada";L2:L="En revisión");"ABIERTO";
-  "AMBIGUO"))))
+=ARRAYFORMULA(SI(L2:L=""; ""; SI(L2:L="Completada"; "TERMINAL"; SI(REGEXMATCH(L2:L; "^(Pendiente|En curso|Bloqueada|En revisión)$"); "ABIERTO"; "AMBIGUO"))))
 ```
 
-Abrir origen (propuesta, columna U2), `HYPERLINK` a la fila real de origen usando el `gid` de cada hoja — **los 5 `gid` de abajo son los de la copia de prueba, no reutilizar en producción** (ver `documentacion/PROCEDIMIENTO_DESPLIEGUE.md`, advertencia de la sección 0):
+Abrir origen, celda U2 — `HIPERVINCULO` (nombre en español de `HYPERLINK`) a la fila real de origen usando el `gid` de cada hoja — **los 5 `gid` de abajo (2059391676, 390138063, 1987525587, 704403620, 102851714) son los de la copia de prueba, no reutilizar en producción** (ver `documentacion/PROCEDIMIENTO_DESPLIEGUE.md`, advertencia de la sección 0):
 
 ```text
-=ARRAYFORMULA(SI(A2:A="";"";
-  HYPERLINK("#gid="&
-    SI(A2:A="Finanzas";"2059391676";
-    SI(A2:A="Comercial";"390138063";
-    SI(A2:A="Soporte";"1987525587";
-    SI(A2:A="Desarrollo IT";"704403620";
-    "102851714"))))
-    &"&range=A"&B2:B;
-    "Abrir origen")))
+=ARRAYFORMULA(SI(C2:C=""; ""; HIPERVINCULO("#gid=" & SI(A2:A="Finanzas"; 2059391676; SI(A2:A="Comercial"; 390138063; SI(A2:A="Soporte"; 1987525587; SI(A2:A="Desarrollo IT"; 704403620; SI(A2:A="Gestión General"; 102851714; ""))))) & "&range=A" & B2:B; "Abrir origen")))
 ```
 
 **Hallazgo real de fragilidad (Etapa 3, ya documentado en `auditoria/CHANGELOG.md`):** un doble clic accidental en una celda de esta columna entra en modo edición y pega un valor fijo, lo que rompe la expansión de la fórmula de matriz para las 27 filas (`#REF!` desde la celda origen), no solo la celda tocada. Mitigado protegiendo toda la hoja (`Datos → Hojas y rangos protegidos`) — ver `PROCEDIMIENTO_DESPLIEGUE.md`, paso A.9.
 
 ---
 
-## 3. `Resumen Actividades`, columna `Origen del registro` (V) — **NO VERBATIM, confirmar contra la celda real**
+## 3. `Resumen Actividades`, columna `Origen del registro` (V) — **VERBATIM**
 
-Última versión corregida (usa columna `C` para el `ID`, no `A` — ver el bug documentado en la sección 1). Semánticamente confirmada: las 27 filas dieron `Histórico/pre-corte` tras la corrección, 0 en las otras dos categorías. El texto exacto que quedó en la celda **no fue vuelto a pegar en el chat** tras la corrección.
+Pegada por Carlos Rubén Bageta el 28/07/2026. Usa columna `C` para el `ID` en las tres posiciones (guarda de vacío incluida) — versión corregida tras el bug documentado en la sección 1. `CONTAR.SI` es el nombre en español de `COUNTIF`.
 
 ```text
-=ARRAYFORMULA(SI(A2:A="";"";
-  SI(COUNTIF('Indice Idempotencia'!B2:B1000;C2:C)>0;"Automatización v3";
-  SI(COUNTIF('Registro Migración Histórica'!C2:C1000;C2:C)>0;"Histórico/pre-corte";
-  "Revisión de origen"))))
+=ARRAYFORMULA(SI(C2:C="";"";SI(CONTAR.SI('Indice Idempotencia'!B2:B1000;C2:C)>0;"Automatización v3";SI(CONTAR.SI('Registro Migración Histórica'!C2:C1000;C2:C)>0;"Histórico/pre-corte";"Revisión de origen"))))
 ```
 
 **Requiere que `Indice Idempotencia` y `Registro Migración Histórica` ya existan como hojas** (aunque estén vacías) — si falta cualquiera de las dos, esta columna específicamente muestra error de referencia hasta que se cree. No afecta al resto de `Resumen Actividades`. Ver el orden recomendado en `PROCEDIMIENTO_DESPLIEGUE.md` (A.5 antes que A.6).
@@ -83,15 +67,19 @@ Abrir origen (propuesta, columna U2), `HYPERLINK` a la fila real de origen usand
 
 ---
 
-## 4. `Registro Migración Histórica`, fórmula principal — **FALTA POR COMPLETO**
+## 4. `Registro Migración Histórica`, fórmula principal (celda A2) — **VERBATIM**
 
-A diferencia de las anteriores, esta fórmula **nunca fue pegada en el chat en ningún momento** — solo se describió en prosa ("las 17 columnas pobladas por fórmula desde `Resumen Actividades`, mediante una fórmula única `HSTACK`"). Este documento no puede darla por buena de memoria ni reconstruirla — sería inventar contenido que después alguien podría copiar a producción sin saber que es una reconstrucción, no el original.
-
-**Antes de poder usar este documento para el despliegue real:** Carlos Rubén Bageta necesita pegar acá el contenido exacto de la celda `A2` de `Registro Migración Histórica` (barra de fórmulas, copia de prueba), incluyendo el encabezado final de las 17 columnas (recordar el bug ya corregido una vez: la primera versión tenía los encabezados corridos una columna por faltar `batch_id`).
+Pegada por Carlos Rubén Bageta el 28/07/2026. Una sola `ARRAYFORMULA(HSTACK(...))` con 17 argumentos, uno por columna, en el mismo orden que el esquema de 17 columnas (`auditoria/CHANGELOG.md`).
 
 ```text
-(pendiente — pegar acá el texto real de Registro Migración Histórica!A2)
+=ARRAYFORMULA(HSTACK(SI('Resumen Actividades'!C2:C="";"";"SIM-20260728");'Resumen Actividades'!C2:C;'Resumen Actividades'!C2:C;'Resumen Actividades'!C2:C;'Resumen Actividades'!A2:A;'Resumen Actividades'!B2:B;SI('Resumen Actividades'!C2:C="";"";'Resumen Actividades'!F2:F&"|"&'Resumen Actividades'!I2:I&"|"&'Resumen Actividades'!M2:M&"|"&'Resumen Actividades'!N2:N);'Resumen Actividades'!L2:L;'Resumen Actividades'!L2:L;'Resumen Actividades'!T2:T;SI('Resumen Actividades'!C2:C="";"";"CONSERVAR");SI(('Resumen Actividades'!C2:C="ALI-62176")+('Resumen Actividades'!C2:C="ALI-23135");"Posible duplicado de contenido revisado 28/07/2026 — CONSERVAR ambas (notificaciones automáticas distintas del mismo problema)";"");SI('Resumen Actividades'!C2:C="";"";"");SI('Resumen Actividades'!C2:C="";"";"");SI('Resumen Actividades'!C2:C="";"";FECHA(2026;7;28));SI('Resumen Actividades'!C2:C="";"";"Carlos Rubén Bageta");SI('Resumen Actividades'!C2:C="";"";"PENDIENTE")))
 ```
+
+**Aclaración de nombres, para no confundirla con una fórmula equivocada (verificado contra `documentacion/PROPUESTA_CONSOLIDACION_Y_MIGRACION_HISTORICA.md`, sección 6.5, antes de asumir nada):** las columnas 8 y 9 (`estado_original`, `estado_normalizado`) parecen "iguales" porque ambas traen `'Resumen Actividades'!L2:L` (el `Estado` crudo, ej. `Pendiente`) — es correcto: en esta hoja, `estado_normalizado` significa "categoría ya homologada", y como el catálogo real no tuvo ninguna variante que homologar (`MATRIZ_HOMOLOGACION_HISTORICA.md`, sección 1), coincide con el original. La columna 10 (`clasificacion`) es la que trae el balde `ABIERTO`/`TERMINAL`/`AMBIGUO` (`'Resumen Actividades'!T2:T`) — es un nombre distinto al de la columna `Estado normalizado` de `Resumen Actividades` (sección 2 de este documento), que sí es ese mismo balde. Dos hojas, mismo tipo de nombre, significado distinto — no son la misma cosa.
+
+**⚠ Antes de reutilizar esta fórmula en producción:** el valor `"SIM-20260728"` (columna `batch_id`) es un identificador de **simulación** — no debe copiarse tal cual al archivo real. Reemplazar por un `batch_id` que identifique el lote real (por ejemplo, con la fecha real de `FECHA_INICIO_CORTE`), y quitar el condicional `("ALI-62176")+("ALI-23135")` de `motivo_excepcion` si en producción no aparecen exactamente esos dos IDs — revisar contra los duplicados reales que arroje la conciliación de producción (`PROCEDIMIENTO_DESPLIEGUE.md`, paso A.10), no asumir que van a ser los mismos dos.
+
+**Nota de proceso (ya documentada en `auditoria/CHANGELOG.md`):** la primera versión de la fila de encabezados de esta hoja quedó corrida una columna por faltar `batch_id` — la fórmula de datos nunca estuvo mal, solo los títulos. Verificar los 17 encabezados contra el esquema antes de dar por buena la hoja.
 
 ---
 
