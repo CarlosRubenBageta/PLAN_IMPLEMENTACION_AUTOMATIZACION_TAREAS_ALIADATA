@@ -213,6 +213,11 @@ function reanudarDesdeManifiesto(mensajeDescriptor, cfg) {
       var res = resultadoEscritura[tarea.taskId];
       return !res || !res.escrita;
     });
+
+    // Fase 10 (codigo/alertas.gs): mismo criterio que en procesarUnMensaje().
+    if (huboFallaEscritura) {
+      enviarAlertaTecnica('FALLO_DE_ESCRITURA', 'Una o más tareas no pudieron escribirse en Sheets (recuperación)', 'message_id=' + mensajeDescriptor.messageId);
+    }
   } else {
     // Todas las tareas ya estaban ESCRITA: esto es exactamente el caso que
     // describe la regla de recuperación del plan v3 ("si falla la

@@ -72,6 +72,12 @@
 
 var PROP = PropertiesService.getScriptProperties();
 
+// Fase 10 (codigo/alertas.gs): cuenta mensajes a REVISION_MANUAL dentro de LA
+// EJECUCIÓN ACTUAL. Se reinicia al principio de
+// procesarCorreosDeTareasConConfiguracion_() — las variables globales de Apps
+// Script no sobreviven entre ejecuciones, así que no hace falta persistirlo.
+var contadorRevisionManualEjecucion = 0;
+
 var ESTADOS = {
   EN_PROCESO: 'EN_PROCESO',
   PROCESADO: 'PROCESADO',
@@ -348,6 +354,10 @@ function procesarCorreosDeTareas() {
     if (!validacion.valido) {
       // Regla dura: si falla la validación crítica, no tocar Gmail ni Sheets.
       Logger.log('procesarCorreosDeTareas(): abortando por configuración inválida:\n' + validacion.errores.join('\n'));
+      // Fase 10 (codigo/alertas.gs): CUENTA_ALERTAS se lee directo de
+      // PropertiesService, no de cfg (acá cfg es null porque la validación falló).
+      despacharAlertaConfiguracionInvalida(validacion.errores);
+      actualizarContadorFallosConsecutivos(true);
       return;
     }
 
@@ -399,6 +409,8 @@ function procesarCorreosDeTareas() {
 function procesarCorreosDeTareasConConfiguracion_(cfg, opciones) {
   opciones = opciones || {};
   var inicioEjecucion = Date.now();
+  // Fase 10 (codigo/alertas.gs): reiniciado al principio de cada ejecución.
+  contadorRevisionManualEjecucion = 0;
 
   // INC-FASE8-002: DRY_RUN es un modo sin persistencia. Recuperar mensajes
   // abandonados implica escribir en Registro Tareas, Log Mensajes e
@@ -466,6 +478,14 @@ function procesarCorreosDeTareasConConfiguracion_(cfg, opciones) {
       cantidadConErrorAislado++;
       gestionarErrorMensaje(mensajeDescriptor, errorMensaje, cfg);
     }
+  }
+
+  // Fase 10 (codigo/alertas.gs): nunca en DRY_RUN — mismo criterio que el
+  // resto del pipeline (INC-FASE8-002), una simulación no debe enviar
+  // correos reales ni modificar el contador persistido de fallos consecutivos.
+  if (!cfg.dryRun) {
+    actualizarContadorFallosConsecutivos(cantidadConErrorAislado > 0);
+    despacharAlertaRevisionManualSiCorresponde(contadorRevisionManualEjecucion);
   }
 
   return {
@@ -712,6 +732,12 @@ function procesarUnMensaje(mensajeDescriptor, cfg) {
     return !res || !res.escrita;
   });
 
+  // Fase 10 (codigo/alertas.gs): riesgo de datos (tarea generada pero no
+  // escrita) — se alerta siempre, no solo cuando la causa es hoja inexistente.
+  if (huboFallaEscritura) {
+    enviarAlertaTecnica('FALLO_DE_ESCRITURA', 'Una o más tareas no pudieron escribirse en Sheets', 'message_id=' + mensajeDescriptor.messageId);
+  }
+
   // Paso 9-10: actualizar Gmail por mensaje individual.
   aplicarResultadoGmail(mensajeDescriptor, huboFallaEscritura ? 'RevisionErrorProcesamiento' : 'Procesado', cfg);
   actualizarLogMensajes(mensajeDescriptor, { etapa: ETAPAS.GMAIL_ACTUALIZADO }, cfg);
@@ -832,6 +858,11 @@ function finalizarMensajeSinTareas(mensajeDescriptor, estadoFinal, motivo, cfg, 
  *   rezagado sin consecuencia funcional.
  */
 function finalizarMensaje(mensajeDescriptor, estadoFinal, tareas, cfg) {
+  // Fase 10 (codigo/alertas.gs): único punto de cierre común a los 4
+  // llamadores de finalizarMensaje() (finalizarMensajeSinTareas(),
+  // procesarUnMensaje(), reanudarDesdeManifiesto(), gestionarErrorMensaje())
+  // — cuenta una sola vez por mensaje, sin importar qué camino lo trajo acá.
+  if (estadoFinal === ESTADOS.REVISION_MANUAL) contadorRevisionManualEjecucion++;
   var ahora = new Date();
   var filasDeseadas = tareas.length === 0
     ? [[mensajeDescriptor.messageId, '', estadoFinal, ahora]]
@@ -1390,6 +1421,12 @@ function gestionarErrorMensaje(mensajeDescriptor, error, cfg) {
         Logger.log('No se pudo registrar el error en Log Mensajes: ' + errorSecundario.message);
       }
       Logger.log('gestionarErrorMensaje(): ' + mensajeDescriptor.messageId + ' superó LIMITE_REINTENTOS_GMAIL (' + cfg.limiteReintentosGmail + '); cierre ERROR_DEFINITIVO con las tareas ya escritas conservadas.');
+      // Fase 10 (codigo/alertas.gs).
+      enviarAlertaTecnica(
+        clasificarTipoErrorCritico(error.message),
+        'Mensaje ' + mensajeDescriptor.messageId + ' cerrado ERROR_DEFINITIVO (superó LIMITE_REINTENTOS_GMAIL)',
+        String(error.message || error)
+      );
       finalizarMensaje(mensajeDescriptor, ESTADOS.ERROR_DEFINITIVO, manifiesto, cfg);
       return;
     }
@@ -1418,6 +1455,12 @@ function gestionarErrorMensaje(mensajeDescriptor, error, cfg) {
   }
 
   if (estado === ESTADOS.ERROR_DEFINITIVO) {
+    // Fase 10 (codigo/alertas.gs).
+    enviarAlertaTecnica(
+      clasificarTipoErrorCritico(error.message),
+      'Mensaje ' + mensajeDescriptor.messageId + ' cerrado ERROR_DEFINITIVO',
+      String(error.message || error)
+    );
     // Se cierra igual que un mensaje terminal, para no reintentarlo indefinidamente,
     // pero SIN tocar Gmail (el mensaje puede requerir revisión humana directa en la bandeja).
     finalizarMensaje(mensajeDescriptor, ESTADOS.ERROR_DEFINITIVO, [], cfg);

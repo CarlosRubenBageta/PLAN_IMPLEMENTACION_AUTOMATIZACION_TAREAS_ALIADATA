@@ -67,6 +67,8 @@ function escribirFilasPorLote(filasPorHoja, cfg) {
       // silenciosa ante errores" / "si una hoja no existe, enviar el
       // mensaje a revisión manual". No se escribe en ninguna otra hoja.
       Logger.log('escribirFilasPorLote(): la hoja "' + nombreTablero + '" no existe; ' + tareasDeHoja.length + ' tarea(s) sin escribir.');
+      // Fase 10 (codigo/alertas.gs).
+      enviarAlertaTecnica('HOJA_INEXISTENTE', 'La hoja de destino "' + nombreTablero + '" no existe en la planilla', tareasDeHoja.length + ' tarea(s) sin escribir.');
       tareasDeHoja.forEach(function (tarea) {
         resultado[tarea.taskId] = { escrita: false, fila: null, motivo: 'Hoja de destino inexistente: ' + nombreTablero };
       });

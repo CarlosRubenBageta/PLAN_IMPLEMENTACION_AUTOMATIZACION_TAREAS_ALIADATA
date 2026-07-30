@@ -1,5 +1,48 @@
 # Changelog
 
+## [2026-07-30] — Entregable de Fase 10: `documentacion/MANUAL_OPERATIVO.md`
+
+Primer entregable formal de la Fase 10 (plan v3, sección "Fase 10 → Entregables"). Documenta el sistema tal como corre hoy en producción: qué hace, dónde está todo (IDs reales, hojas, propiedades), glosario completo de `estado`/`etapa` de `Log Mensajes`, cómo hacer la revisión diaria, catálogo de las 8 alertas de DEC-017 con su estado real (deja explícito que los eventos 2-8 tienen código escrito pero no desplegado ni probado — ver entrada siguiente), la anomalía de la ejecución trabada del 30/07/2026 sin resolver, y un resumen operativo del protocolo de reversión con puntero a `PROCEDIMIENTO_REVERSION.md`. No requirió acceso a Gmail, Sheets, Drive ni Apps Script real — trabajo documental sobre hechos ya registrados en este mismo `CHANGELOG.md` y en `auditoria/DECISIONES.md`.
+
+---
+
+## [2026-07-30] — DEC-017: código nuevo para los 7 eventos de alerta faltantes (`codigo/alertas.gs`)
+
+### Trabajo de código (repositorio únicamente, sin tocar Google Workspace real)
+
+Nuevo archivo `codigo/alertas.gs` implementa los 7 eventos de alerta de la Fase 10 que DEC-017 había diferido (solo quedaba cubierto "runtime terminado inesperadamente", vía la notificación nativa de Apps Script reenviada por filtro — B.11, 28/07/2026): error crítico, tres fallos consecutivos, aumento anormal de revisión manual, clave API ausente, falta de permisos, fallo de escritura, hoja inexistente.
+
+**Diseño, decidido antes de escribir código:**
+- **Envío por `GmailApp.sendEmail()`, no `MailApp`:** reutiliza el servicio avanzado de Gmail ya autorizado (DEC-001) — evita pedir un scope OAuth nuevo al reautorizar el proyecto en un futuro despliegue.
+- **Cooldown por tipo de evento** (`COOLDOWN_ALERTAS_MIN`, default 60 min, `ScriptProperties`): sin esto, una condición persistente (p. ej. `OPENAI_API_KEY` borrada) mandaría un correo cada 10 minutos indefinidamente. La primera ocurrencia siempre alerta de inmediato.
+- **`CUENTA_ALERTAS` se lee directo de `PropertiesService`, no de `cfg`:** las alertas de configuración inválida deben funcionar incluso cuando `validarConfiguracion()` falló y no hay ningún `cfg` disponible.
+- **Sin tocar ninguna lógica de control existente:** todas las inserciones son llamadas de una línea en los puntos donde cada condición YA se detectaba (p. ej. `validarConfiguracion()` ya arma el texto "Falta OPENAI_API_KEY."; `escribirFilasPorLote()` ya detecta una hoja de destino inexistente) — ningún estado final ni camino de ejecución cambia de comportamiento.
+- **Nunca en `DRY_RUN`:** mismo criterio que el resto del pipeline (INC-FASE8-002) — una simulación no debe mandar correos reales. Los dos puntos que si no se guardan mandarían alertas durante una simulación (contador de fallos consecutivos, chequeo de revisión manual) quedaron con `if (!cfg.dryRun)` explícito; el resto de los puntos de alerta están en código que estructuralmente nunca se alcanza en `DRY_RUN` (mismo patrón de guardas que ya usa el resto del pipeline, sin duplicar el chequeo).
+
+**Mapeo evento → detección (todos en `codigo/alertas.gs` salvo donde se indica):**
+| Evento | Dónde se detecta |
+|---|---|
+| Clave API ausente | `validarConfiguracion()` (texto existente) → `procesarCorreosDeTareas()` |
+| Hoja inexistente (técnica) | ídem, texto "No existe la hoja técnica" |
+| Hoja inexistente (de negocio) | `escritura_sheets.gs`, `escribirFilasPorLote()`, rama `!hoja` |
+| Falta de permisos | `validarConfiguracion()` (no se pudo abrir la planilla) + heurística de palabras clave sobre `error.message` en `gestionarErrorMensaje()` |
+| Fallo de escritura | `huboFallaEscritura` en `procesarUnMensaje()` y `reanudarDesdeManifiesto()` (`codigo/recuperacion.gs`) |
+| Error crítico | Residual de configuración inválida + todo cierre `ERROR_DEFINITIVO` en `gestionarErrorMensaje()` que no matchea "falta de permisos" |
+| Tres fallos consecutivos | Contador persistido en `ScriptProperties` (`CONTADOR_FALLOS_CONSECUTIVOS`), actualizado una vez por ejecución real al final de `procesarCorreosDeTareasConConfiguracion_()` y en el aborto por configuración inválida; umbral configurable (`UMBRAL_FALLOS_CONSECUTIVOS`, default 3) |
+| Aumento anormal de revisión manual | Contador **por ejecución** (`contadorRevisionManualEjecucion`, variable global reiniciada al principio de cada corrida — no persiste entre ejecuciones), incrementado en el único punto de cierre común a los 4 llamadores (`finalizarMensaje()`); umbral configurable (`UMBRAL_REVISION_MANUAL_ALERTA`, default 3) |
+
+**3 propiedades nuevas, todas opcionales con default embebido en el código** (deliberadamente NO agregadas a la validación estricta de `validarConfiguracion()` — las alertas deben poder funcionar aunque la configuración general esté rota): `COOLDOWN_ALERTAS_MIN`, `UMBRAL_FALLOS_CONSECUTIVOS`, `UMBRAL_REVISION_MANUAL_ALERTA`. Documentadas en `configuracion/PARAMETROS_EJEMPLO.md` junto con la actualización de `CUENTA_ALERTAS` (ya no dice "sin código que la use"). Corrección agregada a DEC-017 en `auditoria/DECISIONES.md`.
+
+### Pendiente antes de poder desplegar a producción
+
+Este código **no tiene ningún caso de prueba todavía** — el mismo motivo que originó diferir esto en DEC-017 (28/07/2026: "arriesgaría introducir código sin validar") aplica ahora a este código en particular. Falta: probarlo en el proyecto de prueba de la Fase 8 (`MODO_PRUEBA=true`, idealmente forzando cada uno de los 7 casos deliberadamente), y recién después copiarlo al proyecto real con aprobación explícita — a partir de ahí son **10 archivos `.gs`, no 9** (`PROCEDIMIENTO_DESPLIEGUE.md` sigue diciendo 9; se actualiza cuando corresponda desplegar esto, no antes, para no describir como hecho algo que todavía no pasó).
+
+### No accedido
+
+No se accedió a Gmail, Sheets, Drive ni Apps Script real durante esta entrada — solo edición de archivos del repositorio (`codigo/alertas.gs` nuevo; `codigo/script_refactorizado.gs`, `codigo/recuperacion.gs`, `codigo/escritura_sheets.gs`, `configuracion/PARAMETROS_EJEMPLO.md`, `auditoria/DECISIONES.md` modificados).
+
+---
+
 ## [2026-07-30] — Cierre formal de actas: Fases 8, 8.1 y 9 firmadas
 
 ### Firma real (Carlos Rubén Bageta)
