@@ -86,6 +86,8 @@ Confirmado además que la columna `Origen del registro` de `Resumen Actividades`
 
 Primera corrida del activador nuevo sin intervención manual: `17:01:48`, `0 mensajes elegibles, procesando 0`, sin errores. Segunda corrida ya en curso a las `17:11:48` — exactos 10 minutos de diferencia, confirma la frecuencia configurada en B.13. Entra en la cadencia de revisión de todas las ejecuciones del día 1.
 
+**Hallazgo real, corregido:** `Resumen Actividades` quedó sin fila de encabezados — un paso que se salteó al armarla en A.6 (a diferencia de las hojas técnicas y de `Registro Migración Histórica`, no se dio la fila de encabezados en su momento). Corregido pegando los 22 encabezados en `A1:V1`; la protección de la hoja (A.9) no bloqueó la edición para una cuenta administradora. De paso, confirmado con datos reales: la columna `Origen del registro` ya distingue correctamente `Automatización v3` (la tarea real generada por el correo de prueba de B.9-B.10) de `Histórico/pre-corte` (las 9 filas del lote histórico).
+
 ### No accedido
 
 Se envió y procesó un correo real de prueba controlada — primera escritura real del pipeline v3 en las hojas de negocio de producción. No se accedió a OpenAI de forma no controlada (la única llamada real fue la del correo de prueba).
