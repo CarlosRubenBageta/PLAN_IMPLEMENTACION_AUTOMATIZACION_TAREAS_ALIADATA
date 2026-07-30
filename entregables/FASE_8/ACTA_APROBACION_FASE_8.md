@@ -35,9 +35,9 @@ Lotes 2/3 (DEC-009): decisión tomada, aplicada y confirmada con corrida real pa
 Hallazgo adicional H-14 (detectado al preparar CP-39): corregido y confirmado en la misma corrida.
 CP-30 permanece diferido a la Fase 10 (DEC-004), sin condicionar esta aprobación.
 Sin condiciones pendientes.
-Responsable: [a completar por Carlos Rubén Bageta]
-Fecha: [a completar por Carlos Rubén Bageta]
+Responsable: Carlos Rubén Bageta
+Fecha: 30/07/2026
 Observaciones: ver "Evidencia archivada — limitación reconocida" — limitación de trazabilidad de capturas, no bloquea esta aprobación.
 ```
 
-> Con la puerta de aprobación resuelta, la Fase 9 (ventana de corte productiva) puede planificarse. Queda como paso administrativo pendiente que esta acta se firme con responsable y fecha.
+> Con la puerta de aprobación resuelta y firmada, la Fase 9 (ventana de corte productiva) pudo planificarse y ejecutarse — ver `auditoria/CHANGELOG.md`, 30/07/2026.

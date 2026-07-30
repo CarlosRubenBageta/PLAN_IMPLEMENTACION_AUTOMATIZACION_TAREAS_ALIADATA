@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-07-30] — Cierre formal de actas: Fases 8, 8.1 y 9 firmadas
+
+### Firma real (Carlos Rubén Bageta)
+
+Completados los campos `Responsable` y `Fecha` — en blanco hasta ahora — en las 3 puertas de aprobación ya marcadas `APROBADA` por su propio contenido: `entregables/FASE_8/ACTA_APROBACION_FASE_8.md`, y las secciones "Fase 8.1" y "Fase 9" de `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`. **Responsable: Carlos Rubén Bageta. Fecha de firma: 30/07/2026** en las 3 — fecha de la firma formal, distinta de la fecha real de cada aprobación (27/07/2026 para Fase 8, 28/07/2026 para Fase 8.1, 30/07/2026 para Fase 9), que permanece documentada tal cual en el texto de "Observaciones" de cada una. Ambos puntos (quién completa los campos, y qué fecha usar) fueron decisión explícita de Carlos Rubén Bageta antes de escribir nada.
+
+`README.md` actualizado: las 3 fases pasan de "falta firmar el acta" a cerradas formalmente.
+
+### Estado
+
+Fases 8, 8.1 y 9 sin ningún pendiente administrativo. Fase 9 conserva su único riesgo residual aceptado (simulacro completo de reversión, ver `documentacion/PROCEDIMIENTO_REVERSION.md`, sección "Pendiente").
+
+### No accedido
+
+No se accedió a Gmail, Sheets, Drive ni Apps Script real durante esta entrada — edición de archivos del repositorio únicamente.
+
+---
+
 ## [2026-07-30] — A.4 completa: saneamiento real de correos automáticos, 21 filas descartadas
 
 ### Corrida real (Carlos Rubén Bageta, archivo maestro real)

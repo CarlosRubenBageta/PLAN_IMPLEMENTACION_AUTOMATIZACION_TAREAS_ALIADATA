@@ -1398,8 +1398,8 @@ Etapas 0 a 4 — preparación, inventario, catálogos y simulación, todo antes 
 
 ```text
 APROBACIÓN FASE 8.1: APROBADA
-Responsable:
-Fecha:
+Responsable: Carlos Rubén Bageta
+Fecha: 30/07/2026
 Observaciones: Etapas 0 a 4 completas (28/07/2026) con datos reales y simulación validada en copia aislada — ver documentacion/INVENTARIO_TECNICO_Y_DECISIONES_FASE_8_1.md, documentacion/MATRIZ_HOMOLOGACION_HISTORICA.md, y esta sección para el detalle de las Etapas 3 y 4. Reporte de conciliación cerrado sin diferencias (27 = 5 terminales + 22 abiertos + 0 ambiguos) y las 27 transformaciones simuladas (accion=CONSERVAR) aprobadas. Los 7 criterios de aceptación de la fase completa están satisfechos con evidencia real (28/07/2026): columna `Origen del registro` construida y probada (27/27 Histórico/pre-corte), prueba de reversión ejecutada sin impacto en las cinco hojas de negocio, y `Dashboard`/`Listas` reconfirmados sin regresión — ver auditoria/CHANGELOG.md. Aprobada por Carlos Rubén Bageta (28/07/2026, confirmación registrada en esta sesión); ninguna condición técnica pendiente — solo falta firmar (Responsable y Fecha arriba). Las Etapas 5 a 7 se ejecutan dentro de la ventana de corte de la Fase 9.
 ```
 
@@ -1497,8 +1497,8 @@ Cuenta de alertas: cuenta técnica externa (nunca tareas@alia-data.com)
 
 ```text
 APROBACIÓN FASE 9: APROBADA
-Responsable:
-Fecha:
+Responsable: Carlos Rubén Bageta
+Fecha: 30/07/2026
 Observaciones: Corte productivo real ejecutado el 30/07/2026. Aprobación A (cierre del lote
 histórico) y Aprobación B (activación final) firmadas por Carlos Rubén Bageta el mismo día —
 ver auditoria/CHANGELOG.md y documentacion/PROCEDIMIENTO_DESPLIEGUE.md para el detalle completo

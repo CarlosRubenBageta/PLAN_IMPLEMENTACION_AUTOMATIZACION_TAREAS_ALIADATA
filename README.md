@@ -42,11 +42,11 @@ Esta carpeta seleccionada actúa como raíz del proyecto (equivale a `Automatiza
 
 **Para retomar el proyecto en una sesión nueva:** indicar a Cowork que lea este README y `entregables/FASE_8/ACTA_APROBACION_FASE_8.md`.
 
-**Acción pendiente de Rubén para cerrar formalmente la Fase 8:** ninguna condición técnica pendiente — solo falta firmar el acta (responsable y fecha) en `entregables/FASE_8/ACTA_APROBACION_FASE_8.md`.
+**Fase 8 cerrada formalmente:** acta firmada (Responsable: Carlos Rubén Bageta, Fecha: 30/07/2026) en `entregables/FASE_8/ACTA_APROBACION_FASE_8.md`.
 
-**Acción pendiente de Rubén para cerrar formalmente la Fase 8.1:** ninguna condición técnica pendiente — solo falta firmar (responsable y fecha) en la puerta de aprobación de `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`, sección "Fase 8.1".
+**Fase 8.1 cerrada formalmente:** puerta de aprobación firmada (Responsable: Carlos Rubén Bageta, Fecha: 30/07/2026) en `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`, sección "Fase 8.1".
 
-**Acción pendiente de Rubén para cerrar formalmente la Fase 9:** ninguna condición técnica bloqueante — solo falta firmar (responsable y fecha) en la puerta de aprobación de `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`, sección "Fase 9". Queda como riesgo residual aceptado el simulacro completo de reversión (`documentacion/PROCEDIMIENTO_REVERSION.md`, sección "Pendiente").
+**Fase 9 cerrada formalmente:** puerta de aprobación firmada (Responsable: Carlos Rubén Bageta, Fecha: 30/07/2026) en `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`, sección "Fase 9". Queda como riesgo residual aceptado el simulacro completo de reversión (`documentacion/PROCEDIMIENTO_REVERSION.md`, sección "Pendiente").
 
 **Acción en curso — Fase 10:** supervisión diaria de las ejecuciones reales del pipeline v3 (día 1: todas las ejecuciones; días 2-3: dos veces al día; días 4-7: diaria).
 
