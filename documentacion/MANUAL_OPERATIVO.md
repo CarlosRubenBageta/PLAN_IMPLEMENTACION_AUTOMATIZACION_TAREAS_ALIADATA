@@ -77,9 +77,11 @@ El plan v3 exige 8 eventos de alerta hacia una **cuenta técnica externa** (nunc
 
 `CUENTA_ALERTAS` es hoy `carlosrubenbageta@alia-data.com` — **uso temporal**, según quedó registrado en DEC-017 (`auditoria/DECISIONES.md`).
 
-## 6. Anomalía conocida, sin resolver
+## 6. Anomalía conocida — observada, resuelta sola, sin causa raíz confirmada al 100%
 
-**Ejecuciones que quedan "En ejecución" mucho más de lo normal, sin dejar ninguna fila en `Log Mensajes`.** Observado por primera vez el 30/07/2026 (corrida de `18:21:48`, más de 11 minutos activa). No bloqueó las corridas siguientes (la de `18:31:48` corrió y cerró normal). Como no llegó a escribir ni una fila — y `Log Mensajes` escribe su primera fila en los primeros segundos de cualquier ejecución que sí encuentra un mensaje — todo indica que se cuelga *antes* de buscar mensajes, no procesando uno real. Sin causa raíz identificada todavía (detalle: `auditoria/CHANGELOG.md`, entrada del 30/07/2026 "Fase 10: primera ejecución automática real confirmada"). **Si se repite**, vale la pena mirar Google Cloud Console (Stackdriver/Cloud Logging) para un stack trace, en vez de seguir tratándolo como un evento aislado.
+**Una ejecución puede tardar varios minutos y aun así terminar bien.** Observado el 30/07/2026: la corrida de `18:21:48` quedó "En ejecución" más de 11 minutos en vivo, sin dejar ninguna fila en `Log Mensajes` mientras tanto — pero al revisar más tarde la vista Apps Script → Ejecuciones, terminó **`Completada`**, duración final **763.434 s** (~12m43s), no `Falló`. No bloqueó las corridas siguientes (la de `18:31:48` corrió y cerró normal, 6.872 s). Como no dejó ninguna fila en `Log Mensajes` pero cerró sin error, la lectura más consistente es 0 mensajes elegibles esa corrida, con la lentitud concentrada en la búsqueda contra la API de Gmail — lentitud transitoria de Google, no un cuelgue del script. De las 14 ejecuciones revisadas ese rango horario, es la única fuera de lo normal (el resto: 3-16 s) — un outlier aislado, no un patrón repetido (detalle: `auditoria/CHANGELOG.md`, entrada "Fase 10: primera ejecución automática real confirmada").
+
+**Qué hacer si se repite:** abrir esa ejecución puntual en Apps Script → Ejecuciones y leer su log real (línea "N mensajes elegibles, procesando M") para confirmar si de verdad encontró 0 mensajes o si hay algo más. Si además empieza a pasar seguido (no una vez aislada), ahí sí vale la pena mirar Google Cloud Console (Stackdriver/Cloud Logging) para un diagnóstico más profundo.
 
 ## 7. Ante una falla crítica
 
