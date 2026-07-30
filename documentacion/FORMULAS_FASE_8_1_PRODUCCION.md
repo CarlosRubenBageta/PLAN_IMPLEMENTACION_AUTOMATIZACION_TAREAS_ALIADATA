@@ -61,6 +61,12 @@ Pegada por Carlos Rubén Bageta el 28/07/2026. Usa columna `C` para el `ID` en l
 =ARRAYFORMULA(SI(C2:C="";"";SI(CONTAR.SI('Indice Idempotencia'!B2:B1000;C2:C)>0;"Automatización v3";SI(CONTAR.SI('Registro Migración Histórica'!C2:C1000;C2:C)>0;"Histórico/pre-corte";"Revisión de origen"))))
 ```
 
+**Variante real usada en producción (30/07/2026, ajustada con Gemini de Sheets):** rangos sin tope de fila en vez de `2:1000`, para no tener que ampliarlo manualmente si `Indice Idempotencia`/`Registro Migración Histórica` crecen — `CONTAR.SI` no tiene problema de rendimiento sobre una columna completa:
+
+```text
+=ARRAYFORMULA(SI(C2:C="";"";SI(CONTAR.SI('Indice Idempotencia'!B2:B;C2:C)>0;"Automatización v3";SI(CONTAR.SI('Registro Migración Histórica'!C2:C;C2:C)>0;"Histórico/pre-corte";"Revisión de origen"))))
+```
+
 **Requiere que `Indice Idempotencia` y `Registro Migración Histórica` ya existan como hojas** (aunque estén vacías) — si falta cualquiera de las dos, esta columna específicamente muestra error de referencia hasta que se cree. No afecta al resto de `Resumen Actividades`. Ver el orden recomendado en `PROCEDIMIENTO_DESPLIEGUE.md` (A.5 antes que A.6).
 
 **Resultado esperado en producción, el día del corte:** con `Indice Idempotencia` recién creada y vacía (nadie procesó todavía ningún mensaje con v3), **todas las filas deberían dar `Histórico/pre-corte`**, igual que en la copia de prueba — 0 en `Automatización v3` es lo esperado, no un error.

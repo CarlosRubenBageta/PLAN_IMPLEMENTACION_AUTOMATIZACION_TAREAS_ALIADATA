@@ -2,8 +2,8 @@
 
 **Redactado:** 28/07/2026, durante la planificación de la Fase 9 (`PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`, sección "Fase 9").
 **Revisado:** 28/07/2026, tras auditoría externa (`auditoria/AUDITORIA_PROCEDIMIENTOS_DESPLIEGUE_REVERSION_FASE_9.md`, veredicto NO-GO condicionado) — correcciones verificadas independientemente e incorporadas, ver notas "(auditoría)" en cada punto corregido.
-**Fecha/hora real del corte:** *(pendiente — se completa cuando se fije `FECHA_INICIO_CORTE`; hasta entonces este documento es preparación, no ejecución)*.
-**Estado:** **NO-GO todavía** — quedan puntos que requieren código nuevo o una decisión de Carlos Rubén Bageta antes de poder ejecutarse en producción. Marcados explícitamente como `⚠ REQUIERE DECISIÓN` o `⚠ REQUIERE CÓDIGO NUEVO` donde corresponde.
+**Fecha/hora real del corte:** `FECHA_INICIO_CORTE = 2026-07-30T13:05:00-03:00` (ver `auditoria/CHANGELOG.md`, 30/07/2026) — **en ejecución real**.
+**Estado:** GO decidido por Carlos Rubén Bageta el 30/07/2026 — los puntos marcados `⚠ REQUIERE DECISIÓN`/`⚠ REQUIERE CÓDIGO NUEVO` que seguían abiertos se aceptan como riesgo residual, mitigado con verificación manual cuidadosa en cada paso (no resueltos con código nuevo). A.1 completo — ver CHANGELOG para el detalle real de la ejecución.
 
 Este documento traduce el checklist de la Fase 9 del plan v3 en pasos concretos, con los identificadores reales ya confirmados. No reemplaza al plan v3 (ahí están los criterios de aceptación y las dos aprobaciones formales) — es el instructivo operativo para ejecutarlo.
 

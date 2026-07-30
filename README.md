@@ -37,7 +37,8 @@ Esta carpeta seleccionada actúa como raíz del proyecto (equivale a `Automatiza
 | 7. Escritura en Sheets | **APROBADA** (20/07/2026, acta firmada) |
 | 8. Pruebas | **APROBADA** (27/07/2026) — 36/36 casos condicionantes + CP-38/CP-39 (Lotes 2/3, H-07/H-08), todos con corrida real; ver acta |
 | 8.1. Consolidación e incorporación del histórico | **APROBADA** (28/07/2026) — Etapas 0 a 4 completas con datos reales y simulación validada en copia aislada; los 7 criterios de aceptación satisfechos (ver `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`, sección "Fase 8.1"). Nueva fase, no contemplada en el plan original — ver `documentacion/PROPUESTA_CONSOLIDACION_Y_MIGRACION_HISTORICA.md` y DEC-013 a DEC-016 |
-| 9 a 10 | Pendientes |
+| 9. Despliegue controlado | **APROBADA** (30/07/2026) — corte productivo real ejecutado: Aprobación A y B firmadas, pipeline v3 corriendo en producción (`tareas@alia-data.com`), primer correo real procesado con éxito. Detalle completo en `auditoria/CHANGELOG.md` y `documentacion/PROCEDIMIENTO_DESPLIEGUE.md`. Pendiente como riesgo residual aceptado: simulacro completo de reversión (`documentacion/PROCEDIMIENTO_REVERSION.md`) |
+| 10. Monitoreo y estabilización | En curso — cadencia de supervisión iniciada el 30/07/2026 (día 1: todas las ejecuciones) |
 
 **Para retomar el proyecto en una sesión nueva:** indicar a Cowork que lea este README y `entregables/FASE_8/ACTA_APROBACION_FASE_8.md`.
 
@@ -45,10 +46,12 @@ Esta carpeta seleccionada actúa como raíz del proyecto (equivale a `Automatiza
 
 **Acción pendiente de Rubén para cerrar formalmente la Fase 8.1:** ninguna condición técnica pendiente — solo falta firmar (responsable y fecha) en la puerta de aprobación de `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`, sección "Fase 8.1".
 
-**Acción pendiente para planificar la Fase 9:** con las Fases 8 y 8.1 aprobadas, puede planificarse la ventana de corte de la Fase 9 (que incorpora también la ejecución productiva del histórico, con dos aprobaciones separadas — ver "Fase 9" en el plan v3).
+**Acción pendiente de Rubén para cerrar formalmente la Fase 9:** ninguna condición técnica bloqueante — solo falta firmar (responsable y fecha) en la puerta de aprobación de `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`, sección "Fase 9". Queda como riesgo residual aceptado el simulacro completo de reversión (`documentacion/PROCEDIMIENTO_REVERSION.md`, sección "Pendiente").
+
+**Acción en curso — Fase 10:** supervisión diaria de las ejecuciones reales del pipeline v3 (día 1: todas las ejecuciones; días 2-3: dos veces al día; días 4-7: diaria).
 
 ## Reglas de seguridad esenciales
 
-- El activador productivo **permanece activo** hasta la ventana de corte (Fase 9).
+- El activador productivo de v3 **ya está activo** en `tareas@alia-data.com` desde el corte del 30/07/2026 (el activador de la versión anterior fue eliminado ese mismo día, ver `auditoria/CHANGELOG.md`).
 - Nunca guardar credenciales (`OPENAI_API_KEY`) en archivos de esta carpeta.
 - No modificar recursos de Google Workspace sin aprobación explícita de Rubén.

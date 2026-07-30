@@ -1417,36 +1417,37 @@ Incorpora las operaciones de la Fase 8.1 (Etapas 5 a 7) intercaladas con el desp
 
 **Aprobación A — cierre del lote histórico (antes de tocar el código nuevo):**
 
-- [ ] Confirmar respaldo final.
-- [ ] Abrir la **ventana de corte**: registrar `FECHA_INICIO_CORTE`.
-- [ ] Verificar la última ejecución de la versión antigua y desactivar su activador.
-- [ ] Crear las hojas técnicas del pipeline: `Log Mensajes`, `Registro Tareas`, `Indice Idempotencia`.
-- [ ] Crear `Registro Migración Histórica` (Fase 8.1).
-- [ ] Aplicar únicamente las normalizaciones históricas ya aprobadas en la Fase 8.1 (Etapas 2-4).
-- [ ] Crear `Resumen Actividades` (Fase 8.1).
-- [ ] Proteger la hoja `Resumen Actividades` completa (`Datos → Hojas y rangos protegidos`, restringir edición a los administradores) — es de solo lectura por diseño (D3); validado en la Etapa 3 que sin esto, un doble clic accidental en la columna `Abrir origen` rompe la fórmula de matriz para todos los usuarios.
-- [ ] Ejecutar la conciliación histórico/resumen.
-- [ ] Detenerse ante cualquier diferencia no explicada.
-- [ ] **Aprobación A: aprobación humana del lote histórico y su conciliación** — condición para continuar con el despliegue del código. No debe confundirse con la Aprobación B: esta cierra específicamente el trabajo de datos, antes de que el pipeline nuevo exista en el archivo.
+- [x] Confirmar respaldo final (30/07/2026 — archivo maestro y proyecto Apps Script completo).
+- [x] Abrir la **ventana de corte**: registrar `FECHA_INICIO_CORTE` (`2026-07-30T13:05:00-03:00`).
+- [x] Verificar la última ejecución de la versión antigua y desactivar su activador (eliminado 13:29, 30/07/2026).
+- [x] Saneamiento de correos automáticos, relocado antes de las hojas técnicas (auditoría BLQ-06) — 21 filas reales descartadas a `Registros descartados`, conciliado sin diferencias.
+- [x] Crear las hojas técnicas del pipeline: `Log Mensajes`, `Registro Tareas`, `Indice Idempotencia` (protegida).
+- [x] Crear `Resumen Actividades` (Fase 8.1) — 9 filas reales, coincide con `Dashboard`.
+- [x] Crear `Registro Migración Histórica` (Fase 8.1) — 9 filas, `accion=CONSERVAR` en todas.
+- [x] Aplicar únicamente las normalizaciones históricas ya aprobadas en la Fase 8.1 (Etapas 2-4) — trivial, 100% `CONSERVAR`.
+- [x] Proteger la hoja `Resumen Actividades` completa (`Datos → Hojas y rangos protegidos`, restringir edición a los administradores) — es de solo lectura por diseño (D3); validado en la Etapa 3 que sin esto, un doble clic accidental en la columna `Abrir origen` rompe la fórmula de matriz para todos los usuarios.
+- [x] Ejecutar la conciliación histórico/resumen — sin diferencias (9 = 1 terminal + 8 abiertos + 0 ambiguos).
+- [x] Detenerse ante cualquier diferencia no explicada — ninguna diferencia sin explicar.
+- [x] **Aprobación A: aprobación humana del lote histórico y su conciliación** — **APROBADA por Carlos Rubén Bageta, 30/07/2026.** No debe confundirse con la Aprobación B: esta cierra específicamente el trabajo de datos, antes de que el pipeline nuevo exista en el archivo. Detalle completo en `auditoria/CHANGELOG.md` y `documentacion/PROCEDIMIENTO_DESPLIEGUE.md`.
 
 **Continúa el despliegue del pipeline:**
 
-- [ ] Copiar el código aprobado a Apps Script.
-- [ ] Habilitar el servicio avanzado de Gmail y verificar `appsscript.json` (servicio y alcances OAuth).
-- [ ] Configurar propiedades del script (incluido `MODO_PRUEBA=false` y `DRY_RUN=false`).
-- [ ] Crear etiquetas y registrar sus IDs internos.
-- [ ] Verificar nombres de hojas.
-- [ ] Autorizar permisos (incluidos los alcances de Gmail API).
-- [ ] Ejecutar `validarConfiguracion()`.
-- [ ] Ejecutar una prueba manual.
-- [ ] Procesar uno o dos correos controlados.
-- [ ] Verificar filas, log, etiquetado y archivado **por mensaje**.
-- [ ] Ejecutar por separado el saneamiento de correos automáticos: identificar las filas generadas por correos automáticos (`noreply-apps-scripts-notifications@google.com`, Google Workspace, NotebookLM), moverlas a `Registros descartados` sin eliminarlas y registrar la decisión (v3) — distinto de la incorporación histórica de la Fase 8.1 (ver RH-14, `documentacion/PROPUESTA_CONSOLIDACION_Y_MIGRACION_HISTORICA.md`).
-- [x] Configurar las alertas hacia la cuenta técnica externa — **DEC-017 corregida (28/07/2026, auditoría BLQ-05) y resuelta el mismo día:** la notificación nativa no llega directamente a `carlosrubenbageta@alia-data.com`, pero un filtro de Gmail en `tareas@alia-data.com` que la reenvía sí funciona — probado con una falla real controlada, no solo configurado. Detalle en `documentacion/PROCEDIMIENTO_DESPLIEGUE.md`, paso B.11. Cubre solo "runtime terminado inesperadamente"; el resto de los eventos de la Fase 10 sigue pendiente.
-- [ ] **Aprobación B: aprobación final de despliegue** — confirmando además que ninguna diferencia detectada antes de la Aprobación A quedó sin explicar.
-- [ ] Reactivar el activador (versión nueva) y verificar su primera ejecución.
-- [ ] Confirmar que se procesó todo correo posterior a `FECHA_INICIO_CORTE`.
-- [ ] Supervisar las primeras ejecuciones.
+- [x] Copiar el código aprobado a Apps Script (30/07/2026, los 9 archivos).
+- [x] Habilitar el servicio avanzado de Gmail y verificar `appsscript.json` (servicio y alcances OAuth) — confirmado en `enabledAdvancedServices`.
+- [x] Configurar propiedades del script (incluido `MODO_PRUEBA=false` y `DRY_RUN=false`) — 22 propiedades.
+- [x] Crear etiquetas y registrar sus IDs internos — `Revisión manual` + 3 subetiquetas.
+- [x] Verificar nombres de hojas.
+- [x] Autorizar permisos (incluidos los alcances de Gmail API) — confirmado corriendo como `tareas@alia-data.com`.
+- [x] Ejecutar `validarConfiguracion()` — `valido: true`; encabezados de las 3 hojas técnicas verificados a mano.
+- [x] Ejecutar una prueba manual — bandeja real vacía, sin error.
+- [x] Procesar uno o dos correos controlados — `[PRUEBA-DESPLIEGUE-FASE9]`, 1 tarea real generada en `Desarrollo IT`.
+- [x] Verificar filas, log, etiquetado y archivado **por mensaje** — `Log Mensajes` confirma `PROCESADO`/`FINALIZADO`/`ETIQUETADO_Y_ARCHIVADO`; idempotencia probada (segunda corrida sin fila adicional).
+- [x] Ejecutar por separado el saneamiento de correos automáticos — **relocado antes de las hojas técnicas (auditoría BLQ-06), ejecutado dentro de la Aprobación A (A.4)**, no acá: 21 filas reales movidas a `Registros descartados`, conciliado sin diferencias. Ver esa sección más arriba.
+- [x] Configurar las alertas hacia la cuenta técnica externa — **DEC-017 corregida (28/07/2026, auditoría BLQ-05) y resuelta el mismo día:** la notificación nativa no llega directamente a `carlosrubenbageta@alia-data.com`, pero un filtro de Gmail en `tareas@alia-data.com` que la reenvía sí funciona — probado con una falla real controlada, y reconfirmado activo el día del corte. Cubre solo "runtime terminado inesperadamente"; el resto de los eventos de la Fase 10 sigue pendiente.
+- [x] **Aprobación B: aprobación final de despliegue** — **APROBADA por Carlos Rubén Bageta, 30/07/2026.** Sin diferencias sin explicar desde la Aprobación A.
+- [x] Reactivar el activador (versión nueva) y verificar su primera ejecución — creado como `tareas@alia-data.com`, cada 10 minutos, notificación de fallos en modo Inmediatamente.
+- [x] Confirmar que se procesó todo correo posterior a `FECHA_INICIO_CORTE` — bandeja real en 0 antes y después del corte, nada pendiente que drenar.
+- [x] Supervisar las primeras ejecuciones — entra en la cadencia de la Fase 10 (día 1: todas las ejecuciones).
 
 ### Configuración sugerida
 
@@ -1473,32 +1474,43 @@ Cuenta de alertas: cuenta técnica externa (nunca tareas@alia-data.com)
 
 ### Criterios de aceptación
 
-- [ ] La prueba manual es correcta.
-- [ ] El activador pertenece a `tareas@alia-data.com`.
-- [ ] Las propiedades están configuradas.
-- [ ] Las etiquetas existen y sus IDs internos están registrados.
-- [ ] Las hojas técnicas funcionan.
-- [ ] La ventana de corte no dejó correos sin procesar.
-- [ ] No aparecen duplicados.
-- [ ] Existe un procedimiento de reversión probado.
+- [x] La prueba manual es correcta (B.8-B.10, 30/07/2026).
+- [x] El activador pertenece a `tareas@alia-data.com` (B.13, confirmado al crearlo).
+- [x] Las propiedades están configuradas (22, B.5).
+- [x] Las etiquetas existen y sus IDs internos están registrados (B.4).
+- [x] Las hojas técnicas funcionan (creadas, `validarConfiguracion()` las encuentra, `Log Mensajes` recibió una escritura real).
+- [x] La ventana de corte no dejó correos sin procesar (bandeja real en 0 antes y después, B.14).
+- [x] No aparecen duplicados — confirmado para el único mensaje real procesado hasta ahora (idempotencia probada, B.10); se sigue confirmando con la supervisión de la Fase 10 a medida que lleguen correos reales nuevos.
+- [ ] Existe un procedimiento de reversión probado — **parcial:** se probó el mecanismo de restaurar código (28/07/2026, proyecto de prueba), pero el simulacro completo (cuarentena, activador con la cuenta correcta, tiempo de recuperación) sigue sin ejecutarse — ver `documentacion/PROCEDIMIENTO_REVERSION.md`, "Pendiente".
 
-**Adicionales, propios de la incorporación histórica (Fase 8.1, Aprobación A):**
+**Adicionales, propios de la incorporación histórica (Fase 8.1, Aprobación A) — confirmados hoy sobre el archivo real, no solo la copia:**
 
-- [ ] Todos los históricos abiertos o ambiguos aparecen en `Resumen Actividades`.
-- [ ] Los conteos concilian con las cinco hojas de negocio.
-- [ ] No se copiaron filas que ya estaban en el archivo maestro.
-- [ ] Ningún histórico ingresó en las hojas técnicas del pipeline.
-- [ ] La vista muestra correctamente las tareas nuevas y las históricas.
-- [ ] La reversión de normalizaciones fue probada.
-- [ ] `Dashboard` y `Listas` no sufrieron regresiones.
+- [x] Todos los históricos abiertos o ambiguos aparecen en `Resumen Actividades` (9 = 8 abiertos + 1 terminal, conciliado sin diferencias).
+- [x] Los conteos concilian con las cinco hojas de negocio.
+- [x] No se copiaron filas que ya estaban en el archivo maestro (fórmulas de solo lectura, sin operación de copiado).
+- [x] Ningún histórico ingresó en las hojas técnicas del pipeline (`Indice Idempotencia` quedó vacía hasta el primer correo real de v3).
+- [x] La vista muestra correctamente las tareas nuevas y las históricas (`Origen del registro`: 9 `Histórico/pre-corte` antes del corte; a confirmar que el primer correo real de v3 aparezca como `Automatización v3` en la próxima revisión).
+- [ ] La reversión de normalizaciones fue probada — mismo estado que el punto general de arriba, no ensayada sobre el archivo real (solo sobre la copia, Fase 8.1).
+- [x] `Dashboard` y `Listas` no sufrieron regresiones (reconfirmado en A.10).
 
 ### Puerta de aprobación
 
 ```text
-APROBACIÓN FASE 9: PENDIENTE
+APROBACIÓN FASE 9: APROBADA
 Responsable:
 Fecha:
-Observaciones:
+Observaciones: Corte productivo real ejecutado el 30/07/2026. Aprobación A (cierre del lote
+histórico) y Aprobación B (activación final) firmadas por Carlos Rubén Bageta el mismo día —
+ver auditoria/CHANGELOG.md y documentacion/PROCEDIMIENTO_DESPLIEGUE.md para el detalle completo
+de los 27 pasos (A.1-A.12, B.1-B.15). Pipeline v3 corriendo en producción real desde las 17:xx
+del 30/07/2026 (activador creado como tareas@alia-data.com, cada 10 minutos). Primer correo real
+procesado de punta a punta con éxito (tarea escrita, etiquetado, archivado, idempotencia
+confirmada). 21 filas de correos automáticos saneadas de las hojas de negocio antes del corte.
+Único punto pendiente, aceptado explícitamente como riesgo residual por Carlos Rubén Bageta
+(no bloqueante para esta aprobación): el simulacro completo de reversión (cuarentena simulada,
+activador recreado con la cuenta correcta, tiempo de recuperación medido) — ver
+documentacion/PROCEDIMIENTO_REVERSION.md, sección "Pendiente". Entra ahora en la cadencia de
+supervisión de la Fase 10.
 ```
 
 ---

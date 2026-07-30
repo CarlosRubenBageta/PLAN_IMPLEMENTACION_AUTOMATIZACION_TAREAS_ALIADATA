@@ -1,5 +1,128 @@
 # Changelog
 
+## [2026-07-30] — A.4 completa: saneamiento real de correos automáticos, 21 filas descartadas
+
+### Corrida real (Carlos Rubén Bageta, archivo maestro real)
+
+Detección de candidatos con una fórmula (`Candidatos Saneamiento`, patrón `LET`+`VSTACK`+`FILTER` sobre las cinco hojas de negocio, filtrando por remitente/asunto): 23 filas candidatas.
+
+**Corrección real durante la categorización:** el primer repaso de Claude pasó por alto 3 filas (`Comercial` filas 5 y 6, patrón "El equipo de Google..."; `Soporte` fila 5, `NotebookLM`) — detectado al recontar antes de que Carlos Rubén Bageta empezara a copiar datos, sin impacto real (nada se había tocado todavía).
+
+**Categorización final, aprobada por Carlos Rubén Bageta:**
+- 14 filas: remitente `noreply-apps-scripts-notifications@google.com` (`Desarrollo IT`).
+- 2 filas: `NotebookLM` (`Soporte` fila 5, `Desarrollo IT` fila 14).
+- 4 filas: "El equipo de Google..." (tips/novedades de Workspace, sin relación con una tarea real) — decisión de Claude, delegada explícitamente por Carlos Rubén Bageta ("toma la decisión que creas conveniente").
+- 1 fila: `Soporte` fila 6, remitente Google, asunto "Alerta de seguridad" — decisión explícita de Carlos Rubén Bageta (descartar), no asumida por Claude.
+- 2 filas conservadas: notas automáticas de reunión de Gemini (`Comercial` fila 7, `Gestión General` fila 5) — distintas en sustancia de una notificación de sistema (vienen de una reunión real), decisión de Claude de no incluirlas en el descarte.
+
+**Total: 21 filas descartadas, 2 conservadas**, sobre 23 candidatas.
+
+`Registros descartados` creada (17 columnas de negocio + `discard_batch_id`, `hoja_origen`, `fila_origen_previa`, `id_original`, `regla_deteccion`, `motivo_aprobado`, `responsable_aprobacion`, `fecha_aprobacion`, `fecha_movimiento`), poblada copiando desde `Candidatos Saneamiento` con pegado especial (solo valores) — evitó dos veces el error de arrastrar la fórmula de origen. `discard_batch_id = DESCARTE-20260730-01`.
+
+Retiradas las 21 filas de las hojas de origen (selección múltiple + eliminar, sin necesidad de ir de abajo hacia arriba fila por fila): `Comercial` 2, `Soporte` 2, `Desarrollo IT` 17.
+
+**Conciliación (A.4, punto 7):**
+```text
+Comercial:      3 antes = 1 remanente + 2 descartadas   ✓
+Soporte:        3 antes = 1 remanente + 2 descartadas   ✓
+Desarrollo IT: 21 antes = 4 remanentes + 17 descartadas  ✓ (21, no 18 como en el inventario de la Fase 8.1 — la diferencia son 3 filas generadas por las propias pruebas de alertas de ayer/hoy, ya incluidas en el lote descartado)
+```
+
+Confirmado tras el retiro: `Desarrollo IT` quedó con 4 filas reales de una persona con nombre (Daniel Sevilla, `danielsevilla@alia-data.com`), contenido de negocio genuino. `Dashboard` sin regresión (Finanzas 1, Comercial 1, Soporte 1, Desarrollo IT 4, Gestión General 2, total 9 — coincide exactamente). `Listas` sin cambios.
+
+### A.5 — Hojas técnicas creadas
+
+`Log Mensajes` (27 columnas), `Registro Tareas` (16), `Indice Idempotencia` (4) creadas con los encabezados exactos de `documentacion/DISENO_HOJAS_TECNICAS.md`. `Indice Idempotencia` protegida (`Datos → Hojas y rangos protegidos`, personalizado) — probado en vivo bloqueando y restaurando el acceso de una cuenta antes de confirmar. Lista final de editores permitidos: `tareas@alia-data.com`, Luis Castellano, Daniel Sevilla, Gonzalo Sevilla, Carlos Rubén Bageta — confirmada por Carlos Rubén Bageta como el grupo correcto de administradores.
+
+### A.6 — `Resumen Actividades` creada
+
+Fórmula principal + `Estado normalizado` + `Abrir origen` (con los 5 `gid` reales, releídos del archivo real — resultaron idénticos a los de la copia, porque "Hacer una copia" preserva los `gid` de cada pestaña) + `Origen del registro` (con `#REF!` esperado hasta A.7). **9 filas activas, 8 `ABIERTO` + 1 `TERMINAL`** — coincide exactamente con el `Dashboard` post-saneamiento. Variante real de `Origen del registro` ajustada con Gemini de Sheets (rangos sin tope de fila) — actualizada en `documentacion/FORMULAS_FASE_8_1_PRODUCCION.md`.
+
+### A.7 y A.8 — `Registro Migración Histórica` creada, normalizaciones confirmadas
+
+Fórmula adaptada de la de la copia: sin caso de `motivo_excepcion` hardcodeado (los 2 duplicados de la Fase 8.1 eran notificaciones automáticas, ya descartadas en A.4 — no hay ningún duplicado real en las 9 filas actuales), `batch_id=PROD-20260730-01`, `fecha_ejecucion` real (30/07/2026).
+
+**Hallazgo real, error propio, corregido:** la primera versión de la fórmula tenía `motivo_excepcion` como un `""` suelto, sin envolver en `SI(...)` como el resto de las columnas — al ensamblarse con `HSTACK` contra columnas de altura mayor (referencias sin tope de fila a `Resumen Actividades`), esa columna se desbordó con `#N/A` desde la segunda fila hasta más allá de la fila 30. Corregido envolviéndola en el mismo patrón condicional que las demás columnas. Verificado limpio: exactamente 9 filas, `accion=CONSERVAR` en todas (A.8 confirmada de la misma corrida, sin ninguna transformación real que aplicar), `motivo_excepcion` vacío en las 9.
+
+Confirmado además que la columna `Origen del registro` de `Resumen Actividades` se resolvió sola al existir esta hoja: las 9 filas muestran `Histórico/pre-corte`.
+
+### A.9 y A.10 — Protección y conciliación final
+
+`Resumen Actividades` protegida completa (mismo grupo de administradores que `Indice Idempotencia`). Conciliación final cerrada sin diferencias: `9 = 1 terminal + 8 abiertos + 0 ambiguos`; `8 incluibles no resueltos = 8 visibles en Resumen Actividades + 0 excepciones bloqueantes`. Por conjunto: `hoja_origen` en `Registro Migración Histórica` coincide exactamente con lo que dejó el saneamiento por hoja (Finanzas 1, Comercial 1, Soporte 1, Desarrollo IT 4, Gestión General 2 = 9). Sin errores de fórmula. Enlaces `Abrir origen` probados (Finanzas y Desarrollo IT) — correctos. `Dashboard` y `Listas` reconfirmados sin regresión.
+
+### A.12 — Aprobación A firmada
+
+**Aprobación A (cierre del lote histórico): APROBADA por Carlos Rubén Bageta, 30/07/2026.** Conteos finales: 9 filas reales conciliadas sin diferencias (1 terminal + 8 abiertos + 0 ambiguos); 21 filas de correos automáticos saneadas a `Registros descartados` (`DESCARTE-20260730-01`); `Resumen Actividades` y `Registro Migración Histórica` creadas, probadas y protegidas. Cierra el trabajo de datos — sigue el despliegue del pipeline (B.1 en adelante), primera vez que se toca código en el proyecto real.
+
+### Estado
+
+**Aprobación A completa y firmada.** Sigue B.1 (copiar el código v3 al proyecto real).
+
+---
+
+## [2026-07-30] — Despliegue del pipeline v3: B.1 a B.10 completos, primera tarea real generada en producción
+
+### Corrida real (Carlos Rubén Bageta, proyecto Apps Script real)
+
+**B.1:** los 9 archivos copiados al proyecto real, reemplazando `Código.gs`. **B.2:** servicio avanzado de Gmail habilitado, confirmado en `appsscript.json` (`enabledAdvancedServices`). **B.3:** permisos autorizados — confirmado `Session.getActiveUser().getEmail()` = `tareas@alia-data.com`. **B.4:** etiquetas `Revisión manual` (+ 3 subetiquetas) creadas, IDs capturados y guardados (`ID_ETIQUETA_PROCESADO=Label_1`, `ID_ETIQUETA_REVISION_SIN_TAREAS=Label_8145504254152574691`, `ID_ETIQUETA_REVISION_ERROR_PROCESAMIENTO=Label_6171196032327550401`, `ID_ETIQUETA_REVISION_ERROR_AUTOMATIZACION=Label_3173123855110074385`). **B.5:** 22 propiedades configuradas. **B.6:** nombres de hojas reconfirmados. **B.7:** `validarConfiguracion()` → `valido: true`; encabezados de las 3 hojas técnicas verificados a mano contra `documentacion/DISENO_HOJAS_TECNICAS.md`. **B.8:** prueba manual con bandeja vacía (confirmada por búsqueda real `label:inbox -label:Procesado` en Gmail, no por script — evita el riesgo de identidad ya visto hoy) — `0 mensajes elegibles`, sin error.
+
+**B.9-B.10 — primer correo real procesado por v3 en producción:** correo controlado real (`[PRUEBA-DESPLIEGUE-FASE9] Verificar canario de despliegue`) enviado a `tareas@alia-data.com` y procesado. `Log Mensajes`: `estado=PROCESADO`, `etapa=FINALIZADO`, `cantidad_tareas=1`, `resultado_gmail=ETIQUETADO_Y_ARCHIVADO`, `version_script=3.0.0`. Tarea real escrita en `Desarrollo IT`. Prueba de idempotencia: segunda ejecución sin correo nuevo → `0 mensajes elegibles, procesando 0`, sin fila adicional.
+
+### B.11 y B.12 — Alertas confirmadas, Aprobación B firmada
+
+**B.11:** filtro de Gmail (`noreply-apps-scripts-notifications@google.com` → `carlosrubenbageta@alia-data.com`) reconfirmado activo. **B.12 — Aprobación B (activación final): APROBADA por Carlos Rubén Bageta, 30/07/2026.** Sin diferencias sin explicar desde la Aprobación A; ruta de alertas probada de punta a punta con una falla real.
+
+### B.13 — Activador nuevo reactivado
+
+`procesarCorreosDeTareas`, basado en tiempo, cada 10 minutos, creado logueado como `tareas@alia-data.com`, notificación de fallos en modo Inmediatamente. **El pipeline v3 queda corriendo de forma autónoma en producción por primera vez.**
+
+### Estado
+
+**B.1 a B.13 completos.** Sigue B.14 (confirmar drenaje — trivial, la bandeja real ya estaba en 0 antes del corte) y B.15 (supervisión de las primeras ejecuciones, cadencia de la Fase 10).
+
+### No accedido
+
+Se envió y procesó un correo real de prueba controlada — primera escritura real del pipeline v3 en las hojas de negocio de producción. No se accedió a OpenAI de forma no controlada (la única llamada real fue la del correo de prueba).
+
+### No accedido
+
+Se accedió y modificó el archivo maestro real (primera modificación de datos de negocio real de todo el proyecto) — sin acceso a Gmail ni OpenAI real en esta entrada.
+
+---
+
+## [2026-07-30] — Fase 9: ventana de corte abierta, `FECHA_INICIO_CORTE = 2026-07-30T13:05:00-03:00`
+
+### Decisión (Carlos Rubén Bageta, 30/07/2026)
+
+Con el flujo de correo ya suspendido hacia `tareas@alia-data.com` (sin urgencia de horas) y los puntos más riesgosos de la auditoría externa cerrados o explícitamente aceptados como riesgo residual, Carlos Rubén Bageta decide avanzar con el corte completo (Aprobación A + despliegue del pipeline + Aprobación B) en una sola ventana.
+
+### A.1 — Respaldo fresco (real, ejecutado)
+
+- Archivo maestro: copia fresca creada (`RESPALDO - Aliadata Tableros Operativos - Pre corte v3 - 28-07-2026`, un respaldo duplicado por error al perderse la primera copia, sin impacto — ambos son válidos, se ordena después).
+- Proyecto Apps Script real (`1-qrNy_5VOZHbdC9bj7m3Zqv3TTEmPPRwPynMYP20VBQUyR2IChVGVinA`) copiado completo (`Copy of Automatizacion para generar tareas`, ID `1Hg3jvlkv1ipbtel8vBXulrxm00ffOmmeygPZMyBLGt7hB19MwruA5714`).
+- Propiedades: solo `OPENAI_API_KEY` configurada (esperado — el script viejo no usa ninguna otra).
+- Activador confirmado: `procesarCorreosDeTareas`, basado en tiempo, cada 10 minutos, activo, última ejecución real `30/07/2026 12:24:56`.
+
+**Hallazgo real durante la verificación de identidad del proyecto:** la pantalla "Datos Del Proyecto" del editor de Apps Script mostró el "Contenedor" del proyecto real como el archivo de **respaldo** de la Fase 0 (`1x2VlkumTdfXdVnHe_dpkaE_UzX3KvTCEuAhTs3kI_js`), no el archivo maestro — y "0 ejecuciones en los últimos 7 días". Investigado antes de continuar: acceder al proyecto desde `Extensiones → Apps Script` **dentro del archivo maestro real** lleva exactamente al mismo ID de proyecto (`1-qrNy_5...`), y la hoja de negocio `Desarrollo IT` del archivo maestro tiene una fila real con fecha `29/07/2026` — un día antes de la última ejecución del activador. Conclusión: el archivo maestro es el que efectivamente está en uso; el campo "Contenedor" y el conteo de "0 ejecuciones" de esa pantalla son metadata poco confiable para esta versión del editor (probablemente con alcance por-cuenta-que-mira, igual que ya se documentó para las notificaciones nativas en BLQ-05) — no reflejan la realidad operativa. Confirmado con datos reales, no solo con la metadata del proyecto.
+
+**Incidente de seguridad real, resuelto:** al pedir la lista de propiedades del script, una captura de pantalla expuso el valor real de `OPENAI_API_KEY` en esta conversación. Rotada de inmediato por Carlos Rubén Bageta (clave nueva generada y guardada en las propiedades del proyecto real antes de revocar la vieja, para no cortar el servicio) — la clave expuesta quedó revocada e inutilizable.
+
+### A.2 — Ventana de corte abierta
+
+`FECHA_INICIO_CORTE = 2026-07-30T13:05:00-03:00` (hora real confirmada por Carlos Rubén Bageta, GMT-3).
+
+**Corrección real durante el inventario de la bandeja pendiente:** la primera corrida de `inventariarBandejaPendiente()` (ejecutada manualmente desde el editor) devolvió 33 mensajes — pero esa ejecución manual corre bajo la cuenta personal de Carlos Rubén Bageta, no bajo `tareas@alia-data.com` (el activador instalable es quien de verdad ejecuta como esa cuenta). Los 33 mensajes están en la bandeja personal de Carlos Rubén Bageta (en su mayoría, correos de prueba de la Fase 8), no en la bandeja real. **Inventario correcto, confirmado por la propia ejecución real del activador (30/07/2026 13:14:56):** `"No hay correos nuevos para procesar."` — **0 mensajes pendientes reales** en `tareas@alia-data.com` al momento de abrir la ventana de corte.
+
+### A.3 — Activador viejo eliminado
+
+Hallazgo real de acceso: Carlos Rubén Bageta, logueado con su cuenta habitual (editor del proyecto compartido), no tenía la opción de eliminar el activador — confirma en la práctica el hallazgo BLQ-05 de la auditoría (un editor no administra activadores creados por otra cuenta). Resuelto iniciando sesión directamente como `tareas@alia-data.com`; desde ahí sí apareció la opción. **Activador viejo eliminado a las 13:29 (30/07/2026)** — punto de referencia para la conciliación de B.14.
+
+### No accedido
+
+Se accedió al proyecto Apps Script real y al archivo maestro real (lectura, respaldo y modificación del activador en esta entrada) — es la primera vez en todo el proyecto que se toca el entorno productivo real.
+
+---
+
 ## [2026-07-28] — Ensayo del swap de código de reversión, sobre el proyecto Apps Script de prueba de la Fase 8
 
 ### Corrida real (Carlos Rubén Bageta, proyecto "PRUEBA - Automatización de tareas Aliadata - Fase 8")
