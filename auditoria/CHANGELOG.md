@@ -80,6 +80,12 @@ Confirmado además que la columna `Origen del registro` de `Resumen Actividades`
 
 **B.1 a B.13 completos.** Sigue B.14 (confirmar drenaje — trivial, la bandeja real ya estaba en 0 antes del corte) y B.15 (supervisión de las primeras ejecuciones, cadencia de la Fase 10).
 
+---
+
+## [2026-07-30] — Fase 10: primera ejecución automática real confirmada
+
+Primera corrida del activador nuevo sin intervención manual: `17:01:48`, `0 mensajes elegibles, procesando 0`, sin errores. Segunda corrida ya en curso a las `17:11:48` — exactos 10 minutos de diferencia, confirma la frecuencia configurada en B.13. Entra en la cadencia de revisión de todas las ejecuciones del día 1.
+
 ### No accedido
 
 Se envió y procesó un correo real de prueba controlada — primera escritura real del pipeline v3 en las hojas de negocio de producción. No se accedió a OpenAI de forma no controlada (la única llamada real fue la del correo de prueba).
