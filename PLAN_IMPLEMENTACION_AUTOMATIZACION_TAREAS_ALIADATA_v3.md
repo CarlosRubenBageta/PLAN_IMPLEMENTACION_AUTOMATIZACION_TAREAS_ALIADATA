@@ -1570,7 +1570,7 @@ Eventos a notificar:
 - [ ] No se procesan correos automáticos como tareas.
 - [ ] Los mensajes con error llegan a revisión manual.
 - [ ] Las tareas se distribuyen correctamente.
-- [ ] Las alertas llegan a la cuenta técnica externa (DEC-017: pendiente construir la lógica propia para 7 de los 8 eventos listados arriba — la Fase 9 solo dejó activa la notificación nativa de fallas de Apps Script).
+- [x] Las alertas llegan a la cuenta técnica externa (DEC-017: los 8 eventos listados arriba están cubiertos y activos en producción desde el 30/07/2026 — el nativo desde la Fase 9, los 7 restantes vía `codigo/alertas.gs`, probados con corrida real en el proyecto de prueba y verificados en el proyecto real con un envío real confirmado. Ver `auditoria/CHANGELOG.md` y `auditoria/DECISIONES.md`).
 - [ ] El volumen de revisión manual es razonable.
 - [ ] El sistema permanece estable durante siete días.
 

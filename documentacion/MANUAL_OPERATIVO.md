@@ -65,15 +65,15 @@ El plan v3 exige 8 eventos de alerta hacia una **cuenta técnica externa** (nunc
 | # | Evento | Estado (30/07/2026) | Qué hacer si llega |
 |---|---|---|---|
 | 1 | Runtime terminado inesperadamente | **Activo en producción.** Notificación nativa de Apps Script, reenviada por filtro de Gmail hacia `carlosrubenbageta@alia-data.com` (probada con una falla real, 28/07/2026 — `auditoria/CHANGELOG.md`) | Abrir Apps Script → Ejecuciones, ubicar la corrida fallida, leer el stack trace. |
-| 2 | Error crítico | Código escrito y **probado** (`codigo/alertas.gs`, `pruebas/CASOS_DE_PRUEBA_ALERTAS_FASE10.md` CA-05), **sin desplegar al proyecto real todavía** | — |
-| 3 | Tres fallos consecutivos | ídem (CA-06) | — |
-| 4 | Aumento anormal de revisión manual | ídem (CA-03) | — |
-| 5 | Clave API ausente | ídem (CA-01) | — |
-| 6 | Falta de permisos | ídem (CA-04) | — |
-| 7 | Fallo de escritura | ídem (CA-03) | — |
-| 8 | Hoja inexistente | ídem (CA-02, CA-03) | — |
+| 2 | Error crítico | **Activo en producción** (`codigo/alertas.gs`, probado — CA-05 — y desplegado 30/07/2026) | Abrir `Log Mensajes` o Ejecuciones para el detalle; revisar `validarConfiguracion()` si el correo indica un problema de configuración. |
+| 3 | Tres fallos consecutivos | ídem (CA-06) | Señal de un problema sostenido, no un blip — revisar Ejecuciones de las últimas corridas. |
+| 4 | Aumento anormal de revisión manual | ídem (CA-03) | Revisar `Log Mensajes` filtrando `estado=REVISION_MANUAL` de esa ejecución. |
+| 5 | Clave API ausente | ídem (CA-01) | Revisar/restaurar `OPENAI_API_KEY` en Propiedades del script. |
+| 6 | Falta de permisos | ídem (CA-04) | Revisar `SPREADSHEET_ID`, permisos de la cuenta operativa, o el ID de etiqueta si el error menciona Gmail. |
+| 7 | Fallo de escritura | ídem (CA-03) | Revisar que la hoja de destino exista y no esté protegida contra la cuenta operativa. |
+| 8 | Hoja inexistente | ídem (CA-02, CA-03) | Confirmar el nombre exacto de la hoja (técnica o de negocio) mencionada en el correo. |
 
-**Los eventos 2 a 8 están probados (los 7 casos de `pruebas/CASOS_DE_PRUEBA_ALERTAS_FASE10.md`, Aprobados el 30/07/2026, corrida real en el proyecto de prueba) pero NO activos en producción todavía** — `codigo/alertas.gs` no se copió al proyecto Apps Script real; falta esa acción, con aprobación explícita, antes de que estos 7 eventos alerten de verdad. Hasta entonces, la única red de contención real para esos 7 eventos sigue siendo la revisión manual de esta sección 4. Cuando se desplieguen: todas mandan un correo con asunto `[Automatización Aliadata] ...` a `CUENTA_ALERTAS`, con un cooldown de `COOLDOWN_ALERTAS_MIN` (default 60 min, confirmado funcionando en CA-07) por tipo de evento para no saturar la bandeja si el problema persiste.
+**Los 8 eventos están activos en producción desde el 30/07/2026** (7 nuevos vía `codigo/alertas.gs`, probados en el proyecto de prueba — `pruebas/CASOS_DE_PRUEBA_ALERTAS_FASE10.md` — y verificados con un envío real en el proyecto real). Todas mandan un correo con asunto `[Automatización Aliadata] ...` a `CUENTA_ALERTAS`, con un cooldown de `COOLDOWN_ALERTAS_MIN` (60 min en producción) por tipo de evento para no saturar la bandeja si el problema persiste.
 
 `CUENTA_ALERTAS` es hoy `carlosrubenbageta@alia-data.com` — **uso temporal**, según quedó registrado en DEC-017 (`auditoria/DECISIONES.md`).
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026-07-30] — `codigo/alertas.gs` desplegado y verificado en el proyecto real: DEC-017 cerrada del todo
+
+### Corrida real (Carlos Rubén Bageta, proyecto Apps Script real, logueado como `tareas@alia-data.com`)
+
+Con los 7 casos de prueba ya Aprobados (entrada anterior del mismo día), desplegado `codigo/alertas.gs` al proyecto real:
+
+1. Copiado `alertas.gs` (10º archivo) y vuelto a copiar `script_refactorizado.gs`, `recuperacion.gs` y `escritura_sheets.gs` (los 3 que integran las llamadas nuevas) — con el aprendizaje de CA-01 explícito de antemano, sin repetir ese error acá.
+2. Creadas las 3 propiedades opcionales con los valores recomendados (iguales al default del código, por consistencia con el resto del proyecto de tener todo explícito): `COOLDOWN_ALERTAS_MIN=60`, `UMBRAL_FALLOS_CONSECUTIVOS=3`, `UMBRAL_REVISION_MANUAL_ALERTA=3`. `CUENTA_ALERTAS` ya existía desde DEC-017 original, sin cambios.
+3. **Verificación real, logueado como `tareas@alia-data.com`** (no con la cuenta personal — la identidad que corre el activador de verdad): `procesarCorreosDeTareas()` corrió limpio (22:33:29–22:33:35, `0 mensajes elegibles, procesando 0`) — confirma que los 4 archivos cargan sin error de sintaxis y que la configuración sigue válida.
+4. **Autorización nueva confirmada:** al ejecutar `enviarAlertaTecnica()` directo, Google pidió el permiso "Enviar correo electrónico en tu nombre" (scope nuevo, esperado — `GmailApp.sendEmail()` no se usaba antes en este proyecto). Aceptado. Log: `enviarAlertaTecnica(): alerta "undefined" enviada a carlosrubenbageta@alia-data.com.` (22:35:48–22:35:52). Correo real confirmado en la bandeja (`[Automatización Aliadata] undefined`, 22:35, tras descartar una vista de Gmail sin refrescar).
+
+### Estado
+
+**DEC-017 queda cerrada del todo.** Los 8 eventos de alerta de la Fase 10 están activos en producción: el nativo (runtime terminado inesperadamente, Fase 9) y los 7 de `alertas.gs` (verificados en el proyecto real recién, no solo en el de prueba). Criterio de aceptación de la Fase 10 "Las alertas llegan a la cuenta técnica externa" marcado cumplido en `PLAN_IMPLEMENTACION_AUTOMATIZACION_TAREAS_ALIADATA_v3.md`. `documentacion/MANUAL_OPERATIVO.md` y `auditoria/DECISIONES.md` actualizados.
+
+### No accedido
+
+Se accedió y modificó el proyecto Apps Script real por primera vez desde el corte de la Fase 9 (30/07/2026) — sin tocar Gmail de negocio real más allá del correo de prueba de verificación (a `carlosrubenbageta@alia-data.com`, nunca a un contacto real) ni la planilla maestra real.
+
+---
+
 ## [2026-07-30] — Los 7 casos de prueba de `codigo/alertas.gs` (DEC-017), Aprobados con corrida real
 
 ### Corrida real (Carlos Rubén Bageta, proyecto de prueba de la Fase 8)
