@@ -1,5 +1,28 @@
 # Changelog
 
+## [2026-07-30] — Los 7 casos de prueba de `codigo/alertas.gs` (DEC-017), Aprobados con corrida real
+
+### Corrida real (Carlos Rubén Bageta, proyecto de prueba de la Fase 8)
+
+Ejecutados los 7 casos de `pruebas/CASOS_DE_PRUEBA_ALERTAS_FASE10.md` (CA-01 a CA-07), cubriendo los 7 eventos de alerta que `codigo/alertas.gs` había agregado sin probar todavía (ver entrada anterior del mismo día). **Los 7, Aprobados con log real y correo real confirmado.** Detalle completo de cada uno, con logs y evidencia, en ese mismo documento — no se repite acá.
+
+### Hallazgos reales, sin relación con la lógica de `alertas.gs` en sí, descubiertos en el camino
+
+- **CA-01, primer intento:** el proyecto de prueba tenía `alertas.gs` copiado pero `script_refactorizado.gs`/`recuperacion.gs`/`escritura_sheets.gs` en una versión anterior a esta sesión (del ensayo de reversión del 28/07/2026) — sin las llamadas nuevas. Silencioso, sin error, porque el código viejo es válido por sí mismo. Corregido volviendo a copiar los 3 archivos.
+- **CA-03:** `PERMITIR_ETIQUETADO=true` en el proyecto de prueba (debía ser `false` según `configuracion/PARAMETROS_EJEMPLO.md`), apuntando a un ID de etiqueta desactualizado — causó un error real de Gmail (`labelId not found`) sin relación con `alertas.gs`, que impidió el cierre normal de un mensaje. Corregido `PERMITIR_ETIQUETADO=false`. Una ejecución además se canceló (`Execution cancelled`, ~196s) al recargarse la página del editor durante una corrida manual en curso — lección operativa, no un bug: una ejecución manual (a diferencia de un activador automático) puede depender de la pestaña que la inició.
+- **CA-04:** Carlos Rubén Bageta pegó por error el ID productivo real (`SPREADSHEET_ID`, `1BS9CpCWWxdYQZYHMzvaiK-yFEoWR6ViVSWdK3Sb6N5g`) en `SPREADSHEET_ID_PRUEBA` y ejecutó así. La salvaguarda CP-27 de `validarConfiguracion()` (verificada línea por línea en el código real del proyecto de prueba: presente y correcta) no se disparó en esa corrida puntual — la ejecución llegó a `"0 mensajes elegibles, procesando 0"` contra lo que habría sido la planilla productiva real. **Sin impacto:** no había ningún mensaje elegible en ese momento, no se leyó ni escribió nada más. Causa exacta no reconstruible (valor ya sobrescrito); la hipótesis más probable es una diferencia mínima en el valor pegado, no una falla del código. Corregido restaurando el ID de prueba real.
+- **CA-05, diseño original descartado:** un `OPENAI_MODEL` inválido no genera una excepción sin controlar — `consultarIAExtractora()` ya captura el fallo de OpenAI y lo manda a `REVISION_MANUAL` (comportamiento preexistente, no de esta sesión). Rediseñado el caso para usar `OPENAI_MODEL` **ausente** (dispara el `ERROR_CRITICO` genérico de `validarConfiguracion()` en cambio), más simple y sin necesitar correo real.
+
+### Estado
+
+`codigo/alertas.gs` queda **probado y aprobado, todavía sin desplegar al proyecto real** — el despliegue es una decisión y una acción aparte, con aprobación explícita, no asumida por esta corrida de pruebas. `documentacion/MANUAL_OPERATIVO.md` (tabla de eventos de alerta) y `auditoria/DECISIONES.md` (DEC-017) actualizados para reflejar "probado" en vez de "sin desplegar ni probar".
+
+### No accedido
+
+No se accedió al proyecto Apps Script real ni a la planilla maestra real en ningún momento — todas las corridas fueron en el proyecto y la planilla de prueba de la Fase 8. El incidente de CA-04 usó el *ID* de la planilla real dentro del proyecto de *prueba*, sin que la planilla real llegara a leerse ni escribirse (ver detalle arriba).
+
+---
+
 ## [2026-07-30] — Entregable de Fase 10: `documentacion/MANUAL_OPERATIVO.md`
 
 Primer entregable formal de la Fase 10 (plan v3, sección "Fase 10 → Entregables"). Documenta el sistema tal como corre hoy en producción: qué hace, dónde está todo (IDs reales, hojas, propiedades), glosario completo de `estado`/`etapa` de `Log Mensajes`, cómo hacer la revisión diaria, catálogo de las 8 alertas de DEC-017 con su estado real (deja explícito que los eventos 2-8 tienen código escrito pero no desplegado ni probado — ver entrada siguiente), la anomalía de la ejecución trabada del 30/07/2026 sin resolver, y un resumen operativo del protocolo de reversión con puntero a `PROCEDIMIENTO_REVERSION.md`. No requirió acceso a Gmail, Sheets, Drive ni Apps Script real — trabajo documental sobre hechos ya registrados en este mismo `CHANGELOG.md` y en `auditoria/DECISIONES.md`.
