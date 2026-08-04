@@ -1,5 +1,40 @@
 # Changelog
 
+## [2026-08-04] — Retomando Fase 10 tras un bache por enfermedad: ejecución fantasma y contaminación de datos de prueba, ambas resueltas
+
+### Contexto
+
+Carlos Rubén Bageta se enfermó y no pudo darle seguimiento diario a la Fase 10 desde la noche del 30/07/2026. Antes de retomar el informe de estabilización, se hizo un repaso real de lo sucedido en el bache (Apps Script → Ejecuciones, `Log Mensajes` real, bandeja de alertas) en vez de asumir que todo estuvo bien.
+
+### Hallazgo 1 — Ejecución fantasma en el panel de Ejecuciones, sin impacto real
+
+Una ejecución iniciada el 31/07/2026 a las 12:23:43 figuraba "En ejecución" con una duración de más de 373.000 segundos (más de 4 días) — imposible para una ejecución real (límite duro de Apps Script: 30 minutos como máximo en cuentas de Workspace). Sin ningún registro de Cloud disponible para esa ejecución puntual.
+
+**Confirmado sin impacto real**, cruzando contra `Log Mensajes` real: filas con `estado=PROCESADO`/`REVISION_MANUAL` de gente real (Daniel Sevilla, Carlos Rubén Bageta) todos los días entre el 31/07 y el 04/08/2026, incluida una fila del mismo 04/08 con 14 tareas de un solo correo. Las ejecuciones inmediatamente antes y después de la fantasma (11:21 a 13:21 del 31/07) también `Completada`, duración normal. Conclusión: el proceso real murió al chocar con el límite de tiempo de la plataforma poco después de empezar — el panel de Ejecuciones simplemente nunca actualizó el estado de ese registro puntual. El candado (`LockService`) no quedó tomado en ningún momento; el pipeline procesó correo real sin cortes durante todo el bache.
+
+**Resuelto:** usada la opción "Finalizar" del menú de esa fila en Ejecuciones — pasó a `Cancelada`. Acción cosmética sobre el panel, no interrumpió ningún proceso real (ya confirmado que no había ninguno corriendo).
+
+### Hallazgo 2 — Correos de prueba de `alertas.gs` (30/07/2026) también procesados por el pipeline real
+
+Al revisar `Log Mensajes` real se encontraron 2 filas del 30/07/2026 correspondientes a correos sintéticos de la ronda de pruebas de `codigo/alertas.gs` (CA-03 y CA-05, ver entradas del 30/07/2026) — enviados a `tareas@alia-data.com` para que los procesara el **proyecto de prueba**, pero el **pipeline productivo real** los tomó también. Causa: la búsqueda de producción es `in:inbox`, sin ningún filtro de etiqueta — a diferencia del modo prueba (`GMAIL_QUERY_PRUEBA=in:inbox label:Pruebas-Automatizacion`), cualquier correo que llegue a la bandeja real de `tareas@alia-data.com` lo procesa el pipeline real también, sin importar la etiqueta.
+
+- Correo de CA-05 ("Prueba de reversion"): `SIN_TAREAS`, sin impacto.
+- Correo de CA-03 ("[PRUEBA-AUTOMATIZACION] Servidor de facturación caído"): `PROCESADO`, 1 tarea escrita de verdad en `Desarrollo IT` (fila 10, "Revisar el servidor de facturación caído") — dato de prueba mezclado con datos de negocio reales.
+
+**Resuelto**, con el mismo mecanismo formal usado en el saneamiento de la Fase 9 (A.4): copiada la fila a `Registros descartados` (`discard_batch_id=DESCARTE-20260804-01`, `hoja_origen=Desarrollo IT`, `fila_origen_previa=10`, motivo: correo de prueba de alertas, no una tarea real, responsable Carlos Rubén Bageta, 04/08/2026). El contenido de la fila 10 de `Desarrollo IT` se **vació, sin eliminar la fila** — decisión explícita de Carlos Rubén Bageta para no correr una posición hacia arriba el `fila_destino` que `Registro Tareas` tiene guardado para las tareas reales de filas posteriores (ese campo es histórico/de auditoría, ningún código lo vuelve a leer para actuar, así que dejarlo con un leve desfasaje no tiene impacto funcional — se prefirió evitarlo de todos modos). La fila correspondiente en `Registro Tareas` se dejó sin tocar.
+
+**Lección para rondas de prueba futuras:** cualquier correo de prueba enviado a la bandeja real de `tareas@alia-data.com` corre el mismo riesgo — el filtro de etiqueta de prueba no aísla nada del lado del pipeline productivo.
+
+### Estado
+
+Fase 10 puede retomarse: sin hallazgos que bloqueen, ambos resueltos con evidencia real. Sigue el informe de estabilización.
+
+### No accedido
+
+Se accedió y modificó la planilla maestra real (`Registros descartados`, `Desarrollo IT`) y el proyecto Apps Script real (panel de Ejecuciones) — sin tocar Gmail real ni OpenAI en esta entrada.
+
+---
+
 ## [2026-07-30] — `codigo/alertas.gs` desplegado y verificado en el proyecto real: DEC-017 cerrada del todo
 
 ### Corrida real (Carlos Rubén Bageta, proyecto Apps Script real, logueado como `tareas@alia-data.com`)
